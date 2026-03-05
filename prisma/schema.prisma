@@ -20,6 +20,8 @@ model User {
   evidenceItems EvidenceItem[]
   generatedProfiles GeneratedProfile[]
   publicPageSettings PublicPageSettings?
+  automations   Automation[]
+  agentArtifacts AgentArtifact[]
 }
 
 model UserProfile {
@@ -76,4 +78,34 @@ model PublicPageSettings {
   theme     String   @default("paper")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Automation {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  action      String   // "recrawl_url" | "regenerate_profile" | "refresh_timeline" | "refresh_video_script"
+  config      Json     // action-specific config e.g. { url: "https://..." }
+  schedule    String   @default("weekly") // "daily" | "weekly" | "monthly"
+  enabled     Boolean  @default(true)
+  lastRun     DateTime?
+  nextRun     DateTime?
+  lastStatus  String?  // "success" | "error" | "running"
+  lastError   String?
+  runCount    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AgentArtifact {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tool      String   // "timeline" | "video_script" | "tree" | "chat"
+  style     String?  // e.g. "documentary" | "minimal" | "cinematic" for video; "vertical" | "horizontal" | "radial" for tree
+  input     String?  @db.Text
+  output    Json
+  createdAt DateTime @default(now())
 }
