@@ -6,3 +6,4 @@ node_modules/
 dist/
 prisma/migrations/
 src/generated/
+tsconfig.tsbuildinfo
