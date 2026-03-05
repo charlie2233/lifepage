@@ -2,9 +2,22 @@ import OpenAI from "openai";
 import { ProfileJSONSchema, type ProfileJSON } from "@/lib/schema";
 import { type CrawlResult } from "@/lib/crawler";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
+
+const PROFILE_JSON_TEMPLATE = `{
+  "headline": "string",
+  "about": "string",
+  "skills": [{"tag": "string", "level": "beginner|intermediate|advanced|expert", "evidenceRefs": []}],
+  "experiences": [{"role": "string", "org": "string", "startDate": "string|null", "endDate": "string|null", "bullets": ["string"], "evidenceRefs": []}],
+  "projects": [{"title": "string", "problem": "string|null", "approach": "string|null", "impact": "string|null", "tech": ["string"], "links": [{"label": "string", "url": "string"}], "media": [], "evidenceRefs": []}],
+  "achievements": [{"title": "string", "context": "string|null", "date": "string|null", "proof": "string|null"}],
+  "timeline": [{"year": "string", "milestones": ["string"]}],
+  "resume": {"summary": "string", "bullets": ["string"]},
+  "stats": {"projectsShipped": 0, "yearsBuilding": 0, "competitions": 0},
+  "confidence": 0.8
+}`;
 
 export async function generateProfileFromCrawl(
   crawlResults: CrawlResult[],
@@ -40,20 +53,9 @@ Generate a comprehensive profile JSON with these rules:
 10. For stats: estimate projectsShipped, yearsBuilding, competitions based on evidence
 
 Return ONLY valid JSON matching this exact structure:
-{
-  "headline": "string",
-  "about": "string",
-  "skills": [{"tag": "string", "level": "beginner|intermediate|advanced|expert", "evidenceRefs": []}],
-  "experiences": [{"role": "string", "org": "string", "startDate": "string|null", "endDate": "string|null", "bullets": ["string"], "evidenceRefs": []}],
-  "projects": [{"title": "string", "problem": "string|null", "approach": "string|null", "impact": "string|null", "tech": ["string"], "links": [{"label": "string", "url": "string"}], "media": [], "evidenceRefs": []}],
-  "achievements": [{"title": "string", "context": "string|null", "date": "string|null", "proof": "string|null"}],
-  "timeline": [{"year": "string", "milestones": ["string"]}],
-  "resume": {"summary": "string", "bullets": ["string"]},
-  "stats": {"projectsShipped": 0, "yearsBuilding": 0, "competitions": 0},
-  "confidence": 0.8
-}`;
+${PROFILE_JSON_TEMPLATE}`;
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
@@ -75,20 +77,9 @@ Text: ${text}
 User: ${JSON.stringify(userInfo)}
 
 Return ONLY valid JSON matching this exact structure:
-{
-  "headline": "string",
-  "about": "string",
-  "skills": [{"tag": "string", "level": "beginner|intermediate|advanced|expert", "evidenceRefs": []}],
-  "experiences": [{"role": "string", "org": "string", "startDate": null, "endDate": null, "bullets": ["string"], "evidenceRefs": []}],
-  "projects": [{"title": "string", "problem": null, "approach": null, "impact": null, "tech": [], "links": [], "media": [], "evidenceRefs": []}],
-  "achievements": [{"title": "string", "context": null, "date": null, "proof": null}],
-  "timeline": [{"year": "string", "milestones": ["string"]}],
-  "resume": {"summary": "string", "bullets": ["string"]},
-  "stats": {"projectsShipped": 0, "yearsBuilding": 0, "competitions": 0},
-  "confidence": 0.5
-}`;
+${PROFILE_JSON_TEMPLATE}`;
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },

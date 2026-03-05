@@ -72,6 +72,8 @@ export default function DashboardPage() {
   const [userInfo, setUserInfo] = useState({ name: "", bio: "", tags: "" });
   const [mode, setMode] = useState<"hiring" | "admissions">("hiring");
   const [isPublic, setIsPublic] = useState(true);
+  const [theme, setTheme] = useState<"obsidian" | "paper">("obsidian");
+  const [savingSettings, setSavingSettings] = useState(false);
   const [activeTab, setActiveTab] = useState<"crawl" | "profile" | "settings">(
     "crawl"
   );
@@ -81,13 +83,45 @@ export default function DashboardPage() {
   } | null>(null);
 
   const fetchData = useCallback(async () => {
-    const [ev, pr] = await Promise.all([
+    const [ev, pr, st] = await Promise.all([
       fetch("/api/evidence").then((r) => r.json() as Promise<ApiEvidenceResponse>),
       fetch("/api/profile").then((r) => r.json() as Promise<ApiProfileResponse>),
+      fetch("/api/settings").then((r) => r.json() as Promise<{ settings?: { isPublic: boolean; theme: string; mode: string } | null }>),
     ]);
     setEvidence(ev.items ?? []);
     if (pr.profile) setProfile(pr.profile);
+    if (st.settings) {
+      setIsPublic(st.settings.isPublic);
+      setTheme((st.settings.theme as "obsidian" | "paper") ?? "obsidian");
+      setMode((st.settings.mode as "hiring" | "admissions") ?? "hiring");
+    }
   }, []);
+
+  const saveSettings = async (patch: { isPublic?: boolean; theme?: string; mode?: string }) => {
+    setSavingSettings(true);
+    try {
+      await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      setMessage({ type: "success", text: "Settings saved." });
+    } catch {
+      setMessage({ type: "error", text: "Failed to save settings." });
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleSetPublic = (value: boolean) => {
+    setIsPublic(value);
+    saveSettings({ isPublic: value }).catch(() => {/* already handled inside saveSettings */});
+  };
+
+  const handleSetTheme = (value: "obsidian" | "paper") => {
+    setTheme(value);
+    saveSettings({ theme: value }).catch(() => {/* already handled inside saveSettings */});
+  };
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -191,6 +225,12 @@ export default function DashboardPage() {
             </Link>
           )}
           <span className="text-sm text-gray-400">{session?.user?.email}</span>
+          <Link
+            href="/explore"
+            className="text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            Explore
+          </Link>
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
             className="text-sm text-gray-500 hover:text-white"
@@ -666,71 +706,163 @@ export default function DashboardPage() {
         {/* SETTINGS TAB */}
         {activeTab === "settings" && (
           <div className="space-y-6">
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4">🔒 Privacy</h2>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Public Portfolio</p>
-                  <p className="text-sm text-gray-400">
-                    {isPublic
-                      ? "Your page is visible at /u/yourname"
-                      : "Your page is private"}
+
+            {/* ── Page Visibility — GitHub-style ── */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+              <div className="px-6 pt-6 pb-4">
+                <h2 className="text-lg font-semibold mb-1">Page Visibility</h2>
+                <p className="text-sm text-gray-400">
+                  Control who can see your portfolio — just like a GitHub repository.
+                </p>
+              </div>
+
+              {/* Public option */}
+              <button
+                onClick={() => handleSetPublic(true)}
+                className={`w-full flex items-start gap-4 px-6 py-4 text-left border-t border-white/10 transition-colors ${
+                  isPublic ? "bg-green-500/10" : "hover:bg-white/3"
+                }`}
+              >
+                <div className={`mt-0.5 w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${
+                  isPublic ? "bg-green-500/20 border border-green-500/30" : "bg-white/5 border border-white/10"
+                }`}>
+                  🌐
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Public</span>
+                    {isPublic && (
+                      <span className="text-xs bg-green-500/15 border border-green-500/30 text-green-400 px-2 py-0.5 rounded-full">
+                        Current
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Anyone can see your portfolio at{" "}
+                    <span className="text-[#00f5ff]">/u/{username}</span>. It will also appear in Explore.
                   </p>
                 </div>
-                <button
-                  onClick={() => setIsPublic(!isPublic)}
-                  className={`w-12 h-6 rounded-full transition-colors ${
-                    isPublic ? "bg-[#00f5ff]" : "bg-gray-700"
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 bg-white rounded-full transition-transform mx-0.5 ${
-                      isPublic ? "translate-x-6" : "translate-x-0"
-                    }`}
-                  />
-                </button>
+                <div className={`w-4 h-4 rounded-full border-2 mt-1 flex-shrink-0 flex items-center justify-center ${
+                  isPublic ? "border-green-500 bg-green-500" : "border-gray-600"
+                }`}>
+                  {isPublic && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                </div>
+              </button>
+
+              {/* Private option */}
+              <button
+                onClick={() => handleSetPublic(false)}
+                className={`w-full flex items-start gap-4 px-6 py-4 text-left border-t border-white/10 transition-colors ${
+                  !isPublic ? "bg-yellow-500/10" : "hover:bg-white/3"
+                }`}
+              >
+                <div className={`mt-0.5 w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${
+                  !isPublic ? "bg-yellow-500/20 border border-yellow-500/30" : "bg-white/5 border border-white/10"
+                }`}>
+                  🔒
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Private</span>
+                    {!isPublic && (
+                      <span className="text-xs bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 px-2 py-0.5 rounded-full">
+                        Current
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Only you can see this portfolio. It won&apos;t appear in Explore or public searches.
+                  </p>
+                </div>
+                <div className={`w-4 h-4 rounded-full border-2 mt-1 flex-shrink-0 flex items-center justify-center ${
+                  !isPublic ? "border-yellow-500 bg-yellow-500" : "border-gray-600"
+                }`}>
+                  {!isPublic && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                </div>
+              </button>
+
+              <div className="px-6 py-3 bg-white/2 border-t border-white/10">
+                <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                  {savingSettings ? (
+                    <><span className="w-1.5 h-1.5 rounded-full bg-[#00f5ff] animate-pulse" />Saving…</>
+                  ) : (
+                    <><span className="w-1.5 h-1.5 rounded-full bg-green-500" />Changes save instantly</>
+                  )}
+                </p>
               </div>
             </div>
 
+            {/* ── Theme ── */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4">🎨 Theme</h2>
+              <h2 className="text-lg font-semibold mb-1">🎨 Theme</h2>
+              <p className="text-sm text-gray-400 mb-4">Choose the look of your public portfolio page.</p>
               <div className="grid grid-cols-2 gap-4">
                 {[
                   {
-                    id: "obsidian",
+                    id: "obsidian" as const,
                     label: "Obsidian",
-                    desc: "Dark glass neon",
-                    cls: "bg-[#0d0d0d] border-[#00f5ff] text-white",
+                    desc: "Dark · Glass · Neon",
+                    preview: (
+                      <div className="h-20 rounded-lg bg-[#0d0d0d] border border-[#00f5ff]/30 p-3 mb-3">
+                        <div className="w-12 h-1.5 rounded bg-[#00f5ff]/60 mb-1.5" />
+                        <div className="w-20 h-1 rounded bg-white/20 mb-1" />
+                        <div className="w-16 h-1 rounded bg-white/10" />
+                        <div className="flex gap-1 mt-2">
+                          <div className="px-1.5 py-0.5 rounded bg-[#00f5ff]/15 border border-[#00f5ff]/20 text-[6px]">React</div>
+                          <div className="px-1.5 py-0.5 rounded bg-[#00f5ff]/15 border border-[#00f5ff]/20 text-[6px]">AI</div>
+                        </div>
+                      </div>
+                    ),
                   },
                   {
-                    id: "paper",
+                    id: "paper" as const,
                     label: "Paper",
-                    desc: "Clean editorial serif",
-                    cls: "bg-white border-blue-500 text-black",
+                    desc: "Light · Clean · Serif",
+                    preview: (
+                      <div className="h-20 rounded-lg bg-[#faf9f7] border border-gray-200 p-3 mb-3">
+                        <div className="w-12 h-1.5 rounded bg-blue-600/70 mb-1.5" />
+                        <div className="w-20 h-1 rounded bg-gray-300 mb-1" />
+                        <div className="w-16 h-1 rounded bg-gray-200" />
+                        <div className="flex gap-1 mt-2">
+                          <div className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-100 text-[6px] text-blue-600">React</div>
+                          <div className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-100 text-[6px] text-blue-600">AI</div>
+                        </div>
+                      </div>
+                    ),
                   },
                 ].map((t) => (
                   <button
                     key={t.id}
-                    className={`p-4 rounded-xl border-2 ${t.cls} text-left transition-all`}
+                    onClick={() => handleSetTheme(t.id)}
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${
+                      theme === t.id
+                        ? "border-[#00f5ff] bg-[#00f5ff]/5"
+                        : "border-white/10 hover:border-white/20 bg-white/3"
+                    }`}
                   >
-                    <div className="font-semibold">{t.label}</div>
-                    <div className="text-xs opacity-60 mt-1">{t.desc}</div>
+                    {t.preview}
+                    <div className="font-semibold text-sm">{t.label}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{t.desc}</div>
+                    {theme === t.id && (
+                      <div className="text-xs text-[#00f5ff] mt-1">✓ Active</div>
+                    )}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-2">⚠️ Danger Zone</h2>
+            {/* ── Danger Zone ── */}
+            <div className="bg-white/5 border border-red-500/20 rounded-2xl p-6">
+              <h2 className="text-lg font-semibold mb-1 text-red-400">⚠️ Danger Zone</h2>
               <p className="text-sm text-gray-400 mb-4">
-                Regenerate your profile from scratch.
+                Regenerate your entire profile from scratch using your existing evidence.
               </p>
               <button
                 onClick={handleGenerate}
                 disabled={generating}
-                className="border border-red-500/30 text-red-400 px-4 py-2 rounded-lg text-sm hover:bg-red-500/10"
+                className="border border-red-500/30 text-red-400 px-4 py-2 rounded-lg text-sm hover:bg-red-500/10 transition-colors disabled:opacity-50"
               >
-                🔄 Regenerate Profile
+                🔄 {generating ? "Regenerating…" : "Regenerate Profile"}
               </button>
             </div>
           </div>
