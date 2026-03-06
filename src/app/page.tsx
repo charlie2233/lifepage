@@ -210,15 +210,16 @@ function LandingPage() {
   return (
     <div className="lp-page overflow-hidden text-white">
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-32 left-[8%] h-[30rem] w-[30rem] rounded-full bg-[#79e5d2]/10 blur-[120px]" />
-        <div className="absolute right-[4%] top-[16%] h-[26rem] w-[26rem] rounded-full bg-[#8fa9ff]/12 blur-[120px]" />
-        <div className="absolute bottom-[6%] left-[38%] h-[20rem] w-[20rem] rounded-full bg-[#f3b276]/10 blur-[110px]" />
+        <div className="animate-orb-float absolute -top-32 left-[8%] h-[34rem] w-[34rem] rounded-full bg-[#79e5d2]/12 blur-[130px]" />
+        <div className="animate-orb-float-alt absolute right-[4%] top-[16%] h-[28rem] w-[28rem] rounded-full bg-[#8fa9ff]/14 blur-[120px]" />
+        <div className="animate-orb-float absolute bottom-[6%] left-[38%] h-[22rem] w-[22rem] rounded-full bg-[#f3b276]/12 blur-[110px]" style={{ animationDelay: "2s" }} />
+        <div className="animate-orb-float-alt absolute left-[60%] top-[55%] h-[18rem] w-[18rem] rounded-full bg-[#79e5d2]/6 blur-[100px]" style={{ animationDelay: "4s" }} />
       </div>
 
-      <nav className="relative z-10 border-b border-white/8 bg-[#091015]/70 backdrop-blur-2xl">
+      <nav className="relative z-10 border-b border-white/8 bg-[#091015]/75 backdrop-blur-2xl">
         <div className="lp-shell flex items-center justify-between py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[11px] font-black tracking-[0.24em] text-[#041117] shadow-[0_14px_40px_rgba(121,229,210,0.18)]">
+            <div className="animate-pulse-glow flex h-10 w-10 items-center justify-center rounded-2xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[11px] font-black tracking-[0.24em] text-[#041117]">
               LP
             </div>
             <div>
@@ -252,7 +253,7 @@ function LandingPage() {
             </Link>
             <Link
               href="/register"
-              className="lp-button-primary px-4 py-2 text-sm"
+              className="lp-button-primary btn-fancy px-4 py-2 text-sm"
             >
               Get Started
             </Link>
@@ -263,14 +264,17 @@ function LandingPage() {
       <section className="relative z-10">
         <div className="lp-shell grid gap-10 py-20 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)] lg:items-center lg:py-28">
           <div className="lp-fade-rise">
-            <div className="lp-chip px-4 py-2 text-sm">
-              <span className="h-2 w-2 rounded-full bg-[#79e5d2]" />
+            <div className="lp-chip animate-border-glow px-4 py-2 text-sm">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#79e5d2] opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#79e5d2]" />
+              </span>
               AI personal brand builder
             </div>
 
             <h1 className="brand-display mt-8 max-w-4xl text-[3.4rem] leading-[0.95] tracking-[-0.05em] text-[#f8f3ea] sm:text-[4.4rem] lg:text-[5.6rem]">
               Build your personal brand.
-              <span className="block text-transparent bg-[linear-gradient(120deg,#79e5d2_0%,#b9fff1_34%,#f3b276_100%)] bg-clip-text">
+              <span className="animate-gradient-text block bg-[linear-gradient(120deg,#79e5d2_0%,#b9fff1_30%,#8fa9ff_60%,#f3b276_100%)] bg-clip-text text-transparent">
                 Deploy it like a product.
               </span>
             </h1>
@@ -284,7 +288,7 @@ function LandingPage() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/register"
-                className="lp-button-primary px-7 py-3.5 text-base"
+                className="lp-button-primary btn-fancy px-7 py-3.5 text-base"
               >
                 Build my brand
                 <ArrowRight className="h-4 w-4" />
@@ -313,7 +317,7 @@ function LandingPage() {
           </div>
 
           <div className="relative lg:pl-6">
-            <div className="lp-panel rounded-[2rem] p-5 sm:p-6">
+            <div className="lp-panel glow-ring-teal rounded-[2rem] p-5 sm:p-6">
               <div className="grid gap-4">
                 <div className="rounded-[1.5rem] border border-white/10 bg-[rgba(255,255,255,0.035)] p-4">
                   <div className="flex items-center justify-between text-xs text-[#a9b6be]">
@@ -327,14 +331,14 @@ function LandingPage() {
                       { icon: Link2, label: "Import proof", copy: "Website, GitHub, YouTube, Google Sites" },
                       { icon: Bot, label: "Shape the story", copy: "AI turns evidence into projects, timeline, and resume" },
                       { icon: Globe, label: "Deploy anywhere", copy: "/u/yourname or your own domain with access controls" },
-                    ].map((item) => {
+                    ].map((item, i) => {
                       const Icon = item.icon;
                       return (
                         <div
                           key={item.label}
-                          className="flex items-start gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-3"
+                          className={`card-hover flex items-start gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-3 stagger-${i + 1} lp-fade-rise`}
                         >
-                          <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl border border-[#79e5d2]/15 bg-[#79e5d2]/10">
+                          <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl border border-[#79e5d2]/20 bg-[#79e5d2]/12">
                             <Icon className="h-4 w-4 text-[#79e5d2]" />
                           </div>
                           <div>
@@ -466,21 +470,21 @@ function LandingPage() {
             {DEMO_PROFILES.map((p, index) => (
               <div
                 key={p.username}
-                className={`lp-panel group rounded-[1.75rem] ${
+                className={`lp-panel card-hover group rounded-[1.75rem] ${
                   index === 0 ? "lg:row-span-2" : ""
                 }`}
               >
                 <div className="relative h-full p-5 sm:p-6">
                   <div
                     aria-hidden
-                    className={`absolute inset-x-0 top-0 h-40 bg-gradient-to-br ${p.gradient} opacity-70`}
+                    className={`absolute inset-x-0 top-0 h-48 bg-gradient-to-br ${p.gradient} opacity-80 transition-opacity duration-300 group-hover:opacity-100`}
                   />
                   <div className="relative flex h-full flex-col">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <div
-                          className="flex h-11 w-11 items-center justify-center rounded-2xl text-base font-bold text-[#081116]"
-                          style={{ backgroundColor: p.accent }}
+                          className="flex h-11 w-11 items-center justify-center rounded-2xl text-base font-bold text-[#081116] shadow-lg"
+                          style={{ backgroundColor: p.accent, boxShadow: `0 8px 24px ${p.accent}40` }}
                         >
                           {p.name[0]}
                         </div>
@@ -494,7 +498,7 @@ function LandingPage() {
                       <span
                         className={`rounded-full border px-3 py-1 text-xs ${
                           p.isPublic
-                            ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
+                            ? "border-emerald-400/30 bg-emerald-400/12 text-emerald-200"
                             : "border-white/10 bg-white/5 text-[#95a2ac]"
                         }`}
                       >
@@ -522,7 +526,7 @@ function LandingPage() {
                       {p.skills.map((skill) => (
                         <span
                           key={skill}
-                          className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-[#d0d8de]"
+                          className="animate-tag-pop rounded-full border border-white/12 bg-black/25 px-3 py-1.5 text-xs text-[#d0d8de] transition-colors hover:border-white/25 hover:text-white"
                         >
                           {skill}
                         </span>
@@ -531,13 +535,13 @@ function LandingPage() {
 
                     <div className="mt-6 grid grid-cols-2 gap-3">
                       <div className="lp-stat-tile p-4">
-                        <p className="text-2xl font-semibold text-[#f7f1e8]">
+                        <p className="stat-number text-2xl font-semibold text-[#f7f1e8]">
                           {p.stats.projects}
                         </p>
                         <p className="mt-1 text-xs text-[#8e9ca6]">Projects</p>
                       </div>
                       <div className="lp-stat-tile p-4">
-                        <p className="text-2xl font-semibold text-[#f7f1e8]">
+                        <p className="stat-number text-2xl font-semibold text-[#f7f1e8]">
                           {p.stats.years}
                         </p>
                         <p className="mt-1 text-xs text-[#8e9ca6]">
@@ -550,7 +554,7 @@ function LandingPage() {
                       {p.isPublic ? (
                         <Link
                           href={`/u/${p.username}`}
-                          className="inline-flex items-center gap-2 text-sm font-medium text-[#f7f1e8] hover:text-[#79e5d2]"
+                          className="inline-flex items-center gap-2 text-sm font-medium text-[#f7f1e8] transition-colors hover:text-[#79e5d2]"
                         >
                           View portfolio
                           <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -570,10 +574,10 @@ function LandingPage() {
           <div className="mt-8">
             <Link
               href="/explore"
-              className="inline-flex items-center gap-2 text-sm text-[#79e5d2] hover:text-[#cffff6]"
+              className="group inline-flex items-center gap-2 text-sm text-[#79e5d2] transition-colors hover:text-[#cffff6]"
             >
               Browse all public portfolios
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
           </div>
         </div>
@@ -598,18 +602,19 @@ function LandingPage() {
             {HOW_IT_WORKS.map((item, i) => {
               const Icon = item.icon;
               return (
-                <div key={item.step} className="lp-panel rounded-[1.75rem] p-6">
+                <div key={item.step} className={`lp-panel card-hover rounded-[1.75rem] p-6 stagger-${i + 1} lp-fade-rise`}>
                   <div className="flex items-center justify-between">
                     <div
                       className="flex h-12 w-12 items-center justify-center rounded-2xl"
                       style={{
                         background: `${item.color}18`,
-                        border: `1px solid ${item.color}28`,
+                        border: `1px solid ${item.color}30`,
+                        boxShadow: `0 8px 24px ${item.color}20`,
                       }}
                     >
                       <Icon className="h-5 w-5" style={{ color: item.color }} />
                     </div>
-                    <span className="lp-kicker text-[11px]" style={{ color: item.color }}>
+                    <span className="lp-kicker text-[13px] font-black opacity-25" style={{ color: item.color }}>
                       {item.step}
                     </span>
                   </div>
@@ -645,15 +650,15 @@ function LandingPage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            {WHO_ITS_FOR.map((group) => {
+            {WHO_ITS_FOR.map((group, i) => {
               const Icon = group.icon;
               return (
                 <div
                   key={group.title}
-                  className="lp-panel rounded-[1.75rem] p-6"
+                  className={`lp-panel card-hover rounded-[1.75rem] p-6 stagger-${i + 1} lp-fade-rise`}
                 >
                   <div className="flex items-start gap-4">
-                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-[#79e5d2]/20 bg-[#79e5d2]/8">
                       <Icon className="h-5 w-5 text-[#79e5d2]" />
                     </div>
                     <div>
@@ -688,11 +693,11 @@ function LandingPage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {FEATURES.map((feature) => {
+            {FEATURES.map((feature, i) => {
               const Icon = feature.icon;
               return (
-                <div key={feature.title} className="lp-panel rounded-[1.5rem] p-5">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                <div key={feature.title} className={`lp-panel card-hover rounded-[1.5rem] p-5 stagger-${(i % 6) + 1} lp-fade-rise`}>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#79e5d2]/20 bg-[#79e5d2]/8">
                     <Icon className="h-5 w-5 text-[#79e5d2]" />
                   </div>
                   <h3 className="mt-5 text-lg font-semibold text-[#f7f1e8]">
@@ -727,9 +732,9 @@ function LandingPage() {
             {PRICING.map((tier) => (
               <div
                 key={tier.name}
-                className={`lp-panel rounded-[1.75rem] p-6 ${
+                className={`lp-panel card-hover rounded-[1.75rem] p-6 ${
                   tier.name === "Plus"
-                    ? "border-[#79e5d2]/30 bg-[linear-gradient(180deg,rgba(121,229,210,0.12),rgba(255,255,255,0.03))]"
+                    ? "animate-pulse-glow border-[#79e5d2]/35 bg-[linear-gradient(180deg,rgba(121,229,210,0.14),rgba(255,255,255,0.03))]"
                     : ""
                 }`}
               >
@@ -745,7 +750,11 @@ function LandingPage() {
                       </span>
                     </p>
                   </div>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#cbd3d9]">
+                  <span className={`rounded-full border px-3 py-1 text-xs ${
+                    tier.name === "Plus"
+                      ? "border-[#79e5d2]/35 bg-[#79e5d2]/12 text-[#79e5d2]"
+                      : "border-white/10 bg-white/5 text-[#cbd3d9]"
+                  }`}>
                     {tier.badge}
                   </span>
                 </div>
@@ -763,7 +772,7 @@ function LandingPage() {
 
       <section className="relative z-10 pb-20 pt-6">
         <div className="lp-shell">
-          <div className="lp-panel rounded-[2rem] px-6 py-10 text-center sm:px-10 sm:py-12">
+          <div className="lp-panel glow-ring-teal rounded-[2rem] px-6 py-10 text-center sm:px-10 sm:py-12">
             <p className="lp-kicker text-xs text-[#79e5d2]">Launch</p>
             <h2 className="brand-display mt-4 text-4xl tracking-tight text-[#f8f3ea] md:text-5xl">
               Ready to launch your brand?
@@ -775,7 +784,7 @@ function LandingPage() {
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Link
                 href="/register"
-                className="lp-button-primary px-8 py-3.5 text-base"
+                className="lp-button-primary btn-fancy px-8 py-3.5 text-base"
               >
                 Build my brand
                 <ArrowRight className="h-4 w-4" />

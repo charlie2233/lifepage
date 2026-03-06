@@ -14,6 +14,9 @@
   --accent-strong: #cffff6;
   --accent-warm: #f3b276;
   --accent-ink: #8fa9ff;
+  --glow-teal: rgba(121, 229, 210, 0.35);
+  --glow-ink: rgba(143, 169, 255, 0.35);
+  --glow-warm: rgba(243, 178, 118, 0.35);
 }
 
 @theme inline {
@@ -46,6 +49,7 @@ body {
     radial-gradient(circle at 50% 78%, rgba(243, 178, 118, 0.1), transparent 24%),
     linear-gradient(180deg, #091015 0%, #0d1318 52%, #111618 100%);
   line-height: 1.45;
+  overflow-x: hidden;
 }
 
 a,
@@ -114,6 +118,7 @@ select {
     0 26px 80px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.07);
   backdrop-filter: blur(18px);
+  transition: border-color 240ms ease, box-shadow 240ms ease, transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .lp-panel::after {
@@ -147,11 +152,35 @@ select {
   color: #041117;
   font-weight: 700;
   box-shadow: 0 18px 40px rgba(121, 229, 210, 0.18);
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 200ms ease;
+}
+
+.lp-button-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  background-position: -200% center;
+}
+
+.lp-button-primary:hover::after {
+  background-position: 200% center;
+  transition: background-position 500ms ease;
 }
 
 .lp-button-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 22px 48px rgba(121, 229, 210, 0.24);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 24px 56px rgba(121, 229, 210, 0.32), 0 0 0 1px rgba(121, 229, 210, 0.3);
 }
 
 .lp-button-secondary {
@@ -163,12 +192,18 @@ select {
   border: 1px solid var(--line-strong);
   background: rgba(255, 255, 255, 0.03);
   color: var(--foreground);
+  transition:
+    transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 200ms ease,
+    border-color 200ms ease,
+    background-color 200ms ease;
 }
 
 .lp-button-secondary:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(121, 229, 210, 0.28);
+  transform: translateY(-2px) scale(1.02);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(121, 229, 210, 0.35);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
 }
 
 .lp-button-ghost {
@@ -257,4 +292,275 @@ select {
 
 .animate-fade-in {
   animation: fadeIn 0.6s ease-out forwards;
+}
+
+/* ── Floating orb animation ── */
+@keyframes orbFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-28px) scale(1.04); }
+}
+
+@keyframes orbFloatAlt {
+  0%, 100% { transform: translateY(0) translateX(0) scale(1); }
+  33% { transform: translateY(-18px) translateX(12px) scale(1.02); }
+  66% { transform: translateY(10px) translateX(-8px) scale(0.98); }
+}
+
+.animate-orb-float {
+  animation: orbFloat 7s ease-in-out infinite;
+}
+
+.animate-orb-float-alt {
+  animation: orbFloatAlt 9s ease-in-out infinite;
+}
+
+/* ── Shimmer effect ── */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2.4s linear infinite;
+}
+
+/* ── Gradient text animation ── */
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient-text {
+  background-size: 200% 200%;
+  animation: gradientShift 5s ease infinite;
+}
+
+/* ── Pulse glow ── */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(121, 229, 210, 0.18), 0 0 60px rgba(121, 229, 210, 0.06); }
+  50% { box-shadow: 0 0 36px rgba(121, 229, 210, 0.36), 0 0 90px rgba(121, 229, 210, 0.14); }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3.2s ease-in-out infinite;
+}
+
+/* ── Spin slow ── */
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spinSlow 18s linear infinite;
+}
+
+/* ── Border gradient animation ── */
+@keyframes borderGlow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.animate-border-glow {
+  animation: borderGlow 2.8s ease-in-out infinite;
+}
+
+/* ── Staggered fade-rise for list items ── */
+.stagger-1 { animation-delay: 80ms; }
+.stagger-2 { animation-delay: 160ms; }
+.stagger-3 { animation-delay: 240ms; }
+.stagger-4 { animation-delay: 320ms; }
+.stagger-5 { animation-delay: 400ms; }
+.stagger-6 { animation-delay: 480ms; }
+
+/* ── Hover lift card ── */
+.card-hover {
+  transition: transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 240ms ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px) scale(1.008);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(121, 229, 210, 0.12);
+}
+
+/* ── Glow text ── */
+.text-glow-teal {
+  text-shadow: 0 0 20px rgba(121, 229, 210, 0.55);
+}
+
+.text-glow-ink {
+  text-shadow: 0 0 20px rgba(143, 169, 255, 0.55);
+}
+
+/* ── Glass strong ── */
+.glass-strong {
+  background: rgba(10, 18, 24, 0.72);
+  backdrop-filter: blur(28px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ── Gradient border ── */
+.gradient-border {
+  position: relative;
+}
+
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(121, 229, 210, 0.5), rgba(143, 169, 255, 0.3), rgba(243, 178, 118, 0.4));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ── Neon line separator ── */
+.neon-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(121, 229, 210, 0.4), rgba(143, 169, 255, 0.3), transparent);
+}
+
+/* ── Input glow on focus ── */
+.input-fancy {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  outline: none;
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    background-color 200ms ease;
+}
+
+.input-fancy::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.input-fancy:focus {
+  border-color: rgba(121, 229, 210, 0.55);
+  background: rgba(121, 229, 210, 0.04);
+  box-shadow: 0 0 0 3px rgba(121, 229, 210, 0.1), inset 0 1px 0 rgba(121, 229, 210, 0.08);
+}
+
+/* ── Fancy button ── */
+.btn-fancy {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-fancy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  background-position: -200% center;
+  transition: background-position 0ms;
+}
+
+.btn-fancy:hover::after {
+  background-position: 200% center;
+  transition: background-position 480ms ease;
+}
+
+/* ── Dot grid noise overlay ── */
+.noise-overlay {
+  position: relative;
+}
+
+.noise-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+}
+
+/* ── Typing cursor blink ── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.cursor-blink {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: currentColor;
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+
+/* ── Tag pop animation ── */
+@keyframes tagPop {
+  from { opacity: 0; transform: scale(0.85) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-tag-pop {
+  animation: tagPop 280ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ── Glow ring around important elements ── */
+.glow-ring-teal {
+  box-shadow:
+    0 0 0 1px rgba(121, 229, 210, 0.2),
+    0 0 24px rgba(121, 229, 210, 0.12),
+    0 0 60px rgba(121, 229, 210, 0.06);
+}
+
+.glow-ring-ink {
+  box-shadow:
+    0 0 0 1px rgba(143, 169, 255, 0.2),
+    0 0 24px rgba(143, 169, 255, 0.12),
+    0 0 60px rgba(143, 169, 255, 0.06);
+}
+
+/* ── Stat number count-up feel ── */
+.stat-number {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ── Scrollbar styling ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(121, 229, 210, 0.2);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(121, 229, 210, 0.4);
 }
