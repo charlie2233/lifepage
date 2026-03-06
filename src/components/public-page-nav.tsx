@@ -51,10 +51,11 @@ export function PublicPageNav({
       <div className="lp-shell flex items-center justify-between py-5">
         <Link href="/" className="flex items-center gap-3">
           <div
-            className="flex h-10 w-10 items-center justify-center rounded-2xl text-[11px] font-black tracking-[0.24em]"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl text-[11px] font-black tracking-[0.24em] shadow-lg transition-transform hover:scale-105"
             style={{
               background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentSoft})`,
               color: theme.isDark ? "#041117" : "#24140a",
+              boxShadow: `0 8px 24px ${theme.accent}35`,
             }}
           >
             LP
@@ -72,7 +73,7 @@ export function PublicPageNav({
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={buildPublicPageModeHref(basePath, "hiring")}
-            className="inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm"
+            className="inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm transition-transform hover:scale-[1.03]"
             style={
               activeSection === "profile" && mode === "hiring"
                 ? hiringActiveStyle
@@ -84,7 +85,7 @@ export function PublicPageNav({
           </Link>
           <Link
             href={buildPublicPageModeHref(basePath, "admissions")}
-            className="inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm"
+            className="inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm transition-transform hover:scale-[1.03]"
             style={
               activeSection === "profile" && mode === "admissions"
                 ? admissionsActiveStyle
@@ -96,7 +97,7 @@ export function PublicPageNav({
           </Link>
           <Link
             href={buildPublicResumeHref(basePath, mode)}
-            className="inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm"
+            className="inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm transition-transform hover:scale-[1.03]"
             style={activeSection === "resume" ? resumeActiveStyle : modeButtonStyle}
           >
             <FileText className="h-4 w-4" />

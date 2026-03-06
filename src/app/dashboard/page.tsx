@@ -1276,7 +1276,7 @@ export default function DashboardPage() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center">
+      <div className="min-h-screen bg-[#080d10] flex items-center justify-center">
         <div className="inline-flex items-center gap-3 text-white/80">
           <LoaderCircle className="h-5 w-5 animate-spin text-[#00f5ff]" />
           <span className="animate-pulse">Loading dashboard...</span>
@@ -1325,11 +1325,15 @@ export default function DashboardPage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] text-white">
+    <div className="min-h-screen bg-[#080d10] text-white"
+      style={{
+        backgroundImage: "radial-gradient(circle at 15% 15%, rgba(0,245,255,0.06), transparent 35%), radial-gradient(circle at 85% 80%, rgba(121,229,210,0.05), transparent 30%)",
+      }}
+    >
       {/* Header */}
-      <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-50 border-b border-white/8 bg-[#080d10]/80 px-6 py-4 backdrop-blur-2xl flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5 text-xl font-bold">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#00f5ff] text-xs font-black text-black">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[linear-gradient(135deg,rgba(0,245,255,0.9),rgba(121,229,210,0.85))] text-xs font-black text-black shadow-[0_6px_20px_rgba(0,245,255,0.25)]">
             LP
           </span>
           <span>
@@ -1341,22 +1345,22 @@ export default function DashboardPage() {
             <Link
               href={`/u/${username}`}
               target="_blank"
-              className="inline-flex items-center gap-1 text-sm text-[#00f5ff] hover:underline"
+              className="inline-flex items-center gap-1 rounded-full border border-[#00f5ff]/20 bg-[#00f5ff]/8 px-3 py-1.5 text-sm text-[#00f5ff] transition-colors hover:bg-[#00f5ff]/15"
             >
               /u/{username}
               <ExternalLink className="h-3.5 w-3.5" />
             </Link>
           )}
-          <span className="text-sm text-gray-400">{session?.user?.email}</span>
+          <span className="hidden text-sm text-gray-400 sm:block">{session?.user?.email}</span>
           <Link
             href="/explore"
-            className="text-sm text-gray-400 hover:text-white transition-colors"
+            className="text-sm text-gray-400 transition-colors hover:text-white"
           >
             Explore
           </Link>
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
-            className="text-sm text-gray-500 hover:text-white"
+            className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-gray-400 transition-colors hover:border-white/20 hover:text-white"
           >
             Sign out
           </button>
@@ -1367,10 +1371,10 @@ export default function DashboardPage() {
         {/* Message */}
         {message && (
           <div
-            className={`mb-6 px-4 py-3 rounded-lg text-sm border ${
+            className={`mb-6 rounded-xl border px-4 py-3 text-sm ${
               message.type === "success"
-                ? "bg-green-500/10 border-green-500/30 text-green-400"
-                : "bg-red-500/10 border-red-500/30 text-red-400"
+                ? "border-emerald-500/25 bg-emerald-500/8 text-emerald-400"
+                : "border-red-500/25 bg-red-500/8 text-red-400"
             }`}
           >
             {message.text}
@@ -1378,17 +1382,17 @@ export default function DashboardPage() {
         )}
 
         {/* Tabs */}
-        <div className="flex flex-wrap gap-1 bg-white/5 rounded-xl border border-white/10 p-1 mb-8 w-fit">
+        <div className="mb-8 flex flex-wrap gap-1 w-fit rounded-xl border border-white/10 bg-white/5 p-1">
           {(Object.entries(TAB_META) as Array<[DashboardTab, { icon: LucideIcon; label: string }]>).map(([tab, meta]) => {
             const Icon = meta.icon;
             return (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
                 activeTab === tab
-                  ? "bg-[#00f5ff] text-black shadow-lg shadow-[#00f5ff]/10"
-                  : "text-gray-400 hover:text-white"
+                  ? "bg-[linear-gradient(135deg,#00f5ff,#79e5d2)] text-black shadow-[0_6px_20px_rgba(0,245,255,0.2)]"
+                  : "text-gray-400 hover:bg-white/8 hover:text-white"
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -1402,7 +1406,7 @@ export default function DashboardPage() {
         {activeTab === "crawl" && (
           <div className="space-y-8">
             {/* URL Crawler */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
               <div className="mb-2 flex items-center gap-2">
                 <Search className="h-[18px] w-[18px] text-[#00f5ff]" />
                 <h2 className="text-lg font-semibold">Web Crawler</h2>
@@ -1429,7 +1433,7 @@ export default function DashboardPage() {
                 <button
                   onClick={handleCrawl}
                   disabled={crawling || !urlInput.trim()}
-                  className="inline-flex items-center gap-2 bg-[#00f5ff] text-black px-6 py-2.5 rounded-lg font-medium hover:bg-[#00c8d4] transition-colors disabled:opacity-50 whitespace-nowrap"
+                  className="inline-flex items-center gap-2 rounded-lg bg-[linear-gradient(135deg,#00f5ff,#79e5d2)] px-6 py-2.5 font-medium text-black shadow-[0_8px_24px_rgba(0,245,255,0.2)] transition-all hover:shadow-[0_12px_32px_rgba(0,245,255,0.3)] hover:-translate-y-0.5 disabled:opacity-50 disabled:translate-y-0 whitespace-nowrap"
                 >
                   {crawling ? (
                     <>
@@ -1447,7 +1451,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Links */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
               <div className="mb-4 flex items-center gap-2">
                 <Link2 className="h-[18px] w-[18px] text-[#00f5ff]" />
                 <h2 className="text-lg font-semibold">Social Links</h2>
@@ -1496,7 +1500,7 @@ export default function DashboardPage() {
             </div>
 
             {/* User Info */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
               <div className="mb-4 flex items-center gap-2">
                 <User className="h-[18px] w-[18px] text-[#00f5ff]" />
                 <h2 className="text-lg font-semibold">About You</h2>
@@ -1547,7 +1551,7 @@ export default function DashboardPage() {
 
             {/* Evidence Items */}
             {evidence.length > 0 && (
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
                 <div className="mb-4 flex items-center gap-2">
                   <FolderOpen className="h-[18px] w-[18px] text-[#00f5ff]" />
                   <h2 className="text-lg font-semibold">
@@ -1728,7 +1732,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Profile preview */}
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-6">
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm space-y-6">
                   <div>
                     <div className="text-[#00f5ff] text-xs font-mono mb-1">
                       HEADLINE
@@ -1885,7 +1889,7 @@ export default function DashboardPage() {
         {/* USAGE TAB */}
         {activeTab === "usage" && (
           <div className="space-y-6">
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
               <div className="mb-1 flex items-center gap-2">
                 <ChartColumn className="h-[18px] w-[18px] text-[#00f5ff]" />
                 <h2 className="text-lg font-semibold">Usage</h2>
@@ -2622,7 +2626,7 @@ export default function DashboardPage() {
 
             <div
               id="settings-personal"
-              className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6"
+              className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
             >
               <div className="mb-1 flex items-center gap-2">
                 <User className="h-[18px] w-[18px] text-[#00f5ff]" />
@@ -2691,7 +2695,7 @@ export default function DashboardPage() {
             {billing && (
               <div
                 id="settings-usage"
-                className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6"
+                className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
               >
                 <div className="mb-1 flex items-center gap-2">
                   <ChartColumn className="h-[18px] w-[18px] text-[#00f5ff]" />
@@ -2774,7 +2778,7 @@ export default function DashboardPage() {
             {billing && (
               <div
                 id="settings-billing"
-                className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6"
+                className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
               >
                 <div className="mb-1 flex items-center gap-2">
                   <Sparkles className="h-[18px] w-[18px] text-[#00f5ff]" />
@@ -2843,7 +2847,7 @@ export default function DashboardPage() {
 
             <div
               id="settings-ai"
-              className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6"
+              className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
             >
               <div className="mb-1 flex items-center gap-2">
                 <Bot className="h-[18px] w-[18px] text-[#00f5ff]" />
@@ -3065,7 +3069,7 @@ export default function DashboardPage() {
             {/* ── Theme ── */}
             <div
               id="settings-theme"
-              className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6"
+              className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
             >
               <div className="mb-1 flex items-center gap-2">
                 <Palette className="h-[18px] w-[18px] text-[#00f5ff]" />
@@ -3167,7 +3171,7 @@ export default function DashboardPage() {
 
             <div
               id="settings-resume"
-              className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6"
+              className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
             >
               <div className="mb-1 flex items-center gap-2">
                 <FileText className="h-[18px] w-[18px] text-[#00f5ff]" />
@@ -3267,7 +3271,7 @@ export default function DashboardPage() {
 
             <div
               id="settings-deploy"
-              className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6"
+              className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
             >
               <div className="mb-1 flex items-center gap-2">
                 <Globe className="h-[18px] w-[18px] text-[#00f5ff]" />
