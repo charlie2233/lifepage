@@ -1,20 +1,27 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { Prisma } from "@/generated/prisma";
 import { getBillingSnapshot, reserveAiModel } from "@/lib/billing";
 import { prisma } from "@/lib/db";
 import { buildAgentContext, resolveAgentFocus } from "@/lib/agent-context";
 import { AGENT_FOCUS_KINDS } from "@/lib/agent-focus";
+import { parsePortfolioThemeConfig } from "@/lib/portfolio-themes";
+import { parseResumeModelConfig } from "@/lib/resume-models";
 import {
   agentChat,
   generateTimeline,
   generateVideoScript,
   generateTree,
+  setPortfolioTheme,
+  setResumeModel,
   type TimelineStyle,
   type VideoStyle,
   type TreeStyle,
   TIMELINE_STYLES,
   VIDEO_STYLES,
   TREE_STYLES,
+  type PortfolioThemeOutput,
+  type ResumeModelOutput,
 } from "@/lib/agent-tools";
 import { ProfileJSONSchema } from "@/lib/schema";
 import { z } from "zod";
@@ -37,6 +44,8 @@ const RequestSchema = z.object({
       "generate_timeline",
       "generate_video_script",
       "generate_tree",
+      "set_portfolio_theme",
+      "set_resume_model",
     ])
     .optional(),
   style: z.string().optional(),
@@ -48,6 +57,46 @@ const RequestSchema = z.object({
     })
     .optional(),
 });
+
+async function persistThemeResult(userId: string, output: unknown) {
+  const theme = output as PortfolioThemeOutput;
+  await prisma.publicPageSettings.upsert({
+    where: { userId },
+    create: {
+      userId,
+      theme: theme.themeId,
+      themeConfig: theme.themeConfig
+        ? (theme.themeConfig as Prisma.InputJsonValue)
+        : Prisma.JsonNull,
+    },
+    update: {
+      theme: theme.themeId,
+      themeConfig: theme.themeConfig
+        ? (theme.themeConfig as Prisma.InputJsonValue)
+        : Prisma.JsonNull,
+    },
+  });
+}
+
+async function persistResumeModelResult(userId: string, output: unknown) {
+  const resumeModel = output as ResumeModelOutput;
+  await prisma.publicPageSettings.upsert({
+    where: { userId },
+    create: {
+      userId,
+      resumeModel: resumeModel.modelId,
+      resumeModelConfig: resumeModel.modelConfig
+        ? (resumeModel.modelConfig as Prisma.InputJsonValue)
+        : Prisma.JsonNull,
+    },
+    update: {
+      resumeModel: resumeModel.modelId,
+      resumeModelConfig: resumeModel.modelConfig
+        ? (resumeModel.modelConfig as Prisma.InputJsonValue)
+        : Prisma.JsonNull,
+    },
+  });
+}
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -64,7 +113,7 @@ export async function POST(req: Request) {
   const { message, history, tool, style, focus } = parsed.data;
 
   // Load user context
-  const [profile, evidenceItems] = await Promise.all([
+  const [profile, evidenceItems, settings] = await Promise.all([
     prisma.generatedProfile.findFirst({
       where: { userId: session.user.id, isActive: true },
       orderBy: { createdAt: "desc" },
@@ -83,14 +132,29 @@ export async function POST(req: Request) {
       },
       take: 20,
     }),
+    prisma.publicPageSettings.findUnique({
+      where: { userId: session.user.id },
+      select: {
+        theme: true,
+        themeConfig: true,
+        resumeModel: true,
+        resumeModelConfig: true,
+      },
+    }),
   ]);
 
   const parsedProfile = profile?.data
     ? ProfileJSONSchema.safeParse(profile.data)
     : null;
   const profileData = parsedProfile?.success ? parsedProfile.data : null;
-  const context = buildAgentContext(profileData, evidenceItems);
-  const resolvedFocus = resolveAgentFocus(profileData, evidenceItems, focus);
+  const themeContext = {
+    themeId: settings?.theme,
+    themeConfig: parsePortfolioThemeConfig(settings?.themeConfig),
+    resumeModelId: settings?.resumeModel,
+    resumeModelConfig: parseResumeModelConfig(settings?.resumeModelConfig),
+  };
+  const context = buildAgentContext(profileData, evidenceItems, themeContext);
+  const resolvedFocus = resolveAgentFocus(profileData, evidenceItems, focus, themeContext);
 
   if (focus && !resolvedFocus) {
     return NextResponse.json(
@@ -160,6 +224,54 @@ export async function POST(req: Request) {
           aiReservation.clientConfig,
           aiReservation.maxTokens
         );
+      } else if (tool === "set_portfolio_theme") {
+        const s = style?.trim() || "custom";
+        usedStyle = s;
+        if (s === "custom") {
+          const aiReservation = await reserveAiModel(session.user.id, {
+            task: "chat",
+          });
+          output = await setPortfolioTheme(
+            context,
+            aiReservation.model,
+            s,
+            promptOptions,
+            aiReservation.clientConfig,
+            aiReservation.maxTokens
+          );
+        } else {
+          output = await setPortfolioTheme(
+            context,
+            "",
+            s,
+            promptOptions
+          );
+        }
+        await persistThemeResult(session.user.id, output);
+      } else if (tool === "set_resume_model") {
+        const s = style?.trim() || "custom";
+        usedStyle = s;
+        if (s === "custom") {
+          const aiReservation = await reserveAiModel(session.user.id, {
+            task: "chat",
+          });
+          output = await setResumeModel(
+            context,
+            aiReservation.model,
+            s,
+            promptOptions,
+            aiReservation.clientConfig,
+            aiReservation.maxTokens
+          );
+        } else {
+          output = await setResumeModel(
+            context,
+            "",
+            s,
+            promptOptions
+          );
+        }
+        await persistResumeModelResult(session.user.id, output);
       }
 
       // Persist artifact
@@ -264,6 +376,54 @@ export async function POST(req: Request) {
           aiReservation.clientConfig,
           aiReservation.maxTokens
         );
+      } else if (detectedTool === "set_portfolio_theme") {
+        const s = detectedStyle?.trim() || "custom";
+        finalStyle = s;
+        if (s === "custom") {
+          const aiReservation = await reserveAiModel(session.user.id, {
+            task: "chat",
+          });
+          toolOutput = await setPortfolioTheme(
+            context,
+            aiReservation.model,
+            s,
+            promptOptions,
+            aiReservation.clientConfig,
+            aiReservation.maxTokens
+          );
+        } else {
+          toolOutput = await setPortfolioTheme(
+            context,
+            "",
+            s,
+            promptOptions
+          );
+        }
+        await persistThemeResult(session.user.id, toolOutput);
+      } else if (detectedTool === "set_resume_model") {
+        const s = detectedStyle?.trim() || "custom";
+        finalStyle = s;
+        if (s === "custom") {
+          const aiReservation = await reserveAiModel(session.user.id, {
+            task: "chat",
+          });
+          toolOutput = await setResumeModel(
+            context,
+            aiReservation.model,
+            s,
+            promptOptions,
+            aiReservation.clientConfig,
+            aiReservation.maxTokens
+          );
+        } else {
+          toolOutput = await setResumeModel(
+            context,
+            "",
+            s,
+            promptOptions
+          );
+        }
+        await persistResumeModelResult(session.user.id, toolOutput);
       }
 
       if (toolOutput) {

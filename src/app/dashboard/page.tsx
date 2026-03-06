@@ -13,6 +13,18 @@ import {
 import type { PublicPageVisibility } from "@/lib/page-visibility";
 import { normalizeVisibility } from "@/lib/page-visibility";
 import {
+  PORTFOLIO_THEME_PRESETS,
+  normalizePortfolioThemeId,
+  type PortfolioThemeConfig,
+  type PortfolioThemeId,
+} from "@/lib/portfolio-themes";
+import {
+  RESUME_MODEL_PRESETS,
+  normalizeResumeModelId,
+  type ResumeModelConfig,
+  type ResumeModelId,
+} from "@/lib/resume-models";
+import {
   ArrowRight,
   ArrowUp,
   ArrowUpRight,
@@ -195,6 +207,22 @@ interface ApiAgentResponse {
   error?: string;
   artifacts?: AgentArtifact[];
 }
+interface ThemeArtifactOutput {
+  themeId: PortfolioThemeId;
+  themeConfig?: PortfolioThemeConfig | null;
+  themeLabel: string;
+  summary: string;
+  rationale: string;
+  changes: string[];
+}
+interface ResumeModelArtifactOutput {
+  modelId: ResumeModelId;
+  modelConfig?: ResumeModelConfig | null;
+  modelLabel: string;
+  summary: string;
+  rationale: string;
+  changes: string[];
+}
 interface ApiBillingResponse {
   billing?: BillingSnapshot;
   plans?: BillingPlan[];
@@ -232,6 +260,12 @@ function splitCrawlInput(value: string) {
 }
 
 function humanizeAgentToolName(tool: string) {
+  if (tool === "set_portfolio_theme") {
+    return "portfolio theme";
+  }
+  if (tool === "set_resume_model") {
+    return "resume model";
+  }
   return tool.replace(/^generate_/, "").replace(/_/g, " ");
 }
 
@@ -244,6 +278,11 @@ function buildAgentFocusOptions(
       value: "all",
       label: "Whole brand",
       hint: "Use the full portfolio, profile, and evidence context.",
+    },
+    {
+      value: "theme",
+      label: "Theme / UI",
+      hint: "Change the public portfolio look, mood, and presentation system.",
     },
   ];
 
@@ -492,12 +531,76 @@ function TreeArtifact({ output }: { output: unknown }) {
   );
 }
 
+function ThemeArtifact({ output }: { output: unknown }) {
+  const theme = output as ThemeArtifactOutput;
+  return (
+    <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">{theme.themeLabel}</p>
+          <p className="mt-1 text-xs text-gray-400">{theme.summary}</p>
+        </div>
+        <span className="rounded-full border border-[#00f5ff]/25 bg-[#00f5ff]/10 px-3 py-1 text-xs text-[#7ef4ff]">
+          {theme.themeId}
+        </span>
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-gray-300">{theme.rationale}</p>
+      {theme.changes?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {theme.changes.map((change) => (
+            <span
+              key={change}
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300"
+            >
+              {change}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ResumeModelArtifact({ output }: { output: unknown }) {
+  const resumeModel = output as ResumeModelArtifactOutput;
+  return (
+    <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">{resumeModel.modelLabel}</p>
+          <p className="mt-1 text-xs text-gray-400">{resumeModel.summary}</p>
+        </div>
+        <span className="rounded-full border border-[#00f5ff]/25 bg-[#00f5ff]/10 px-3 py-1 text-xs text-[#7ef4ff]">
+          {resumeModel.modelId}
+        </span>
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-gray-300">
+        {resumeModel.rationale}
+      </p>
+      {resumeModel.changes?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {resumeModel.changes.map((change) => (
+            <span
+              key={change}
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300"
+            >
+              {change}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 // ── Artifact renderer dispatcher ─────────────────────────────────────────────
 
 function ArtifactRenderer({ tool, output }: { tool: string; output: unknown }) {
   if (tool === "generate_timeline") return <TimelineArtifact output={output} />;
   if (tool === "generate_video_script") return <VideoScriptArtifact output={output} />;
   if (tool === "generate_tree") return <TreeArtifact output={output} />;
+  if (tool === "set_portfolio_theme") return <ThemeArtifact output={output} />;
+  if (tool === "set_resume_model") return <ResumeModelArtifact output={output} />;
   return (
     <pre className="mt-2 text-xs bg-white/5 rounded p-3 overflow-auto max-h-48">
       {JSON.stringify(output, null, 2)}
@@ -565,6 +668,20 @@ const AGENT_TOOL_META: Array<{
     styles: ["skills", "projects", "career", "goals"],
     desc: "Interactive skill/project tree",
   },
+  {
+    tool: "set_portfolio_theme",
+    icon: Palette,
+    label: "Theme / UI",
+    styles: ["custom", ...PORTFOLIO_THEME_PRESETS.map((theme) => theme.id)],
+    desc: "Apply 30 portfolio models or generate a custom portfolio look",
+  },
+  {
+    tool: "set_resume_model",
+    icon: FileText,
+    label: "Resume Model",
+    styles: ["custom", ...RESUME_MODEL_PRESETS.map((model) => model.id)],
+    desc: "Apply a structured resume model or generate a custom resume direction",
+  },
 ];
 
 // ── Main dashboard ────────────────────────────────────────────────────────────
@@ -586,7 +703,10 @@ export default function DashboardPage() {
   const [userInfo, setUserInfo] = useState({ name: "", bio: "", tags: "" });
   const [mode, setMode] = useState<"hiring" | "admissions">("hiring");
   const [visibility, setVisibility] = useState<PublicPageVisibility>("public");
-  const [theme, setTheme] = useState<"obsidian" | "paper">("obsidian");
+  const [theme, setTheme] = useState<PortfolioThemeId>("obsidian");
+  const [themeConfig, setThemeConfig] = useState<PortfolioThemeConfig | null>(null);
+  const [resumeModel, setResumeModel] = useState<ResumeModelId>("executive");
+  const [resumeModelConfig, setResumeModelConfig] = useState<ResumeModelConfig | null>(null);
   const [customDomain, setCustomDomain] = useState("");
   const [customDomainInput, setCustomDomainInput] = useState("");
   const [currentHost, setCurrentHost] = useState("");
@@ -651,7 +771,10 @@ export default function DashboardPage() {
           settings?: {
             isPublic: boolean;
             visibility?: PublicPageVisibility | null;
-            theme: string;
+            theme: PortfolioThemeId;
+            themeConfig?: PortfolioThemeConfig | null;
+            resumeModel?: ResumeModelId;
+            resumeModelConfig?: ResumeModelConfig | null;
             mode: string;
             customDomain?: string | null;
           } | null;
@@ -666,7 +789,10 @@ export default function DashboardPage() {
     if (pr.profile) setProfile(pr.profile);
     if (st.settings) {
       setVisibility(normalizeVisibility(st.settings));
-      setTheme((st.settings.theme as "obsidian" | "paper") ?? "obsidian");
+      setTheme(normalizePortfolioThemeId(st.settings.theme));
+      setThemeConfig(st.settings.themeConfig ?? null);
+      setResumeModel(normalizeResumeModelId(st.settings.resumeModel));
+      setResumeModelConfig(st.settings.resumeModelConfig ?? null);
       setMode((st.settings.mode as "hiring" | "admissions") ?? "hiring");
       setCustomDomain(st.settings.customDomain ?? "");
       setCustomDomainInput(st.settings.customDomain ?? "");
@@ -687,7 +813,10 @@ export default function DashboardPage() {
 
   const saveSettings = async (patch: {
     visibility?: PublicPageVisibility;
-    theme?: string;
+    theme?: PortfolioThemeId;
+    themeConfig?: PortfolioThemeConfig | null;
+    resumeModel?: ResumeModelId;
+    resumeModelConfig?: ResumeModelConfig | null;
     mode?: string;
     customDomain?: string | null;
   }) => {
@@ -702,7 +831,10 @@ export default function DashboardPage() {
         settings?: {
           isPublic: boolean;
           visibility?: PublicPageVisibility | null;
-          theme: string;
+          theme: PortfolioThemeId;
+          themeConfig?: PortfolioThemeConfig | null;
+          resumeModel?: ResumeModelId;
+          resumeModelConfig?: ResumeModelConfig | null;
           mode: string;
           customDomain?: string | null;
         } | null;
@@ -710,6 +842,12 @@ export default function DashboardPage() {
       };
       if (!res.ok) {
         throw new Error(data.error ?? "Failed to save settings.");
+      }
+      if (data.settings) {
+        setTheme(normalizePortfolioThemeId(data.settings.theme));
+        setThemeConfig(data.settings.themeConfig ?? null);
+        setResumeModel(normalizeResumeModelId(data.settings.resumeModel));
+        setResumeModelConfig(data.settings.resumeModelConfig ?? null);
       }
       setMessage({ type: "success", text: "Settings saved." });
       return data.settings ?? null;
@@ -731,9 +869,18 @@ export default function DashboardPage() {
     });
   };
 
-  const handleSetTheme = (value: "obsidian" | "paper") => {
+  const handleSetTheme = (value: PortfolioThemeId) => {
     setTheme(value);
-    saveSettings({ theme: value }).catch(() => {
+    setThemeConfig(null);
+    saveSettings({ theme: value, themeConfig: null }).catch(() => {
+      // Error already handled and shown via setMessage inside saveSettings
+    });
+  };
+
+  const handleSetResumeModel = (value: ResumeModelId) => {
+    setResumeModel(value);
+    setResumeModelConfig(null);
+    saveSettings({ resumeModel: value, resumeModelConfig: null }).catch(() => {
       // Error already handled and shown via setMessage inside saveSettings
     });
   };
@@ -954,6 +1101,15 @@ export default function DashboardPage() {
       const data = (await res.json()) as ApiAgentResponse;
       if (!res.ok) throw new Error(data.error ?? "Agent error");
       if (data.billing) setBilling(data.billing);
+      if (data.tool === "set_portfolio_theme" && data.output) {
+        const themeOutput = data.output as ThemeArtifactOutput;
+        setTheme(themeOutput.themeId);
+        setThemeConfig(themeOutput.themeConfig ?? null);
+      } else if (data.tool === "set_resume_model" && data.output) {
+        const resumeModelOutput = data.output as ResumeModelArtifactOutput;
+        setResumeModel(normalizeResumeModelId(resumeModelOutput.modelId));
+        setResumeModelConfig(resumeModelOutput.modelConfig ?? null);
+      }
 
       const assistantMsg: ChatMessage = {
         role: "assistant",
@@ -1983,21 +2139,50 @@ export default function DashboardPage() {
                     <p className="font-medium text-sm">{t.label}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{t.desc}</p>
                     {selectedTool === t.tool && (
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        {t.styles.map((s) => (
-                          <button
-                            key={s}
-                            onClick={(e) => { e.stopPropagation(); setSelectedStyle(s); }}
-                            className={`text-xs px-2 py-0.5 rounded-md border transition-colors ${
-                              selectedStyle === s
-                                ? "border-[#00f5ff] bg-[#00f5ff]/15 text-[#00f5ff]"
-                                : "border-white/10 text-gray-400 hover:border-white/20"
-                            }`}
+                      t.tool === "set_portfolio_theme" || t.tool === "set_resume_model" ? (
+                        <div className="mt-3 space-y-2">
+                          <label className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+                            {t.tool === "set_portfolio_theme" ? "Portfolio model" : "Resume model"}
+                          </label>
+                          <select
+                            value={selectedStyle}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              setSelectedStyle(e.target.value);
+                            }}
+                            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-[#00f5ff]/40 focus:outline-none"
                           >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
+                            <option value="custom">custom</option>
+                            {t.tool === "set_portfolio_theme"
+                              ? PORTFOLIO_THEME_PRESETS.map((preset) => (
+                                  <option key={preset.id} value={preset.id}>
+                                    {preset.label} · {preset.heroLayout} / {preset.projectLayout}
+                                  </option>
+                                ))
+                              : RESUME_MODEL_PRESETS.map((preset) => (
+                                  <option key={preset.id} value={preset.id}>
+                                    {preset.label} · {preset.headerLayout} / {preset.sectionStyle}
+                                  </option>
+                                ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {t.styles.map((s) => (
+                            <button
+                              key={s}
+                              onClick={(e) => { e.stopPropagation(); setSelectedStyle(s); }}
+                              className={`text-xs px-2 py-0.5 rounded-md border transition-colors ${
+                                selectedStyle === s
+                                  ? "border-[#00f5ff] bg-[#00f5ff]/15 text-[#00f5ff]"
+                                  : "border-white/10 text-gray-400 hover:border-white/20"
+                              }`}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      )
                     )}
                   </div>
                   );
@@ -2029,7 +2214,7 @@ export default function DashboardPage() {
                   Chat with Agent
                 </p>
                 <p className="text-xs text-gray-400">
-                  Ask for advice, or say &quot;make me a documentary timeline&quot; or &quot;write a pitch video script&quot;. Current focus:{" "}
+                  Ask for advice, generate artifacts, or say &quot;redesign my portfolio theme&quot;. Current focus:{" "}
                   <span className="text-white">{activeFocusOption.label}</span>.
                 </p>
               </div>
@@ -2137,10 +2322,16 @@ export default function DashboardPage() {
                             <ChartColumn className="h-4 w-4 text-[#00f5ff]" />
                           ) : a.tool === "generate_video_script" ? (
                             <Clapperboard className="h-4 w-4 text-[#00f5ff]" />
+                          ) : a.tool === "set_resume_model" ? (
+                            <FileText className="h-4 w-4 text-[#00f5ff]" />
+                          ) : a.tool === "set_portfolio_theme" ? (
+                            <Palette className="h-4 w-4 text-[#00f5ff]" />
                           ) : (
                             <GitBranch className="h-4 w-4 text-[#00f5ff]" />
                           )}
-                          <span className="text-sm font-medium capitalize">{a.tool.replace("generate_", "")}</span>
+                          <span className="text-sm font-medium capitalize">
+                            {humanizeAgentToolName(a.tool)}
+                          </span>
                           {a.style && <span className="text-xs text-gray-500">· {a.style}</span>}
                         </div>
                         <span className="text-xs text-gray-500">{new Date(a.createdAt).toLocaleDateString()}</span>
@@ -2411,6 +2602,7 @@ export default function DashboardPage() {
                   { href: "#settings-ai", icon: Bot, label: "AI Preferences" },
                   { href: "#settings-public", icon: Globe, label: "Public Site" },
                   { href: "#settings-theme", icon: Palette, label: "Theme" },
+                  { href: "#settings-resume", icon: FileText, label: "Resume" },
                   { href: "#settings-deploy", icon: Globe, label: "Deploy" },
                 ].map((item) => {
                   const Icon = item.icon;
@@ -2879,42 +3071,11 @@ export default function DashboardPage() {
                 <Palette className="h-[18px] w-[18px] text-[#00f5ff]" />
                 <h2 className="text-lg font-semibold">Theme</h2>
               </div>
-              <p className="text-sm text-gray-400 mb-4">Choose the look of your public portfolio page.</p>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  {
-                    id: "obsidian" as const,
-                    label: "Obsidian",
-                    desc: "Dark · Glass · Neon",
-                    preview: (
-                      <div className="h-20 rounded-lg bg-[#0d0d0d] border border-[#00f5ff]/30 p-3 mb-3">
-                        <div className="w-12 h-1.5 rounded bg-[#00f5ff]/60 mb-1.5" />
-                        <div className="w-20 h-1 rounded bg-white/20 mb-1" />
-                        <div className="w-16 h-1 rounded bg-white/10" />
-                        <div className="flex gap-1 mt-2">
-                          <div className="px-1.5 py-0.5 rounded bg-[#00f5ff]/15 border border-[#00f5ff]/20 text-[6px]">React</div>
-                          <div className="px-1.5 py-0.5 rounded bg-[#00f5ff]/15 border border-[#00f5ff]/20 text-[6px]">AI</div>
-                        </div>
-                      </div>
-                    ),
-                  },
-                  {
-                    id: "paper" as const,
-                    label: "Paper",
-                    desc: "Light · Clean · Serif",
-                    preview: (
-                      <div className="h-20 rounded-lg bg-[#faf9f7] border border-gray-200 p-3 mb-3">
-                        <div className="w-12 h-1.5 rounded bg-blue-600/70 mb-1.5" />
-                        <div className="w-20 h-1 rounded bg-gray-300 mb-1" />
-                        <div className="w-16 h-1 rounded bg-gray-200" />
-                        <div className="flex gap-1 mt-2">
-                          <div className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-100 text-[6px] text-blue-600">React</div>
-                          <div className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-100 text-[6px] text-blue-600">AI</div>
-                        </div>
-                      </div>
-                    ),
-                  },
-                ].map((t) => (
+              <p className="mb-4 text-sm text-gray-400">
+                Choose the look of your public portfolio page. The agent can also create a custom variant on top of these preset directions.
+              </p>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {PORTFOLIO_THEME_PRESETS.map((t) => (
                   <button
                     key={t.id}
                     onClick={() => handleSetTheme(t.id)}
@@ -2924,15 +3085,184 @@ export default function DashboardPage() {
                         : "border-white/10 hover:border-white/20 bg-white/3"
                     }`}
                   >
-                    {t.preview}
+                    <div
+                      className="mb-3 h-20 rounded-lg border p-3"
+                      style={{
+                        background: t.previewBackground,
+                        borderColor: `${t.accent}33`,
+                      }}
+                    >
+                      <div
+                        className="mb-1.5 h-1.5 w-12 rounded"
+                        style={{ background: `${t.accent}cc` }}
+                      />
+                      <div
+                        className="mb-1 h-1 w-20 rounded"
+                        style={{
+                          background:
+                            t.variant === "dark"
+                              ? "rgba(255,255,255,0.22)"
+                              : "rgba(30,30,30,0.18)",
+                        }}
+                      />
+                      <div
+                        className="h-1 w-16 rounded"
+                        style={{
+                          background:
+                            t.variant === "dark"
+                              ? "rgba(255,255,255,0.12)"
+                              : "rgba(30,30,30,0.1)",
+                        }}
+                      />
+                      <div className="mt-2 flex gap-1">
+                        <div
+                          className="rounded border px-1.5 py-0.5 text-[6px]"
+                          style={{
+                            background: `${t.accent}22`,
+                            borderColor: `${t.accent}33`,
+                            color: t.variant === "dark" ? t.accentSoft : t.accent,
+                          }}
+                        >
+                          React
+                        </div>
+                        <div
+                          className="rounded border px-1.5 py-0.5 text-[6px]"
+                          style={{
+                            background: `${t.accentSecondary}22`,
+                            borderColor: `${t.accentSecondary}33`,
+                            color:
+                              t.variant === "dark"
+                                ? t.accentSoft
+                                : t.accentSecondary,
+                          }}
+                        >
+                          Brand
+                        </div>
+                      </div>
+                    </div>
                     <div className="font-semibold text-sm">{t.label}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{t.desc}</div>
+                    <div className="mt-0.5 text-xs text-gray-500">
+                      {t.category} · {t.heroLayout} hero · {t.projectLayout} projects · {t.timelineLayout} timeline
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500">
+                      {t.variant === "dark" ? "Dark" : "Light"} · {t.displayFont}/{t.bodyFont} · {t.description}
+                    </div>
                     {theme === t.id && (
                       <div className="text-xs text-[#00f5ff] mt-1">Active</div>
                     )}
                   </button>
                 ))}
               </div>
+              {theme === "custom" && (
+                <div className="mt-4 rounded-xl border border-[#00f5ff]/20 bg-[#00f5ff]/5 p-4">
+                  <p className="text-sm font-medium text-[#8ef6ff]">Custom theme active</p>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-300">
+                    This portfolio is using an agent-generated variant
+                    {themeConfig?.baseThemeId ? ` built on ${themeConfig.baseThemeId}` : ""}.
+                    Pick a preset above to reset it, or use the agent tool to redesign it again.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div
+              id="settings-resume"
+              className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6"
+            >
+              <div className="mb-1 flex items-center gap-2">
+                <FileText className="h-[18px] w-[18px] text-[#00f5ff]" />
+                <h2 className="text-lg font-semibold">Resume Model</h2>
+              </div>
+              <p className="mb-4 text-sm text-gray-400">
+                Choose the layout system for your separate public resume page. The agent can apply one of these presets or generate a custom variant safely on top of them.
+              </p>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {RESUME_MODEL_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => handleSetResumeModel(preset.id)}
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${
+                      resumeModel === preset.id
+                        ? "border-[#00f5ff] bg-[#00f5ff]/5"
+                        : "border-white/10 hover:border-white/20 bg-white/3"
+                    }`}
+                  >
+                    <div
+                      className="mb-3 rounded-lg border p-3"
+                      style={{
+                        background: `linear-gradient(180deg, ${preset.sheetStart}, ${preset.sheetEnd})`,
+                        borderColor: `${preset.accent}33`,
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div
+                            className="h-1.5 w-16 rounded"
+                            style={{ background: `${preset.accent}cc` }}
+                          />
+                          <div
+                            className="mt-2 h-1 w-24 rounded"
+                            style={{ background: "rgba(33,25,18,0.18)" }}
+                          />
+                          <div
+                            className="mt-1 h-1 w-16 rounded"
+                            style={{ background: "rgba(33,25,18,0.12)" }}
+                          />
+                        </div>
+                        {preset.asideLayout !== "hidden" && (
+                          <div
+                            className="w-12 rounded border px-2 py-1 text-[6px] uppercase tracking-[0.14em]"
+                            style={{
+                              borderColor: `${preset.accent}2a`,
+                              background: `${preset.accentSoft}cc`,
+                              color: preset.accent,
+                            }}
+                          >
+                            {preset.asideLayout}
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-3 flex gap-1">
+                        {[0, 1, 2].map((index) => (
+                          <div
+                            key={index}
+                            className="h-9 flex-1 rounded border"
+                            style={{
+                              borderColor: `${preset.accent}24`,
+                              background:
+                                preset.sectionStyle === "cards"
+                                  ? "rgba(255,255,255,0.74)"
+                                  : preset.sectionStyle === "bands"
+                                    ? `${preset.accentSoft}aa`
+                                    : "rgba(255,255,255,0.35)",
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="font-semibold text-sm">{preset.label}</div>
+                    <div className="mt-0.5 text-xs text-gray-500">
+                      {preset.headerLayout} header · {preset.asideLayout} aside · {preset.sectionStyle} sections
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500">
+                      {preset.displayFont}/{preset.bodyFont} · {preset.description}
+                    </div>
+                    {resumeModel === preset.id && (
+                      <div className="text-xs text-[#00f5ff] mt-1">Active</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+              {resumeModel === "custom" && (
+                <div className="mt-4 rounded-xl border border-[#00f5ff]/20 bg-[#00f5ff]/5 p-4">
+                  <p className="text-sm font-medium text-[#8ef6ff]">Custom resume model active</p>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-300">
+                    This public resume is using an agent-generated variant
+                    {resumeModelConfig?.baseModelId ? ` built on ${resumeModelConfig.baseModelId}` : ""}.
+                    Pick a preset above to reset it, or use the agent tool to redesign the resume page again.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div

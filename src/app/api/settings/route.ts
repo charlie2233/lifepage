@@ -1,15 +1,29 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/generated/prisma";
 import { normalizeCustomDomain } from "@/lib/custom-domain";
 import type { PublicPageVisibility } from "@/lib/page-visibility";
+import {
+  PortfolioThemeConfigSchema,
+  PortfolioThemeIdSchema,
+  type PortfolioThemeId,
+} from "@/lib/portfolio-themes";
+import {
+  ResumeModelConfigSchema,
+  ResumeModelIdSchema,
+  type ResumeModelId,
+} from "@/lib/resume-models";
 import { z } from "zod";
 
 const schema = z.object({
   isPublic: z.boolean().optional(),
   visibility: z.enum(["public", "unlisted", "private"]).optional(),
   mode: z.enum(["hiring", "admissions"]).optional(),
-  theme: z.enum(["obsidian", "paper"]).optional(),
+  theme: PortfolioThemeIdSchema.optional(),
+  themeConfig: PortfolioThemeConfigSchema.nullable().optional(),
+  resumeModel: ResumeModelIdSchema.optional(),
+  resumeModelConfig: ResumeModelConfigSchema.nullable().optional(),
   customDomain: z.union([z.string(), z.null()]).optional(),
 });
 
@@ -39,7 +53,10 @@ export async function PATCH(req: Request) {
     isPublic?: boolean;
     visibility?: PublicPageVisibility;
     mode?: "hiring" | "admissions";
-    theme?: "obsidian" | "paper";
+    theme?: PortfolioThemeId;
+    themeConfig?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+    resumeModel?: ResumeModelId;
+    resumeModelConfig?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
     customDomain?: string | null;
     customDomainNormalized?: string | null;
   } = {};
@@ -59,6 +76,21 @@ export async function PATCH(req: Request) {
 
   if (parsed.data.mode !== undefined) updateData.mode = parsed.data.mode;
   if (parsed.data.theme !== undefined) updateData.theme = parsed.data.theme;
+  if (Object.prototype.hasOwnProperty.call(parsed.data, "themeConfig")) {
+    updateData.themeConfig =
+      parsed.data.themeConfig === null
+        ? Prisma.JsonNull
+        : (parsed.data.themeConfig as Prisma.InputJsonValue);
+  }
+  if (parsed.data.resumeModel !== undefined) {
+    updateData.resumeModel = parsed.data.resumeModel;
+  }
+  if (Object.prototype.hasOwnProperty.call(parsed.data, "resumeModelConfig")) {
+    updateData.resumeModelConfig =
+      parsed.data.resumeModelConfig === null
+        ? Prisma.JsonNull
+        : (parsed.data.resumeModelConfig as Prisma.InputJsonValue);
+  }
 
   if (Object.prototype.hasOwnProperty.call(parsed.data, "customDomain")) {
     const rawDomain = parsed.data.customDomain?.trim() ?? "";

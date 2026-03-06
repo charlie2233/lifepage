@@ -1,5 +1,45 @@
 import type { Metadata } from "next";
+import {
+  Cormorant_Garamond,
+  Fraunces,
+  IBM_Plex_Mono,
+  Manrope,
+  Sora,
+  Space_Grotesk,
+} from "next/font/google";
 import "./globals.css";
+
+const sans = Manrope({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+const display = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-display",
+});
+
+const displayAlt = Cormorant_Garamond({
+  subsets: ["latin"],
+  variable: "--font-display-alt",
+  weight: ["400", "500", "600", "700"],
+});
+
+const sansAlt = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-sans-alt",
+});
+
+const sansSharp = Sora({
+  subsets: ["latin"],
+  variable: "--font-sans-sharp",
+});
+
+const mono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-mono",
+});
 
 export const metadata: Metadata = {
   title: "LifePage — AI Personal Brand Builder",
@@ -13,7 +53,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={`${sans.variable} ${display.variable} ${displayAlt.variable} ${sansAlt.variable} ${sansSharp.variable} ${mono.variable}`}
+    >
       <body className="antialiased">{children}</body>
     </html>
   );

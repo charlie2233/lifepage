@@ -23,19 +23,17 @@ export type PublicPageUser = Prisma.UserGetPayload<{
 }>;
 
 export const getPublicPageUserByUsername = cache(async (username: string) => {
-  return prisma.user.findFirst({
-    where: {
-      username,
-      publicPageSettings: {
-        is: {
-          visibility: {
-            not: "private",
-          },
-        },
-      },
-    },
-    include: publicPageInclude,
-  });
+  try {
+    const user = await prisma.user.findFirst({
+      where: { username },
+      include: publicPageInclude,
+    });
+
+    return user && canAccessPortfolio(user.publicPageSettings) ? user : null;
+  } catch (error) {
+    console.warn("Falling back from public page username lookup:", error);
+    return null;
+  }
 });
 
 export const getPublicPageUserByCustomDomain = cache(async (hostname: string) => {
@@ -46,19 +44,23 @@ export const getPublicPageUserByCustomDomain = cache(async (hostname: string) =>
     return null;
   }
 
-  return prisma.user.findFirst({
-    where: {
-      publicPageSettings: {
-        is: {
-          customDomainNormalized: normalizedHostname,
-          visibility: {
-            not: "private",
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        publicPageSettings: {
+          is: {
+            customDomainNormalized: normalizedHostname,
           },
         },
       },
-    },
-    include: publicPageInclude,
-  });
+      include: publicPageInclude,
+    });
+
+    return user && canAccessPortfolio(user.publicPageSettings) ? user : null;
+  } catch (error) {
+    console.warn("Falling back from public page custom-domain lookup:", error);
+    return null;
+  }
 });
 
 export function resolvePublicPageMode(

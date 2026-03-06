@@ -1,4 +1,5 @@
 export const AGENT_FOCUS_KINDS = [
+  "theme",
   "headline",
   "about",
   "resume",
@@ -46,6 +47,7 @@ export function parseAgentFocusValue(
   }
 
   if (
+    value === "theme" ||
     value === "headline" ||
     value === "about" ||
     value === "resume" ||

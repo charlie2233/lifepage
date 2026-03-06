@@ -1,5 +1,15 @@
 import type { ProfileJSON } from "@/lib/schema";
 import type { AgentFocusSelection } from "@/lib/agent-focus";
+import type { PortfolioThemeConfig, PortfolioThemeId } from "@/lib/portfolio-themes";
+import {
+  describePortfolioThemesForAgent,
+  resolvePortfolioTheme,
+} from "@/lib/portfolio-themes";
+import type { ResumeModelConfig, ResumeModelId } from "@/lib/resume-models";
+import {
+  describeResumeModelsForAgent,
+  resolveResumeModel,
+} from "@/lib/resume-models";
 
 export interface AgentEvidenceContextItem {
   id: string;
@@ -85,7 +95,13 @@ function formatEvidence(
 
 export function buildAgentContext(
   profile: ProfileJSON | null,
-  evidenceItems: AgentEvidenceContextItem[]
+  evidenceItems: AgentEvidenceContextItem[],
+  themeInput?: {
+    themeId?: string | null;
+    themeConfig?: PortfolioThemeConfig | null;
+    resumeModelId?: string | null;
+    resumeModelConfig?: ResumeModelConfig | null;
+  } | null
 ) {
   const sections: string[] = [];
 
@@ -139,6 +155,47 @@ export function buildAgentContext(
     );
   }
 
+  if (themeInput) {
+    const resolvedTheme = resolvePortfolioTheme(
+      themeInput.themeId as PortfolioThemeId | undefined,
+      themeInput.themeConfig
+    );
+    const resolvedResumeModel = resolveResumeModel(
+      themeInput.resumeModelId as ResumeModelId | undefined,
+      themeInput.resumeModelConfig
+    );
+    sections.push(
+      joinNonEmpty([
+        "PUBLIC THEME",
+        `Current theme: ${resolvedTheme.label} (${resolvedTheme.id})`,
+        `Description: ${resolvedTheme.description}`,
+        `Variant: ${resolvedTheme.variant}`,
+        `Display direction: ${resolvedTheme.display}`,
+        themeInput.themeConfig?.baseThemeId
+          ? `Custom base preset: ${themeInput.themeConfig.baseThemeId}`
+          : null,
+        "AVAILABLE PRESETS:",
+          describePortfolioThemesForAgent(),
+      ])
+    );
+    sections.push(
+      joinNonEmpty([
+        "PUBLIC RESUME MODEL",
+        `Current resume model: ${resolvedResumeModel.label} (${resolvedResumeModel.id})`,
+        `Description: ${resolvedResumeModel.description}`,
+        `Header: ${resolvedResumeModel.headerLayout}`,
+        `Aside: ${resolvedResumeModel.asideLayout}`,
+        `Sections: ${resolvedResumeModel.sectionStyle}`,
+        `Fonts: ${resolvedResumeModel.displayFont}/${resolvedResumeModel.bodyFont}`,
+        themeInput.resumeModelConfig?.baseModelId
+          ? `Custom base preset: ${themeInput.resumeModelConfig.baseModelId}`
+          : null,
+        "AVAILABLE PRESETS:",
+        describeResumeModelsForAgent(),
+      ])
+    );
+  }
+
   if (!sections.length) {
     return "No profile or evidence is available yet. Help the user plan what to build next.";
   }
@@ -149,11 +206,37 @@ export function buildAgentContext(
 export function resolveAgentFocus(
   profile: ProfileJSON | null,
   evidenceItems: AgentEvidenceContextItem[],
-  focus?: AgentFocusSelection | null
+  focus?: AgentFocusSelection | null,
+  themeInput?: {
+    themeId?: string | null;
+    themeConfig?: PortfolioThemeConfig | null;
+    resumeModelId?: string | null;
+    resumeModelConfig?: ResumeModelConfig | null;
+  } | null
 ): ResolvedAgentFocus | null {
   if (!focus) return null;
 
   switch (focus.kind) {
+    case "theme": {
+      const resolvedTheme = resolvePortfolioTheme(
+        themeInput?.themeId as PortfolioThemeId | undefined,
+        themeInput?.themeConfig
+      );
+      return {
+        label: "Theme / UI",
+        context: joinNonEmpty([
+          `Current theme: ${resolvedTheme.label} (${resolvedTheme.id})`,
+          `Description: ${resolvedTheme.description}`,
+          `Variant: ${resolvedTheme.variant}`,
+          `Display: ${resolvedTheme.display}`,
+          themeInput?.themeConfig?.baseThemeId
+            ? `Custom base preset: ${themeInput.themeConfig.baseThemeId}`
+            : null,
+          "Available presets:",
+          describePortfolioThemesForAgent(),
+        ]),
+      };
+    }
     case "headline":
       return profile ? { label: "Headline", context: `Headline: ${profile.headline}` } : null;
     case "about":
@@ -161,6 +244,11 @@ export function resolveAgentFocus(
         ? { label: "About", context: `About section:\n${profile.about}` }
         : null;
     case "resume":
+      {
+        const resolvedResumeModel = resolveResumeModel(
+          themeInput?.resumeModelId as ResumeModelId | undefined,
+          themeInput?.resumeModelConfig
+        );
       return profile
         ? {
             label: "Resume summary",
@@ -169,9 +257,13 @@ export function resolveAgentFocus(
               profile.resume.bullets.length
                 ? `Bullets: ${profile.resume.bullets.slice(0, 6).join(" | ")}`
                 : null,
+              `Current resume model: ${resolvedResumeModel.label} (${resolvedResumeModel.id})`,
+              `Layout: ${resolvedResumeModel.headerLayout} header, ${resolvedResumeModel.asideLayout} aside, ${resolvedResumeModel.sectionStyle} sections`,
+              `Fonts: ${resolvedResumeModel.displayFont}/${resolvedResumeModel.bodyFont}`,
             ]),
           }
         : null;
+      }
     case "skills":
       return profile
         ? {

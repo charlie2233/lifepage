@@ -6,6 +6,18 @@
 
 import OpenAI from "openai";
 import { z } from "zod";
+import {
+  describePortfolioThemesForAgent,
+  getPortfolioThemePreset,
+  normalizePortfolioThemeId,
+  PortfolioThemeConfigSchema,
+} from "@/lib/portfolio-themes";
+import {
+  describeResumeModelsForAgent,
+  getResumeModelPreset,
+  normalizeResumeModelId,
+  ResumeModelConfigSchema,
+} from "@/lib/resume-models";
 
 function getOpenAI(clientConfig?: { apiKey: string; baseURL?: string }) {
   return new OpenAI({
@@ -20,6 +32,8 @@ export type ToolName =
   | "generate_timeline"
   | "generate_video_script"
   | "generate_tree"
+  | "set_portfolio_theme"
+  | "set_resume_model"
   | "regenerate_profile"
   | "recrawl_url"
   | "chat";
@@ -339,6 +353,210 @@ Rules:
   return TreeOutputSchema.parse(parsed);
 }
 
+// ─── Portfolio theme tool ────────────────────────────────────────────────────
+
+const PortfolioThemeOutputSchema = z.object({
+  themeId: z.string(),
+  themeConfig: PortfolioThemeConfigSchema.nullable().optional(),
+  themeLabel: z.string(),
+  summary: z.string(),
+  rationale: z.string(),
+  changes: z.array(z.string()).default([]),
+});
+
+export type PortfolioThemeOutput = z.infer<typeof PortfolioThemeOutputSchema>;
+
+export async function setPortfolioTheme(
+  context: string,
+  model: string,
+  style: string = "custom",
+  options?: AgentPromptOptions,
+  clientConfig?: { apiKey: string; baseURL?: string },
+  maxTokens?: number
+): Promise<PortfolioThemeOutput> {
+  const normalizedStyle = style === "custom" ? "custom" : normalizePortfolioThemeId(style);
+
+  if (normalizedStyle !== "custom") {
+    const preset = getPortfolioThemePreset(normalizedStyle);
+    return PortfolioThemeOutputSchema.parse({
+      themeId: normalizedStyle,
+      themeConfig: null,
+      themeLabel: preset.label,
+      summary: `Applied the ${preset.label} portfolio model to the public portfolio.`,
+      rationale:
+        options?.userRequest ??
+        `Switch the portfolio to the ${preset.label} model.`,
+      changes: [
+        `Updated the hero to the ${preset.heroLayout} layout.`,
+        `Switched projects to the ${preset.projectLayout} card system and timeline to ${preset.timelineLayout}.`,
+        `Applied the ${preset.displayFont}/${preset.bodyFont} font pairing and ${preset.proofLayout} proof layout.`,
+        "Reset any previous custom theme overrides.",
+      ],
+    });
+  }
+
+  const prompt = `You are a premium portfolio art director. Create a safe structured theme variant for a personal portfolio.
+
+Context about the person:
+${context}
+
+${buildFocusPrompt(options)}
+${options?.userRequest ? `User request:\n${options.userRequest}\n` : ""}
+
+Available preset themes:
+${describePortfolioThemesForAgent()}
+
+Return a JSON object only:
+{
+  "themeId": "custom",
+  "themeConfig": {
+    "baseThemeId": "one available preset id",
+    "variant": "dark or light",
+    "accent": "#RRGGBB",
+    "accentSecondary": "#RRGGBB",
+    "accentWarm": "#RRGGBB",
+    "display": "serif or sans",
+    "displayFont": "fraunces|cormorant|space|sora",
+    "bodyFont": "manrope|space|sora",
+    "heroLayout": "split|centered|editorial",
+    "projectLayout": "grid|feature|stack",
+    "timelineLayout": "cards|rail|minimal",
+    "statsLayout": "tiles|band|pills",
+    "proofLayout": "grid|spotlight|mosaic"
+  },
+  "themeLabel": "Short title for the variant",
+  "summary": "One sentence on the resulting look",
+  "rationale": "Why this visual direction fits the person's brand and work",
+  "changes": ["3-5 short concrete visual changes"]
+}
+
+Rules:
+- themeId must be "custom"
+- Choose exactly one baseThemeId from the available presets
+- All colors must be valid 6-digit hex values
+- Keep the selected display/body fonts and layout variants coherent with the requested brand direction
+- Stay tasteful and production-safe; no gimmicks, no novelty neon overload
+- Match the user's brand context and evidence
+- Focus on layout mood, typography direction, and palette; do not mention CSS or code`;
+
+  const completion = await getOpenAI(clientConfig).chat.completions.create({
+    model,
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+    temperature: 0.6,
+    ...(maxTokens ? { max_tokens: maxTokens } : {}),
+  });
+
+  const raw = completion.choices[0]?.message?.content ?? "{}";
+  const parsed = JSON.parse(raw) as unknown;
+  const validated = PortfolioThemeOutputSchema.parse(parsed);
+
+  return {
+    ...validated,
+    themeId: "custom",
+    themeConfig: validated.themeConfig ?? {},
+  };
+}
+
+// ─── Resume model tool ───────────────────────────────────────────────────────
+
+const ResumeModelOutputSchema = z.object({
+  modelId: z.string(),
+  modelConfig: ResumeModelConfigSchema.nullable().optional(),
+  modelLabel: z.string(),
+  summary: z.string(),
+  rationale: z.string(),
+  changes: z.array(z.string()).default([]),
+});
+
+export type ResumeModelOutput = z.infer<typeof ResumeModelOutputSchema>;
+
+export async function setResumeModel(
+  context: string,
+  model: string,
+  style: string = "custom",
+  options?: AgentPromptOptions,
+  clientConfig?: { apiKey: string; baseURL?: string },
+  maxTokens?: number
+): Promise<ResumeModelOutput> {
+  const normalizedStyle = style === "custom" ? "custom" : normalizeResumeModelId(style);
+
+  if (normalizedStyle !== "custom") {
+    const preset = getResumeModelPreset(normalizedStyle);
+    return ResumeModelOutputSchema.parse({
+      modelId: normalizedStyle,
+      modelConfig: null,
+      modelLabel: preset.label,
+      summary: `Applied the ${preset.label} resume model to the public resume page.`,
+      rationale:
+        options?.userRequest ??
+        `Switch the resume to the ${preset.label} model.`,
+      changes: [
+        `Updated the resume header to the ${preset.headerLayout} layout.`,
+        `Switched the resume structure to ${preset.sectionStyle} sections with a ${preset.asideLayout} info rail.`,
+        `Applied the ${preset.displayFont}/${preset.bodyFont} font pairing and ${preset.bulletStyle} bullet treatment.`,
+        "Reset any previous custom resume-model overrides.",
+      ],
+    });
+  }
+
+  const prompt = `You are a premium resume art director and screening strategist. Create a safe structured resume model variant for a public portfolio resume page.
+
+Context about the person:
+${context}
+
+${buildFocusPrompt(options)}
+${options?.userRequest ? `User request:\n${options.userRequest}\n` : ""}
+
+Available preset resume models:
+${describeResumeModelsForAgent()}
+
+Return a JSON object only:
+{
+  "modelId": "custom",
+  "modelConfig": {
+    "baseModelId": "one available preset id",
+    "displayFont": "fraunces|cormorant|space|sora",
+    "bodyFont": "manrope|space|sora",
+    "headerLayout": "split|centered|stacked",
+    "asideLayout": "right|left|top|hidden",
+    "sectionStyle": "dividers|cards|bands",
+    "bulletStyle": "dot|dash|diamond",
+    "accent": "#RRGGBB"
+  },
+  "modelLabel": "Short title for the resume model",
+  "summary": "One sentence on the resulting resume look",
+  "rationale": "Why this resume direction fits the person's goals",
+  "changes": ["3-5 short concrete visual or structural changes"]
+}
+
+Rules:
+- modelId must be "custom"
+- Choose exactly one baseModelId from the available presets
+- All colors must be valid 6-digit hex values
+- Keep the layout practical for hiring managers or admissions readers
+- Stay structured and production-safe; no gimmicks and no raw CSS
+- Focus on hierarchy, screening clarity, and tone rather than design jargon`;
+
+  const completion = await getOpenAI(clientConfig).chat.completions.create({
+    model,
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+    temperature: 0.6,
+    ...(maxTokens ? { max_tokens: maxTokens } : {}),
+  });
+
+  const raw = completion.choices[0]?.message?.content ?? "{}";
+  const parsed = JSON.parse(raw) as unknown;
+  const validated = ResumeModelOutputSchema.parse(parsed);
+
+  return {
+    ...validated,
+    modelId: "custom",
+    modelConfig: validated.modelConfig ?? {},
+  };
+}
+
 // ─── Chat / general agent tool ─────────────────────────────────────────────────
 
 export async function agentChat(
@@ -357,6 +575,8 @@ You have access to these tools you can suggest using:
 - generate_timeline: Create timeline trees in styles: ${TIMELINE_STYLES.join(", ")}
 - generate_video_script: Create video scripts in styles: ${VIDEO_STYLES.join(", ")}  
 - generate_tree: Create skill/project/career trees in styles: ${TREE_STYLES.join(", ")}
+- set_portfolio_theme: Apply a public portfolio theme in styles: custom, ${describePortfolioThemesForAgent()}
+- set_resume_model: Apply a public resume model in styles: custom, ${describeResumeModelsForAgent()}
 - regenerate_profile: Refresh the AI-generated portfolio profile
 - recrawl_url: Re-crawl a specific URL to get fresh content
 
@@ -379,6 +599,10 @@ or
 [TOOL: generate_video_script style=pitch]
 or
 [TOOL: generate_tree style=skills]
+or
+[TOOL: set_portfolio_theme style=custom]
+or
+[TOOL: set_resume_model style=executive]
 
 Otherwise, give helpful advice about personal branding, portfolio building, and career development.
 Be concise, practical, and direct.`;

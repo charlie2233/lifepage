@@ -35,7 +35,8 @@ const SITE_AUTHOR_URL = "https://atrak.dev";
 
 const DEFAULT_METADATA: Metadata = {
   title: "LifePage",
-  description: "AI-powered personal brand builder that turns your work into a live, deployable site.",
+  description:
+    "AI-powered personal brand and life-story builder for creators, students, job seekers, and people documenting their life.",
 };
 
 const DEMO_PROFILES = [
@@ -117,6 +118,33 @@ const FEATURES: Array<{
   { icon: LayoutGrid, title: "Explore Page", desc: "Browse public personal brands and discover creators, engineers, and builders." },
 ];
 
+const WHO_ITS_FOR: Array<{
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+}> = [
+  {
+    icon: Sparkles,
+    title: "People building a personal brand",
+    desc: "Turn your links, work, and proof into a polished site that feels intentional and easy to share.",
+  },
+  {
+    icon: GraduationCap,
+    title: "Students applying to college",
+    desc: "Show projects, growth, leadership, and ambition in a format admissions teams can actually follow.",
+  },
+  {
+    icon: BriefcaseBusiness,
+    title: "People applying for jobs",
+    desc: "Give recruiters and hiring managers a stronger story than a resume alone can carry.",
+  },
+  {
+    icon: ChartColumn,
+    title: "People recording their life",
+    desc: "Document milestones, timelines, projects, memories, and the way your life evolves over time.",
+  },
+];
+
 const PRICING = [
   {
     name: "Free",
@@ -180,354 +208,626 @@ export async function generateMetadata(): Promise<Metadata> {
 
 function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white overflow-hidden">
-
-      {/* ── Background glow blobs ── */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-[#00f5ff]/8 blur-[120px]" />
-        <div className="absolute top-1/2 -right-40 w-[500px] h-[500px] rounded-full bg-[#7c3aed]/8 blur-[120px]" />
-        <div className="absolute -bottom-20 left-1/3 w-[400px] h-[400px] rounded-full bg-[#f97316]/6 blur-[100px]" />
+    <div className="lp-page overflow-hidden text-white">
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-32 left-[8%] h-[30rem] w-[30rem] rounded-full bg-[#79e5d2]/10 blur-[120px]" />
+        <div className="absolute right-[4%] top-[16%] h-[26rem] w-[26rem] rounded-full bg-[#8fa9ff]/12 blur-[120px]" />
+        <div className="absolute bottom-[6%] left-[38%] h-[20rem] w-[20rem] rounded-full bg-[#f3b276]/10 blur-[110px]" />
       </div>
 
-      {/* ── Nav ── */}
-      <nav className="relative z-10 flex items-center justify-between px-6 md:px-10 py-5 border-b border-white/8 backdrop-blur-sm">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-[#00f5ff] flex items-center justify-center">
-            <span className="text-black font-black text-xs">LP</span>
+      <nav className="relative z-10 border-b border-white/8 bg-[#091015]/70 backdrop-blur-2xl">
+        <div className="lp-shell flex items-center justify-between py-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[11px] font-black tracking-[0.24em] text-[#041117] shadow-[0_14px_40px_rgba(121,229,210,0.18)]">
+              LP
+            </div>
+            <div>
+              <p className="brand-display text-[1.35rem] leading-none tracking-tight">
+                LifePage
+              </p>
+              <p className="lp-kicker mt-1 text-[10px] text-[#94a2ad]">
+                Brand, proof, deploy
+              </p>
+            </div>
           </div>
-          <span className="text-xl font-bold tracking-tight">
-            Life<span className="text-[#00f5ff]">Page</span>
-          </span>
-        </div>
-        <div className="flex items-center gap-2 md:gap-3">
-          <Link
-            href="#contact"
-            className="hidden sm:inline-flex text-sm text-gray-400 hover:text-white px-3 py-1.5 transition-colors"
-          >
-            Contact
-          </Link>
-          <Link
-            href="/explore"
-            className="hidden sm:inline-flex text-sm text-gray-400 hover:text-white px-3 py-1.5 transition-colors"
-          >
-            Explore
-          </Link>
-          <Link
-            href="/login"
-            className="text-sm text-gray-300 hover:text-white px-4 py-2 rounded-xl border border-white/10 hover:border-white/20 transition-all"
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/register"
-            className="text-sm bg-[#00f5ff] text-black px-4 py-2 rounded-xl font-semibold hover:bg-[#00e5ef] transition-colors shadow-lg shadow-[#00f5ff]/20"
-          >
-            Get Started
-          </Link>
-        </div>
-      </nav>
 
-      {/* ── Hero ── */}
-      <section className="relative z-10 flex flex-col items-center text-center px-6 pt-24 pb-16 md:pt-32 md:pb-20">
-        {/* Badge */}
-        <div className="inline-flex items-center gap-2 bg-[#00f5ff]/10 border border-[#00f5ff]/25 rounded-full px-4 py-1.5 text-sm text-[#00f5ff] mb-8">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#00f5ff] animate-pulse" />
-          AI Personal Brand Builder
-        </div>
-
-        {/* Headline */}
-        <h1 className="text-5xl md:text-7xl font-extrabold leading-[1.08] tracking-tight mb-6 max-w-4xl">
-          Build your{" "}
-          <span className="relative">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00f5ff] via-[#7c3aed] to-[#f97316]">
-              personal brand
-            </span>
-          </span>
-          . Deploy it instantly.
-        </h1>
-
-        <p className="text-lg md:text-xl text-gray-400 max-w-2xl mb-10 leading-relaxed">
-          Paste a URL — your website, GitHub, YouTube, or project link — and the AI
-          crawls it, screenshots it, and turns it into a deployable personal brand site in seconds.
-          Publish it <strong className="text-white">public, link-only, or private</strong>, just like a GitHub repo.
-        </p>
-
-        {/* CTAs */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <Link
-            href="/register"
-            className="group flex items-center justify-center gap-2 bg-[#00f5ff] text-black px-8 py-3.5 rounded-xl text-base font-bold hover:bg-[#00e5ef] transition-all shadow-xl shadow-[#00f5ff]/25 hover:shadow-[#00f5ff]/40 hover:-translate-y-0.5"
-          >
-            Build my brand
-            <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
-          </Link>
-          <Link
-            href="/explore"
-            className="flex items-center justify-center gap-2 border border-white/15 text-white px-8 py-3.5 rounded-xl text-base hover:bg-white/5 hover:border-white/25 transition-all"
-          >
-            <Search className="h-4 w-4" />
-            Explore brands
-          </Link>
-        </div>
-        <p className="text-xs text-gray-600">Free to start · No credit card · {SITE_AUTHOR}</p>
-      </section>
-
-      {/* ── Live portfolio cards preview ── */}
-      <section className="relative z-10 max-w-5xl mx-auto px-6 pb-20">
-        <div className="text-center mb-10">
-          <p className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-2">Example portfolios</p>
-          <h2 className="text-2xl md:text-3xl font-bold">See personal brands in the wild</h2>
-          <p className="text-gray-400 text-sm mt-2">
-            Browse live brand pages, share with a direct link, or keep yours fully private
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-4">
-          {DEMO_PROFILES.map((p) => (
-            <div
-              key={p.username}
-              className={`relative group rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all hover:-translate-y-1 cursor-pointer`}
-            >
-              {/* Card gradient bg */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${p.gradient} opacity-60`} />
-              <div className="absolute inset-0 bg-[#0a0a0a]/70" />
-
-              <div className="relative p-5">
-                {/* Public/Private badge — GitHub style */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-black"
-                      style={{ background: p.accent }}
-                    >
-                      {p.name[0]}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold leading-none">{p.name}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">@{p.username}</p>
-                    </div>
-                  </div>
-                  {/* Public/Private pill like GitHub */}
-                  <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${
-                    p.isPublic
-                      ? "border-green-500/30 text-green-400 bg-green-500/10"
-                      : "border-gray-500/30 text-gray-400 bg-gray-500/10"
-                  }`}>
-                    {p.isPublic ? (
-                      <>
-                        <Globe className="h-3 w-3" />
-                        Public
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="h-3 w-3" />
-                        Private
-                      </>
-                    )}
-                  </span>
-                </div>
-
-                <p className="text-xs text-gray-400 mb-3 leading-snug">{p.headline}</p>
-
-                {/* Skills */}
-                <div className="flex flex-wrap gap-1 mb-4">
-                  {p.skills.map((s) => (
-                    <span key={s} className="text-xs bg-white/8 border border-white/10 rounded-md px-2 py-0.5 text-gray-300">
-                      {s}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Stats */}
-                <div className="flex gap-4 text-xs text-gray-500">
-                  <span><b className="text-white">{p.stats.projects}</b> projects</span>
-                  <span><b className="text-white">{p.stats.years}</b> yrs building</span>
-                </div>
-
-                {/* View button — only on hover, only for public */}
-                {p.isPublic && (
-                  <Link
-                    href={`/u/${p.username}`}
-                    className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-end p-5 transition-opacity"
-                  >
-                    <span
-                      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold text-black"
-                      style={{ background: p.accent }}
-                    >
-                      View portfolio
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                    </span>
-                  </Link>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="text-center mt-6">
-          <Link
-            href="/explore"
-            className="inline-flex items-center gap-2 text-sm text-[#00f5ff] hover:underline"
-          >
-            Browse all public portfolios
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </section>
-
-      {/* ── How it works ── */}
-      <section className="relative z-10 max-w-5xl mx-auto px-6 py-16 border-t border-white/8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-3">How it works</h2>
-          <p className="text-gray-400">Three steps. Zero manual data entry.</p>
-        </div>
-        <div className="grid md:grid-cols-3 gap-6">
-          {HOW_IT_WORKS.map((item, i) => {
-            const Icon = item.icon;
-            return (
-            <div
-              key={item.step}
-              className="relative bg-white/3 border border-white/8 rounded-2xl p-6 hover:border-white/15 transition-colors"
-            >
-              {i < 2 && (
-                <div className="hidden md:block absolute top-8 -right-4 text-gray-700 z-10">
-                  <ArrowRight className="h-4 w-4" />
-                </div>
-              )}
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
-                style={{ background: `${item.color}18`, border: `1px solid ${item.color}30` }}
-              >
-                <Icon className="h-5 w-5" style={{ color: item.color }} />
-              </div>
-              <div className="text-xs font-mono mb-1" style={{ color: item.color }}>{item.step}</div>
-              <h3 className="font-semibold mb-2">{item.title}</h3>
-              <p className="text-sm text-gray-400 leading-relaxed">{item.desc}</p>
-            </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ── Features grid ── */}
-      <section className="relative z-10 max-w-5xl mx-auto px-6 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-3">Everything you need</h2>
-          <p className="text-gray-400">Built for students, engineers, and creators.</p>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {FEATURES.map((f) => {
-            const Icon = f.icon;
-            return (
-            <div
-              key={f.title}
-              className="flex gap-3 bg-white/3 border border-white/8 rounded-xl p-4 hover:bg-white/5 hover:border-white/15 transition-all"
-            >
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-                <Icon className="h-[18px] w-[18px] text-[#00f5ff]" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm mb-1">{f.title}</h3>
-                <p className="text-xs text-gray-400 leading-relaxed">{f.desc}</p>
-              </div>
-            </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="relative z-10 max-w-5xl mx-auto px-6 py-16 border-t border-white/8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-3">Simple pricing</h2>
-          <p className="text-gray-400">
-            Free gets monthly advanced AI credits. Plus adds more. Pro removes the cap.
-          </p>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {PRICING.map((tier) => (
-            <div
-              key={tier.name}
-              className={`rounded-2xl border p-6 ${
-                tier.name === "Plus"
-                  ? "border-[#00f5ff]/30 bg-[#00f5ff]/8"
-                  : "border-white/10 bg-white/3"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div>
-                  <p className="text-lg font-semibold">{tier.name}</p>
-                  <p className="mt-1 text-3xl font-bold">
-                    {tier.price}
-                    <span className="text-sm font-medium text-gray-500">/mo</span>
-                  </p>
-                </div>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300">
-                  {tier.badge}
-                </span>
-              </div>
-              <p className="text-sm text-white mb-2">{tier.detail}</p>
-              <p className="text-sm leading-relaxed text-gray-400">{tier.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Sign-up CTA banner ── */}
-      <section className="relative z-10 max-w-5xl mx-auto px-6 pb-20">
-        <div className="relative rounded-2xl overflow-hidden border border-[#00f5ff]/20 bg-gradient-to-br from-[#00f5ff]/8 via-transparent to-[#7c3aed]/8 p-10 text-center">
-          <div aria-hidden className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-px bg-gradient-to-r from-transparent via-[#00f5ff]/50 to-transparent" />
-          </div>
-          <h2 className="text-3xl md:text-4xl font-bold mb-3">
-            Ready to launch your brand?
-          </h2>
-          <p className="text-gray-400 mb-8 max-w-md mx-auto">
-            Turn your work into a polished personal brand site and deploy it in minutes.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex items-center gap-2 md:gap-3">
             <Link
-              href="/register"
-              className="inline-flex items-center gap-2 bg-[#00f5ff] text-black px-8 py-3.5 rounded-xl font-bold hover:bg-[#00e5ef] transition-all shadow-xl shadow-[#00f5ff]/25 hover:-translate-y-0.5"
+              href="#contact"
+              className="lp-button-ghost hidden px-3 py-2 text-sm sm:inline-flex"
             >
-              Build my brand
-              <ArrowRight className="h-4 w-4" />
+              Contact
+            </Link>
+            <Link
+              href="/explore"
+              className="lp-button-ghost hidden px-3 py-2 text-sm sm:inline-flex"
+            >
+              Explore
             </Link>
             <Link
               href="/login"
-              className="border border-white/15 text-gray-300 px-8 py-3.5 rounded-xl hover:bg-white/5 hover:border-white/25 transition-all"
+              className="lp-button-secondary px-4 py-2 text-sm"
             >
               Sign In
             </Link>
             <Link
-              href="#contact"
-              className="border border-white/15 text-gray-300 px-8 py-3.5 rounded-xl hover:bg-white/5 hover:border-white/25 transition-all"
+              href="/register"
+              className="lp-button-primary px-4 py-2 text-sm"
             >
-              Contact us
+              Get Started
             </Link>
+          </div>
+        </div>
+      </nav>
+
+      <section className="relative z-10">
+        <div className="lp-shell grid gap-10 py-20 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)] lg:items-center lg:py-28">
+          <div className="lp-fade-rise">
+            <div className="lp-chip px-4 py-2 text-sm">
+              <span className="h-2 w-2 rounded-full bg-[#79e5d2]" />
+              AI personal brand builder
+            </div>
+
+            <h1 className="brand-display mt-8 max-w-4xl text-[3.4rem] leading-[0.95] tracking-[-0.05em] text-[#f8f3ea] sm:text-[4.4rem] lg:text-[5.6rem]">
+              Build your personal brand.
+              <span className="block text-transparent bg-[linear-gradient(120deg,#79e5d2_0%,#b9fff1_34%,#f3b276_100%)] bg-clip-text">
+                Deploy it like a product.
+              </span>
+            </h1>
+
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-[#a4b1ba] sm:text-xl">
+              Paste a URL and LifePage turns scattered proof into a sharp public
+              site. It crawls your work, structures the story, and publishes it
+              as a brand page you can keep public, link-only, or private.
+            </p>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/register"
+                className="lp-button-primary px-7 py-3.5 text-base"
+              >
+                Build my brand
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/explore"
+                className="lp-button-secondary px-7 py-3.5 text-base"
+              >
+                <Search className="h-4 w-4" />
+                Explore brands
+              </Link>
+            </div>
+
+            <div className="mt-7 flex flex-wrap gap-2.5 text-sm text-[#c9d2d9]">
+              <span className="lp-chip px-3.5 py-2">Personal brands</span>
+              <span className="lp-chip px-3.5 py-2">College applications</span>
+              <span className="lp-chip px-3.5 py-2">Job applications</span>
+              <span className="lp-chip px-3.5 py-2">Life documentation</span>
+            </div>
+
+            <div className="mt-8 flex flex-wrap gap-3 text-sm text-[#8d9aa5]">
+              <span className="lp-chip px-3 py-1.5">Free to start</span>
+              <span className="lp-chip px-3 py-1.5">No credit card</span>
+              <span className="lp-chip px-3 py-1.5">Built by {SITE_AUTHOR}</span>
+            </div>
+          </div>
+
+          <div className="relative lg:pl-6">
+            <div className="lp-panel rounded-[2rem] p-5 sm:p-6">
+              <div className="grid gap-4">
+                <div className="rounded-[1.5rem] border border-white/10 bg-[rgba(255,255,255,0.035)] p-4">
+                  <div className="flex items-center justify-between text-xs text-[#a9b6be]">
+                    <span className="lp-kicker text-[10px] text-[#79e5d2]">
+                      Brand flow
+                    </span>
+                    <span>2 min launch</span>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {[
+                      { icon: Link2, label: "Import proof", copy: "Website, GitHub, YouTube, Google Sites" },
+                      { icon: Bot, label: "Shape the story", copy: "AI turns evidence into projects, timeline, and resume" },
+                      { icon: Globe, label: "Deploy anywhere", copy: "/u/yourname or your own domain with access controls" },
+                    ].map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <div
+                          key={item.label}
+                          className="flex items-start gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-3"
+                        >
+                          <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl border border-[#79e5d2]/15 bg-[#79e5d2]/10">
+                            <Icon className="h-4 w-4 text-[#79e5d2]" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-[#f4efe8]">
+                              {item.label}
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-[#93a1ab]">
+                              {item.copy}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="rounded-[1.75rem] border border-white/10 bg-[#0a1115]/90 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="lp-kicker text-[10px] text-[#94a2ad]">
+                        Live preview
+                      </p>
+                      <p className="mt-2 brand-display text-2xl tracking-tight">
+                        alexchen.com
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200">
+                      Public
+                    </span>
+                  </div>
+
+                  <div className="mt-5 rounded-[1.5rem] border border-white/8 bg-[linear-gradient(160deg,rgba(121,229,210,0.09),rgba(255,255,255,0.02))] p-5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-lg font-bold text-[#081116]">
+                        A
+                      </div>
+                      <div>
+                        <p className="text-base font-semibold text-[#f7f1e8]">
+                          Alex Chen
+                        </p>
+                        <p className="text-sm text-[#91a0aa]">
+                          Full-stack engineer building AI products
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-3 gap-3">
+                      <div className="lp-stat-tile p-4">
+                        <p className="text-2xl font-semibold text-[#f7f1e8]">
+                          12
+                        </p>
+                        <p className="mt-1 text-xs text-[#8e9ca6]">
+                          Projects shipped
+                        </p>
+                      </div>
+                      <div className="lp-stat-tile p-4">
+                        <p className="text-2xl font-semibold text-[#f7f1e8]">
+                          4
+                        </p>
+                        <p className="mt-1 text-xs text-[#8e9ca6]">
+                          Years building
+                        </p>
+                      </div>
+                      <div className="lp-stat-tile p-4">
+                        <p className="text-2xl font-semibold text-[#f7f1e8]">
+                          1
+                        </p>
+                        <p className="mt-1 text-xs text-[#8e9ca6]">
+                          Resume export
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      {["Hiring mode", "Admissions mode", "Custom domain"].map(
+                        (label) => (
+                          <span
+                            key={label}
+                            className="rounded-full border border-white/8 bg-white/[0.04] px-3 py-1.5 text-xs text-[#d0d8de]"
+                          >
+                            {label}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {[
+                    { title: "Visibility", value: "Public, link-only, private" },
+                    { title: "AI usage", value: "Kimi, Qwen, Auto" },
+                    { title: "Deploy", value: "/u/yourname or custom domain" },
+                  ].map((item) => (
+                    <div key={item.title} className="lp-stat-tile p-4">
+                      <p className="lp-kicker text-[10px] text-[#79e5d2]">
+                        {item.title}
+                      </p>
+                      <p className="mt-3 text-sm leading-6 text-[#d3dbe0]">
+                        {item.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="relative z-10 pb-20">
+        <div className="lp-shell">
+          <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="lp-kicker text-xs text-[#79e5d2]">
+                Example portfolios
+              </p>
+              <h2 className="brand-display mt-3 text-4xl tracking-tight text-[#f8f3ea] md:text-5xl">
+                See personal brands in the wild
+              </h2>
+            </div>
+            <p className="max-w-xl text-base leading-7 text-[#97a4ae]">
+              Public pages read like a real product launch, not a link dump. Each
+              one can ship to a direct URL or a custom domain.
+            </p>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1.12fr_0.88fr_0.88fr]">
+            {DEMO_PROFILES.map((p, index) => (
+              <div
+                key={p.username}
+                className={`lp-panel group rounded-[1.75rem] ${
+                  index === 0 ? "lg:row-span-2" : ""
+                }`}
+              >
+                <div className="relative h-full p-5 sm:p-6">
+                  <div
+                    aria-hidden
+                    className={`absolute inset-x-0 top-0 h-40 bg-gradient-to-br ${p.gradient} opacity-70`}
+                  />
+                  <div className="relative flex h-full flex-col">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="flex h-11 w-11 items-center justify-center rounded-2xl text-base font-bold text-[#081116]"
+                          style={{ backgroundColor: p.accent }}
+                        >
+                          {p.name[0]}
+                        </div>
+                        <div>
+                          <p className="text-base font-semibold text-[#f8f3ea]">
+                            {p.name}
+                          </p>
+                          <p className="text-sm text-[#8e9aa4]">@{p.username}</p>
+                        </div>
+                      </div>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-xs ${
+                          p.isPublic
+                            ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
+                            : "border-white/10 bg-white/5 text-[#95a2ac]"
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          {p.isPublic ? (
+                            <Globe className="h-3.5 w-3.5" />
+                          ) : (
+                            <Lock className="h-3.5 w-3.5" />
+                          )}
+                          {p.isPublic ? "Public" : "Private"}
+                        </span>
+                      </span>
+                    </div>
+
+                    <div className="mt-10">
+                      <p className="lp-kicker text-[10px] text-[#94a2ad]">
+                        Brand headline
+                      </p>
+                      <p className="mt-3 brand-display text-2xl leading-tight tracking-tight text-[#f7f1e8]">
+                        {p.headline}
+                      </p>
+                    </div>
+
+                    <div className="mt-6 flex flex-wrap gap-2">
+                      {p.skills.map((skill) => (
+                        <span
+                          key={skill}
+                          className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-[#d0d8de]"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="mt-6 grid grid-cols-2 gap-3">
+                      <div className="lp-stat-tile p-4">
+                        <p className="text-2xl font-semibold text-[#f7f1e8]">
+                          {p.stats.projects}
+                        </p>
+                        <p className="mt-1 text-xs text-[#8e9ca6]">Projects</p>
+                      </div>
+                      <div className="lp-stat-tile p-4">
+                        <p className="text-2xl font-semibold text-[#f7f1e8]">
+                          {p.stats.years}
+                        </p>
+                        <p className="mt-1 text-xs text-[#8e9ca6]">
+                          Years building
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-auto pt-6">
+                      {p.isPublic ? (
+                        <Link
+                          href={`/u/${p.username}`}
+                          className="inline-flex items-center gap-2 text-sm font-medium text-[#f7f1e8] hover:text-[#79e5d2]"
+                        >
+                          View portfolio
+                          <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                        </Link>
+                      ) : (
+                        <p className="text-sm text-[#8c98a1]">
+                          Private mode keeps the page hidden from Explore.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8">
+            <Link
+              href="/explore"
+              className="inline-flex items-center gap-2 text-sm text-[#79e5d2] hover:text-[#cffff6]"
+            >
+              Browse all public portfolios
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="relative z-10 border-t border-white/8 py-20">
+        <div className="lp-shell">
+          <div className="mb-10">
+            <p className="lp-kicker text-xs text-[#79e5d2]">How it works</p>
+            <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <h2 className="brand-display text-4xl tracking-tight text-[#f8f3ea] md:text-5xl">
+                Three moves from raw links to a deployable brand site
+              </h2>
+              <p className="max-w-lg text-base leading-7 text-[#97a4ae]">
+                The experience should feel closer to shipping a product than
+                filling out a profile form.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-3">
+            {HOW_IT_WORKS.map((item, i) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.step} className="lp-panel rounded-[1.75rem] p-6">
+                  <div className="flex items-center justify-between">
+                    <div
+                      className="flex h-12 w-12 items-center justify-center rounded-2xl"
+                      style={{
+                        background: `${item.color}18`,
+                        border: `1px solid ${item.color}28`,
+                      }}
+                    >
+                      <Icon className="h-5 w-5" style={{ color: item.color }} />
+                    </div>
+                    <span className="lp-kicker text-[11px]" style={{ color: item.color }}>
+                      {item.step}
+                    </span>
+                  </div>
+                  <h3 className="mt-10 text-xl font-semibold text-[#f7f1e8]">
+                    {item.title}
+                  </h3>
+                  <p className="mt-3 text-sm leading-7 text-[#96a3ad]">
+                    {item.desc}
+                  </p>
+                  {i < HOW_IT_WORKS.length - 1 && (
+                    <div className="mt-8 h-px bg-gradient-to-r from-white/15 via-white/4 to-transparent" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="relative z-10 border-t border-white/8 py-20">
+        <div className="lp-shell">
+          <div className="mb-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="lp-kicker text-xs text-[#79e5d2]">Who it&apos;s for</p>
+              <h2 className="brand-display mt-3 text-4xl tracking-tight text-[#f8f3ea] md:text-5xl">
+                Built for people with a story, not just a resume
+              </h2>
+            </div>
+            <p className="max-w-lg text-base leading-7 text-[#97a4ae]">
+              LifePage covers the audiences that most portfolio tools flatten:
+              creators, applicants, professionals, and people archiving their life.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {WHO_ITS_FOR.map((group) => {
+              const Icon = group.icon;
+              return (
+                <div
+                  key={group.title}
+                  className="lp-panel rounded-[1.75rem] p-6"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                      <Icon className="h-5 w-5 text-[#79e5d2]" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-[#f7f1e8]">
+                        {group.title}
+                      </h3>
+                      <p className="mt-2 text-sm leading-7 text-[#98a5ae]">
+                        {group.desc}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="relative z-10 py-20">
+        <div className="lp-shell">
+          <div className="mb-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="lp-kicker text-xs text-[#79e5d2]">Core product</p>
+              <h2 className="brand-display mt-3 text-4xl tracking-tight text-[#f8f3ea] md:text-5xl">
+                Everything needed to shape, host, and share a brand page
+              </h2>
+            </div>
+            <p className="max-w-lg text-base leading-7 text-[#97a4ae]">
+              The value is not just generation. It is the whole loop: import,
+              structure, edit, export, host, and deploy.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {FEATURES.map((feature) => {
+              const Icon = feature.icon;
+              return (
+                <div key={feature.title} className="lp-panel rounded-[1.5rem] p-5">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                    <Icon className="h-5 w-5 text-[#79e5d2]" />
+                  </div>
+                  <h3 className="mt-5 text-lg font-semibold text-[#f7f1e8]">
+                    {feature.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-7 text-[#97a4ae]">
+                    {feature.desc}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="relative z-10 border-t border-white/8 py-20">
+        <div className="lp-shell">
+          <div className="mb-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="lp-kicker text-xs text-[#79e5d2]">Pricing</p>
+              <h2 className="brand-display mt-3 text-4xl tracking-tight text-[#f8f3ea] md:text-5xl">
+                Small plans, clear credit logic
+              </h2>
+            </div>
+            <p className="max-w-lg text-base leading-7 text-[#97a4ae]">
+              Free gets advanced credits each month. Plus adds room. Pro removes
+              the ceiling for heavy builders.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {PRICING.map((tier) => (
+              <div
+                key={tier.name}
+                className={`lp-panel rounded-[1.75rem] p-6 ${
+                  tier.name === "Plus"
+                    ? "border-[#79e5d2]/30 bg-[linear-gradient(180deg,rgba(121,229,210,0.12),rgba(255,255,255,0.03))]"
+                    : ""
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-lg font-semibold text-[#f7f1e8]">
+                      {tier.name}
+                    </p>
+                    <p className="mt-2 brand-display text-5xl tracking-tight text-[#f8f3ea]">
+                      {tier.price}
+                      <span className="ml-1 text-base font-medium text-[#95a2ac]">
+                        /mo
+                      </span>
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#cbd3d9]">
+                    {tier.badge}
+                  </span>
+                </div>
+                <p className="mt-8 text-sm font-medium text-[#f8f1e8]">
+                  {tier.detail}
+                </p>
+                <p className="mt-3 text-sm leading-7 text-[#97a4ae]">
+                  {tier.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="relative z-10 pb-20 pt-6">
+        <div className="lp-shell">
+          <div className="lp-panel rounded-[2rem] px-6 py-10 text-center sm:px-10 sm:py-12">
+            <p className="lp-kicker text-xs text-[#79e5d2]">Launch</p>
+            <h2 className="brand-display mt-4 text-4xl tracking-tight text-[#f8f3ea] md:text-5xl">
+              Ready to launch your brand?
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-[#97a4ae]">
+              Turn your work into a polished brand site, export the resume, and
+              publish it in minutes.
+            </p>
+            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+              <Link
+                href="/register"
+                className="lp-button-primary px-8 py-3.5 text-base"
+              >
+                Build my brand
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/login"
+                className="lp-button-secondary px-8 py-3.5 text-base"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="#contact"
+                className="lp-button-secondary px-8 py-3.5 text-base"
+              >
+                Contact us
+              </Link>
+            </div>
           </div>
         </div>
       </section>
 
       <ContactSection />
 
-      {/* ── Footer ── */}
-      <footer className="relative z-10 border-t border-white/8 py-8 px-6">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-[#00f5ff] flex items-center justify-center">
-              <span className="text-black font-black text-[8px]">LP</span>
+      <footer className="relative z-10 border-t border-white/8 py-8">
+        <div className="lp-shell flex flex-col gap-4 text-sm text-[#8f9ca6] sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[10px] font-black tracking-[0.2em] text-[#041117]">
+              LP
             </div>
-            <span>LifePage</span>
+            <div>
+              <p className="brand-display text-lg leading-none text-[#f7f1e8]">
+                LifePage
+              </p>
+              <p className="mt-1 text-xs text-[#8f9ca6]">
+                Brand builder for people with proof
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-6 text-xs">
-            <Link href="/explore" className="hover:text-white transition-colors">Explore</Link>
-            <Link href="#contact" className="hover:text-white transition-colors">Contact</Link>
-            <Link href="/login" className="hover:text-white transition-colors">Sign In</Link>
-            <Link href="/register" className="hover:text-white transition-colors">Register</Link>
+          <div className="flex flex-wrap items-center gap-5 text-xs uppercase tracking-[0.14em] text-[#8f9ca6]">
+            <Link href="/explore" className="hover:text-white">Explore</Link>
+            <Link href="#contact" className="hover:text-white">Contact</Link>
+            <Link href="/login" className="hover:text-white">Sign In</Link>
+            <Link href="/register" className="hover:text-white">Register</Link>
           </div>
           <p className="text-xs">
             Built by{" "}
-            <a href={SITE_AUTHOR_URL} target="_blank" rel="noopener noreferrer" className="text-[#00f5ff] hover:underline">
+            <a
+              href={SITE_AUTHOR_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#79e5d2] hover:text-[#cffff6]"
+            >
               {SITE_AUTHOR}
             </a>
           </p>

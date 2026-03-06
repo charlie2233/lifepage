@@ -1,234 +1,379 @@
-import { prisma } from "@/lib/db";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowRight, ArrowUpRight, Compass, Globe, Sparkles } from "lucide-react";
+import { prisma } from "@/lib/db";
+import { getDemoExploreProfiles } from "@/lib/demo-public-pages";
+import { resolvePortfolioTheme } from "@/lib/portfolio-themes";
 
 export const metadata: Metadata = {
   title: "Explore Personal Brands — LifePage",
   description: "Browse public personal brand sites built and deployed with LifePage.",
 };
 
-// Always dynamically rendered — needs DB access
 export const dynamic = "force-dynamic";
 
 interface ProfileData {
   headline?: string;
   skills?: Array<{ tag: string }>;
-  stats?: { projectsShipped?: number; yearsBuilding?: number; competitions?: number };
+  stats?: {
+    projectsShipped?: number;
+    yearsBuilding?: number;
+    competitions?: number;
+  };
 }
 
 export default async function ExplorePage() {
-  const users = await prisma.user.findMany({
-    where: {
-      publicPageSettings: { is: { visibility: "public" } },
-      generatedProfiles: { some: { isActive: true } },
-    },
-    select: {
-      username: true,
-      name: true,
-      avatar: true,
-      createdAt: true,
-      generatedProfiles: {
-        where: { isActive: true },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { data: true },
-      },
-      publicPageSettings: {
-        select: { theme: true },
-      },
-      evidenceItems: {
-        where: { visible: true },
-        orderBy: { createdAt: "asc" },
-        take: 1,
-        select: { screenshot: true, title: true },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 48,
-  });
+  let profiles: Array<{
+    username: string;
+    name: string;
+    avatar: string | null;
+    headline: string | null;
+    skills: string[];
+    stats: ProfileData["stats"];
+    theme: string;
+    screenshot: string | null;
+    joinedAt: Date;
+  }> = [];
 
-  const profiles = users
-    .filter((u) => u.username)
-    .map((u) => {
-      const data = (u.generatedProfiles[0]?.data ?? {}) as ProfileData;
-      return {
-        username: u.username!,
-        name: u.name ?? u.username!,
-        avatar: u.avatar,
-        headline: data.headline ?? null,
-        skills: (data.skills ?? []).slice(0, 4).map((s) => s.tag),
-        stats: data.stats ?? {},
-        theme: u.publicPageSettings?.theme ?? "obsidian",
-        screenshot: u.evidenceItems[0]?.screenshot ?? null,
-        joinedAt: u.createdAt,
-      };
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        publicPageSettings: { is: { isPublic: true } },
+        generatedProfiles: { some: { isActive: true } },
+      },
+      select: {
+        username: true,
+        name: true,
+        avatar: true,
+        createdAt: true,
+        generatedProfiles: {
+          where: { isActive: true },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { data: true },
+        },
+        publicPageSettings: {
+          select: { theme: true },
+        },
+        evidenceItems: {
+          where: { visible: true },
+          orderBy: { createdAt: "asc" },
+          take: 1,
+          select: { screenshot: true, title: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 48,
     });
 
+    profiles = users
+      .filter((user) => user.username)
+      .map((user) => {
+        const data = (user.generatedProfiles[0]?.data ?? {}) as ProfileData;
+        return {
+          username: user.username!,
+          name: user.name ?? user.username!,
+          avatar: user.avatar,
+          headline: data.headline ?? null,
+          skills: (data.skills ?? []).slice(0, 4).map((skill) => skill.tag),
+          stats: data.stats ?? {},
+          theme: user.publicPageSettings?.theme ?? "obsidian",
+          screenshot: user.evidenceItems[0]?.screenshot ?? null,
+          joinedAt: user.createdAt,
+        };
+      });
+  } catch (error) {
+    console.warn("Falling back from explore profile lookup:", error);
+  }
+
+  if (profiles.length === 0) {
+    profiles = getDemoExploreProfiles();
+  }
+
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
-      {/* Background glow */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/4 w-[500px] h-[500px] rounded-full bg-[#00f5ff]/6 blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] rounded-full bg-[#7c3aed]/6 blur-[100px]" />
+    <div className="lp-page text-white">
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-24 left-[12%] h-[24rem] w-[24rem] rounded-full bg-[#79e5d2]/10 blur-[120px]" />
+        <div className="absolute bottom-[8%] right-[10%] h-[22rem] w-[22rem] rounded-full bg-[#8fa9ff]/10 blur-[120px]" />
       </div>
 
-      {/* Nav */}
-      <nav className="relative z-10 flex items-center justify-between px-6 md:px-10 py-5 border-b border-white/8 backdrop-blur-sm">
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-[#00f5ff] flex items-center justify-center">
-            <span className="text-black font-black text-xs">LP</span>
+      <nav className="relative z-10 border-b border-white/8 bg-[#091015]/70 backdrop-blur-2xl">
+        <div className="lp-shell flex items-center justify-between py-5">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[11px] font-black tracking-[0.24em] text-[#041117]">
+              LP
+            </div>
+            <div>
+              <p className="brand-display text-[1.35rem] leading-none tracking-tight">
+                LifePage
+              </p>
+              <p className="lp-kicker mt-1 text-[10px] text-[#94a2ad]">
+                Public brand pages
+              </p>
+            </div>
+          </Link>
+
+          <div className="flex items-center gap-2 md:gap-3">
+            <span className="hidden rounded-full border border-[#79e5d2]/20 bg-[#79e5d2]/10 px-3 py-1.5 text-sm text-[#79e5d2] sm:inline-flex">
+              Explore
+            </span>
+            <Link
+              href="/"
+              className="lp-button-ghost hidden px-3 py-2 text-sm sm:inline-flex"
+            >
+              Home
+            </Link>
+            <Link
+              href="/login"
+              className="lp-button-secondary px-4 py-2 text-sm"
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/register"
+              className="lp-button-primary px-4 py-2 text-sm"
+            >
+              Get Started
+            </Link>
           </div>
-          <span className="text-xl font-bold tracking-tight">
-            Life<span className="text-[#00f5ff]">Page</span>
-          </span>
-        </Link>
-        <div className="flex items-center gap-2 md:gap-3">
-          <span className="hidden sm:inline-flex text-sm text-[#00f5ff] border-b border-[#00f5ff]/40 pb-0.5">Explore</span>
-          <Link
-            href="/login"
-            className="text-sm text-gray-300 hover:text-white px-4 py-2 rounded-xl border border-white/10 hover:border-white/20 transition-all"
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/register"
-            className="text-sm bg-[#00f5ff] text-black px-4 py-2 rounded-xl font-semibold hover:bg-[#00e5ef] transition-colors shadow-lg shadow-[#00f5ff]/20"
-          >
-            Get Started
-          </Link>
         </div>
       </nav>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6 py-12">
-        {/* Header */}
-        <div className="mb-10">
-          <div className="flex items-center gap-2 text-xs font-mono text-gray-500 uppercase tracking-widest mb-3">
-            <Compass className="h-3.5 w-3.5 text-[#00f5ff]" />
-            Public brand pages
+      <div className="relative z-10">
+        <div className="lp-shell py-14 md:py-20">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)] lg:items-end">
+            <div>
+              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-[#79e5d2]">
+                <Compass className="h-3.5 w-3.5" />
+                <span className="lp-kicker text-[11px]">Explore brands</span>
+              </div>
+              <h1 className="brand-display mt-4 text-5xl tracking-tight text-[#f8f3ea] md:text-6xl">
+                Browse personal brands that already feel deployed
+              </h1>
+              <p className="mt-5 max-w-2xl text-lg leading-8 text-[#99a6af]">
+                Discover creators, engineers, designers, and applicants who turned
+                their proof of work into live brand sites with LifePage.
+              </p>
+            </div>
+
+            <div className="lp-panel rounded-[1.75rem] p-5">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="lp-stat-tile p-4">
+                  <p className="lp-kicker text-[10px] text-[#79e5d2]">
+                    Live pages
+                  </p>
+                  <p className="mt-3 text-3xl font-semibold text-[#f8f3ea]">
+                    {profiles.length}
+                  </p>
+                </div>
+                <div className="lp-stat-tile p-4">
+                  <p className="lp-kicker text-[10px] text-[#79e5d2]">
+                    Access
+                  </p>
+                  <p className="mt-3 text-sm leading-6 text-[#d4dce2]">
+                    Public pages only
+                  </p>
+                </div>
+                <div className="lp-stat-tile p-4">
+                  <p className="lp-kicker text-[10px] text-[#79e5d2]">
+                    Format
+                  </p>
+                  <p className="mt-3 text-sm leading-6 text-[#d4dce2]">
+                    Brand story, projects, proof
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold mb-3">
-            Explore <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00f5ff] to-[#7c3aed]">Personal Brands</span>
-          </h1>
-          <p className="text-gray-400 text-lg max-w-xl">
-            Discover creators, engineers, and designers who turned their work into live personal brand sites with LifePage.
-          </p>
         </div>
 
-        {/* Profiles grid */}
         {profiles.length === 0 ? (
-          <div className="text-center py-24">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#00f5ff]/20 bg-[#00f5ff]/8">
-              <Sparkles className="h-7 w-7 text-[#00f5ff]" />
+          <div className="lp-shell pb-20">
+            <div className="lp-panel rounded-[2rem] px-6 py-20 text-center">
+              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-[1.5rem] border border-[#79e5d2]/20 bg-[#79e5d2]/10">
+                <Sparkles className="h-7 w-7 text-[#79e5d2]" />
+              </div>
+              <h2 className="brand-display text-4xl tracking-tight text-[#f8f3ea]">
+                No public brand pages yet
+              </h2>
+              <p className="mx-auto mt-3 max-w-md text-base leading-7 text-[#97a4ae]">
+                Be the first to launch yours.
+              </p>
+              <Link
+                href="/register"
+                className="lp-button-primary mt-8 px-6 py-3.5 text-base"
+              >
+                Build my brand
+                <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
-            <h2 className="text-2xl font-bold mb-2">No public brand pages yet</h2>
-            <p className="text-gray-400 mb-8">Be the first to launch yours.</p>
-            <Link
-              href="/register"
-              className="inline-flex items-center gap-2 bg-[#00f5ff] text-black px-6 py-3 rounded-xl font-bold hover:bg-[#00e5ef] transition-colors"
-            >
-              Build my brand
-              <ArrowRight className="h-4 w-4" />
-            </Link>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {profiles.map((p) => {
-              const isObsidian = p.theme === "obsidian";
-              return (
-                <Link
-                  key={p.username}
-                  href={`/u/${p.username}`}
-                  className="group relative flex flex-col rounded-2xl border border-white/10 overflow-hidden hover:border-[#00f5ff]/30 hover:-translate-y-1 transition-all duration-200 bg-white/3 hover:bg-white/5"
-                >
-                  {/* Screenshot banner */}
-                  {p.screenshot ? (
-                    <div className="w-full h-36 overflow-hidden flex-shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={p.screenshot}
-                        alt={`${p.name}'s portfolio`}
-                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                  ) : (
-                    <div
-                      className={`w-full h-36 flex-shrink-0 flex items-center justify-center text-4xl ${
-                        isObsidian
-                          ? "bg-gradient-to-br from-[#00f5ff]/10 to-[#7c3aed]/10"
-                          : "bg-gradient-to-br from-blue-500/10 to-purple-500/10"
-                      }`}
-                    >
-                      {p.name[0]}
-                    </div>
-                  )}
-
-                  {/* Card body */}
-                  <div className="p-4 flex flex-col flex-1">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="font-semibold text-sm">{p.name}</p>
-                        <p className="text-xs text-gray-500">@{p.username}</p>
+          <div className="lp-shell pb-20">
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {profiles.map((profile) => {
+                const cardTheme = resolvePortfolioTheme(profile.theme);
+                const launchYear = profile.joinedAt.getFullYear();
+                return (
+                  <Link
+                    key={profile.username}
+                    href={`/u/${profile.username}`}
+                    className="lp-panel group flex flex-col rounded-[1.75rem] overflow-hidden"
+                  >
+                    {profile.screenshot ? (
+                      <div className="h-52 overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={profile.screenshot}
+                          alt={`${profile.name}'s portfolio`}
+                          className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]"
+                        />
                       </div>
-                      {/* Public badge */}
-                      <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border border-green-500/30 text-green-400 bg-green-500/10 flex-shrink-0 ml-2">
-                        <Globe className="h-3 w-3" />
-                        Public
-                      </span>
-                    </div>
-
-                    {p.headline && (
-                      <p className="text-xs text-gray-400 mb-3 line-clamp-2 leading-relaxed">{p.headline}</p>
+                    ) : (
+                      <div
+                        className="relative flex h-52 items-end overflow-hidden px-6 py-5"
+                        style={{ background: cardTheme.previewBackground }}
+                      >
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_48%)]" />
+                        <div className="relative">
+                          <p className="lp-kicker text-[10px] text-[#c7d2d9]">
+                            Public brand
+                          </p>
+                          <p className="mt-2 brand-display text-3xl tracking-tight text-[#f8f3ea]">
+                            {profile.name}
+                          </p>
+                        </div>
+                      </div>
                     )}
 
-                    {p.skills.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {p.skills.map((s) => (
-                          <span key={s} className="text-xs bg-white/6 border border-white/10 rounded-md px-2 py-0.5 text-gray-300">
-                            {s}
+                    <div className="flex flex-1 flex-col p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-base font-semibold text-[#f7f1e8]">
+                            {profile.name}
+                          </p>
+                          <p className="mt-1 text-sm text-[#8f9ca5]">
+                            @{profile.username}
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200">
+                          <span className="inline-flex items-center gap-1">
+                            <Globe className="h-3.5 w-3.5" />
+                            Public
                           </span>
-                        ))}
+                        </span>
                       </div>
-                    )}
 
-                    <div className="flex items-center gap-4 text-xs text-gray-500 mt-auto">
-                      {p.stats.projectsShipped != null && (
-                        <span><b className="text-white">{p.stats.projectsShipped}</b> projects</span>
+                      {profile.headline && (
+                        <p className="mt-4 text-sm leading-7 text-[#98a5ae]">
+                          {profile.headline}
+                        </p>
                       )}
-                      {p.stats.yearsBuilding != null && (
-                        <span><b className="text-white">{p.stats.yearsBuilding}</b> yrs</span>
+
+                      {profile.skills.length > 0 && (
+                        <div className="mt-5 flex flex-wrap gap-2">
+                          {profile.skills.map((skill) => (
+                            <span
+                              key={skill}
+                              className="rounded-full border px-3 py-1.5 text-xs"
+                              style={{
+                                borderColor: cardTheme.chipBorder,
+                                background: cardTheme.chipBackground,
+                                color: cardTheme.chipText,
+                              }}
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
                       )}
-                      <span className="ml-auto inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 text-[#00f5ff] transition-opacity">
-                        View
-                        <ArrowUpRight className="h-3.5 w-3.5" />
-                      </span>
+
+                      <div className="mt-6 grid grid-cols-3 gap-3">
+                        <div
+                          className="lp-stat-tile p-3"
+                          style={{
+                            borderColor: cardTheme.statBorder,
+                            background: cardTheme.statBackground,
+                          }}
+                        >
+                          <p className="text-lg font-semibold text-[#f8f3ea]">
+                            {profile.stats?.projectsShipped ?? 0}
+                          </p>
+                          <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[#87949e]">
+                            Projects
+                          </p>
+                        </div>
+                        <div
+                          className="lp-stat-tile p-3"
+                          style={{
+                            borderColor: cardTheme.statBorder,
+                            background: cardTheme.statBackground,
+                          }}
+                        >
+                          <p className="text-lg font-semibold text-[#f8f3ea]">
+                            {profile.stats?.yearsBuilding ?? 0}
+                          </p>
+                          <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[#87949e]">
+                            Years
+                          </p>
+                        </div>
+                        <div
+                          className="lp-stat-tile p-3"
+                          style={{
+                            borderColor: cardTheme.statBorder,
+                            background: cardTheme.statBackground,
+                          }}
+                        >
+                          <p className="text-lg font-semibold text-[#f8f3ea]">
+                            {launchYear}
+                          </p>
+                          <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[#87949e]">
+                            Joined
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-auto pt-6">
+                        <span className="inline-flex items-center gap-2 text-sm font-medium text-[#f7f1e8] group-hover:text-[#79e5d2]">
+                          View brand page
+                          <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              );
-            })}
+                  </Link>
+                );
+              })}
+            </div>
+
+            <div className="mt-12 border-t border-white/8 pt-8 text-center">
+              <p className="text-sm text-[#97a4ae]">
+                Want your brand here?
+              </p>
+              <Link
+                href="/register"
+                className="lp-button-primary mt-4 px-6 py-3.5 text-base"
+              >
+                Build your brand
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
         )}
-
-        {/* CTA at bottom */}
-        <div className="mt-16 text-center border-t border-white/8 pt-12">
-          <p className="text-gray-400 mb-4">Want your brand here?</p>
-          <Link
-            href="/register"
-            className="inline-flex items-center gap-2 bg-[#00f5ff] text-black px-6 py-3 rounded-xl font-bold hover:bg-[#00e5ef] transition-all shadow-xl shadow-[#00f5ff]/20"
-          >
-            Build your brand
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
       </div>
 
-      <footer className="relative z-10 border-t border-white/8 py-6 px-6 text-center text-xs text-gray-600 mt-4">
-        Built by{" "}
-        <a href="https://atrak.dev" target="_blank" rel="noopener noreferrer" className="text-[#00f5ff]/70 hover:text-[#00f5ff]">
-          atrak.dev
-        </a>{" "}
-        · LifePage
+      <footer className="relative z-10 border-t border-white/8 py-8">
+        <div className="lp-shell text-center text-xs text-[#8f9ca6]">
+          Built by{" "}
+          <a
+            href="https://atrak.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#79e5d2] hover:text-[#cffff6]"
+          >
+            atrak.dev
+          </a>{" "}
+          · LifePage
+        </div>
       </footer>
     </div>
   );

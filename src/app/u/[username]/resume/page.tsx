@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { PublicResumePage } from "@/components/public-resume-page";
 import type { ProfileJSON } from "@/lib/schema";
-import { PublicProfilePage } from "@/components/public-profile-page";
 import { getDemoPublicPageUser } from "@/lib/demo-public-pages";
 import { getPublicPageUserByUsername } from "@/lib/public-page";
 
@@ -25,25 +25,30 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     | undefined;
 
   return {
-    title: `${user.name ?? username} — LifePage`,
-    description: profile?.headline ?? `Portfolio of ${username}`,
+    title: `${user.name ?? username} Resume — LifePage`,
+    description:
+      profile?.resume.summary ??
+      profile?.headline ??
+      `Resume of ${user.name ?? username}`,
   };
 }
 
-export default async function PublicProfileRoute({
+export default async function PublicResumeRoute({
   params,
   searchParams,
 }: Props) {
   const { username } = await params;
   const { mode } = await searchParams;
-
   const user =
     (await getPublicPageUserByUsername(username)) ??
     getDemoPublicPageUser(username);
-  if (!user) notFound();
+
+  if (!user) {
+    notFound();
+  }
 
   return (
-    <PublicProfilePage
+    <PublicResumePage
       basePath={`/u/${username}`}
       queryMode={mode}
       user={user}

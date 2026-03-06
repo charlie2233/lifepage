@@ -83,6 +83,9 @@ model PublicPageSettings {
   visibility             String   @default("public")
   mode                   String   @default("hiring")
   theme                  String   @default("paper")
+  themeConfig            Json?
+  resumeModel            String   @default("executive")
+  resumeModelConfig      Json?
   customDomain           String?
   customDomainNormalized String?  @unique
   createdAt              DateTime @default(now())
