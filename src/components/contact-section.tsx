@@ -116,13 +116,13 @@ export function ContactSection() {
             </p>
 
             <div className="mt-8 space-y-3 text-sm text-[#dde4e9]">
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="card-hover rounded-2xl border border-white/10 bg-black/20 p-4 transition-colors hover:border-white/20 hover:text-white">
                 Product support, onboarding, and feedback
               </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="card-hover rounded-2xl border border-white/10 bg-black/20 p-4 transition-colors hover:border-white/20 hover:text-white">
                 Partnerships, campus pilots, and creator programs
               </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="card-hover rounded-2xl border border-white/10 bg-black/20 p-4 transition-colors hover:border-white/20 hover:text-white">
                 Custom domains, deployment, and AI workflow questions
               </div>
             </div>
@@ -151,7 +151,7 @@ export function ContactSection() {
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-sm text-[#9ba8b1]">
+                <label className="mb-1.5 block text-xs font-medium tracking-wide text-[#94a2ad]">
                   Name
                 </label>
                 <input
@@ -163,12 +163,12 @@ export function ContactSection() {
                   placeholder="Alex Chen"
                   autoComplete="name"
                   required
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-[#5b6670] focus:border-[#79e5d2]/45 focus:outline-none"
+                  className="input-fancy"
                 />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm text-[#9ba8b1]">
+                <label className="mb-1.5 block text-xs font-medium tracking-wide text-[#94a2ad]">
                   Email
                 </label>
                 <input
@@ -181,13 +181,13 @@ export function ContactSection() {
                   placeholder="you@example.com"
                   autoComplete="email"
                   required
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-[#5b6670] focus:border-[#79e5d2]/45 focus:outline-none"
+                  className="input-fancy"
                 />
               </div>
             </div>
 
             <div className="mt-4">
-              <label className="mb-1.5 block text-sm text-[#9ba8b1]">
+              <label className="mb-1.5 block text-xs font-medium tracking-wide text-[#94a2ad]">
                 Company or school
               </label>
               <input
@@ -198,12 +198,12 @@ export function ContactSection() {
                 }
                 placeholder="Optional"
                 autoComplete="organization"
-                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-[#5b6670] focus:border-[#79e5d2]/45 focus:outline-none"
+                className="input-fancy"
               />
             </div>
 
             <div className="mt-4">
-              <label className="mb-1.5 block text-sm text-[#9ba8b1]">
+              <label className="mb-1.5 block text-xs font-medium tracking-wide text-[#94a2ad]">
                 Message
               </label>
               <textarea
@@ -216,7 +216,7 @@ export function ContactSection() {
                 rows={6}
                 required
                 minLength={20}
-                className="w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-[#5b6670] focus:border-[#79e5d2]/45 focus:outline-none"
+                className="input-fancy resize-none"
               />
             </div>
 
@@ -237,13 +237,13 @@ export function ContactSection() {
             </div>
 
             {error && (
-              <p className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              <p className="lp-fade-rise mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                 {error}
               </p>
             )}
 
             {success && (
-              <p className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+              <p className="lp-fade-rise mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
                 Message sent. We will get back to you by email.
               </p>
             )}
@@ -255,7 +255,7 @@ export function ContactSection() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="lp-button-primary px-5 py-3 text-sm disabled:opacity-60"
+                className="lp-button-primary btn-fancy px-5 py-3 text-sm disabled:opacity-60"
               >
                 {submitting ? (
                   <>
