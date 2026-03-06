@@ -14,6 +14,12 @@ model User {
   username      String?   @unique
   passwordHash  String?
   avatar        String?
+  planTier      String    @default("free")
+  aiProvider    String    @default("kimi")
+  preferredAiModel String?
+  aiUsageRate   String    @default("auto")
+  aiUsageCycleStartedAt DateTime @default(now())
+  advancedAiCreditsUsed Int @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   profile       UserProfile?
@@ -70,14 +76,17 @@ model GeneratedProfile {
 }
 
 model PublicPageSettings {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  isPublic  Boolean  @default(true)
-  mode      String   @default("hiring")
-  theme     String   @default("paper")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isPublic               Boolean  @default(true)
+  visibility             String   @default("public")
+  mode                   String   @default("hiring")
+  theme                  String   @default("paper")
+  customDomain           String?
+  customDomainNormalized String?  @unique
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 }
 
 model Automation {

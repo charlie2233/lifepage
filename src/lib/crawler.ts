@@ -1,6 +1,9 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 
+const GOOGLE_SITES_HOSTNAME = "sites.google.com";
+const GOOGLE_SITES_IMPORT_LIMIT = 6;
+
 export interface CrawlResult {
   url: string;
   title: string;
@@ -11,6 +14,57 @@ export interface CrawlResult {
   bodyText: string;
   screenshot: string | null;
   metadata: Record<string, string>;
+}
+
+function stripUrlState(url: string) {
+  const parsed = new URL(url);
+  parsed.hash = "";
+  parsed.search = "";
+  return parsed.toString();
+}
+
+function getGoogleSitesPrefix(url: URL) {
+  const segments = url.pathname.split("/").filter(Boolean);
+  if (segments.length < 2) return null;
+
+  if (segments[0] === "view" || segments[0] === "site") {
+    return `/${segments[0]}/${segments[1]}`;
+  }
+
+  return null;
+}
+
+export function isGoogleSitesUrl(url: string) {
+  try {
+    return new URL(url).hostname === GOOGLE_SITES_HOSTNAME;
+  } catch {
+    return false;
+  }
+}
+
+export function expandGoogleSitesUrls(rootUrl: string, links: string[]) {
+  if (!isGoogleSitesUrl(rootUrl)) {
+    return [rootUrl];
+  }
+
+  const root = new URL(rootUrl);
+  const rootPrefix = getGoogleSitesPrefix(root);
+  const urls = new Set<string>([stripUrlState(rootUrl)]);
+
+  for (const link of links) {
+    try {
+      const candidate = new URL(link, root);
+      if (candidate.hostname !== root.hostname) continue;
+      if (rootPrefix && !candidate.pathname.startsWith(rootPrefix)) continue;
+
+      urls.add(stripUrlState(candidate.toString()));
+      if (urls.size >= GOOGLE_SITES_IMPORT_LIMIT) break;
+    } catch {
+      continue;
+    }
+  }
+
+  return Array.from(urls);
 }
 
 export async function crawlUrl(url: string): Promise<CrawlResult> {

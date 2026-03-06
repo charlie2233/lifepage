@@ -1,12 +1,86 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { crawlUrl } from "@/lib/crawler";
+import { crawlUrl, expandGoogleSitesUrls, isGoogleSitesUrl } from "@/lib/crawler";
 import { z } from "zod";
 
 const schema = z.object({
-  url: z.string().url(),
+  url: z.string().optional(),
+  urls: z.array(z.string()).optional(),
 });
+
+function createInputError(message: string) {
+  return new z.ZodError([
+    {
+      code: "custom",
+      message,
+      path: ["url"],
+    },
+  ]);
+}
+
+function splitCrawlInput(value: string) {
+  return value
+    .split(/[\n,]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function getRequestedUrls(body: z.infer<typeof schema>) {
+  const requestedUrls = [
+    ...(body.url ? splitCrawlInput(body.url) : []),
+    ...((body.urls ?? []).flatMap(splitCrawlInput)),
+  ];
+
+  if (requestedUrls.length === 0) {
+    throw createInputError("Provide at least one URL");
+  }
+
+  return requestedUrls;
+}
+
+function normalizeUrl(url: string) {
+  const candidate =
+    url.startsWith("http://") || url.startsWith("https://")
+      ? url
+      : `https://${url}`;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error(`Invalid URL: ${url}`);
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error(`Invalid URL: ${url}`);
+  }
+
+  return parsed.toString();
+}
+
+function canonicalizeCrawlUrl(url: string) {
+  const parsed = new URL(url);
+  parsed.hash = "";
+  parsed.search = "";
+  return parsed.toString();
+}
+
+async function createEvidenceItem(userId: string, fallbackUrl: string, crawlResult: Awaited<ReturnType<typeof crawlUrl>>) {
+  return prisma.evidenceItem.create({
+    data: {
+      userId,
+      type: "url",
+      url: crawlResult.url,
+      title: crawlResult.title || fallbackUrl,
+      description: crawlResult.description || "",
+      screenshot: crawlResult.screenshot,
+      rawContent: crawlResult.bodyText,
+      metadata: crawlResult.metadata as object,
+      visible: true,
+    },
+  });
+}
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -16,29 +90,105 @@ export async function POST(req: Request) {
 
   try {
     const body = (await req.json()) as unknown;
-    const { url } = schema.parse(body);
+    const parsedBody = schema.parse(body);
+    const requestedUrls = getRequestedUrls(parsedBody);
 
-    const crawlResult = await crawlUrl(url);
+    const results: Array<{
+      inputUrl: string;
+      url?: string;
+      item?: Awaited<ReturnType<typeof prisma.evidenceItem.create>>;
+      error?: string;
+    }> = [];
 
-    const item = await prisma.evidenceItem.create({
-      data: {
-        userId: session.user.id,
-        type: "url",
-        url: crawlResult.url,
-        title: crawlResult.title || url,
-        description: crawlResult.description || "",
-        screenshot: crawlResult.screenshot,
-        rawContent: crawlResult.bodyText,
-        metadata: crawlResult.metadata as object,
-        visible: true,
-      },
+    for (const inputUrl of requestedUrls) {
+      try {
+        const normalizedUrl = normalizeUrl(inputUrl);
+        const rootCrawlResult = await crawlUrl(normalizedUrl);
+        const discoveredUrls = isGoogleSitesUrl(normalizedUrl)
+          ? expandGoogleSitesUrls(normalizedUrl, rootCrawlResult.links)
+          : [normalizedUrl];
+
+        const rootItem = await createEvidenceItem(
+          session.user.id,
+          normalizedUrl,
+          rootCrawlResult
+        );
+        const crawledUrlSet = new Set<string>([
+          canonicalizeCrawlUrl(normalizedUrl),
+          canonicalizeCrawlUrl(rootCrawlResult.url),
+        ]);
+
+        results.push({
+          inputUrl,
+          url: rootCrawlResult.url,
+          item: rootItem,
+        });
+
+        for (const discoveredUrl of discoveredUrls) {
+          const canonicalDiscoveredUrl = canonicalizeCrawlUrl(discoveredUrl);
+          if (crawledUrlSet.has(canonicalDiscoveredUrl)) {
+            continue;
+          }
+
+          try {
+            const crawlResult = await crawlUrl(discoveredUrl);
+            const item = await createEvidenceItem(
+              session.user.id,
+              discoveredUrl,
+              crawlResult
+            );
+
+            results.push({
+              inputUrl: discoveredUrl,
+              url: crawlResult.url,
+              item,
+            });
+            crawledUrlSet.add(canonicalDiscoveredUrl);
+          } catch (error) {
+            results.push({
+              inputUrl: discoveredUrl,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+      } catch (error) {
+        results.push({
+          inputUrl,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    const items = results.flatMap((result) => (result.item ? [result.item] : []));
+    if (items.length === 0) {
+      const errors = results
+        .map((result) => result.error)
+        .filter((error): error is string => Boolean(error));
+      const status = errors.every((error) => error.startsWith("Invalid URL:"))
+        ? 400
+        : 500;
+
+      return NextResponse.json(
+        {
+          error: errors.slice(0, 3).join("; ") || "Crawl failed",
+          results,
+        },
+        { status }
+      );
+    }
+
+    return NextResponse.json({
+      item: items[0],
+      items,
+      results,
     });
-
-    return NextResponse.json({ item, crawlResult });
   } catch (err) {
     console.error("Crawl error:", err);
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+      return NextResponse.json(
+        { error: err.issues[0]?.message ?? "Invalid URL" },
+        { status: 400 }
+      );
     }
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

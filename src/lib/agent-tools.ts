@@ -7,8 +7,11 @@
 import OpenAI from "openai";
 import { z } from "zod";
 
-function getOpenAI() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getOpenAI(clientConfig?: { apiKey: string; baseURL?: string }) {
+  return new OpenAI({
+    apiKey: clientConfig?.apiKey ?? process.env.OPENAI_API_KEY,
+    baseURL: clientConfig?.baseURL,
+  });
 }
 
 // ─── Shared types ──────────────────────────────────────────────────────────────
@@ -25,6 +28,25 @@ export interface ToolResult {
   tool: ToolName;
   style?: string;
   output: unknown;
+}
+
+interface AgentPromptOptions {
+  focusLabel?: string | null;
+  focusContext?: string | null;
+  userRequest?: string | null;
+}
+
+function buildFocusPrompt(options?: AgentPromptOptions) {
+  if (!options?.focusLabel || !options.focusContext) {
+    return "";
+  }
+
+  return `Primary focus area:
+${options.focusLabel}
+${options.focusContext}
+
+Treat this focus area as the main place to work. Keep suggestions and generated output anchored to it while still respecting the overall brand story.
+`;
 }
 
 // ─── Timeline tool ─────────────────────────────────────────────────────────────
@@ -52,7 +74,11 @@ export type TimelineOutput = z.infer<typeof TimelineOutputSchema>;
 
 export async function generateTimeline(
   context: string,
-  style: TimelineStyle = "vertical"
+  model: string,
+  style: TimelineStyle = "vertical",
+  options?: AgentPromptOptions,
+  clientConfig?: { apiKey: string; baseURL?: string },
+  maxTokens?: number
 ): Promise<TimelineOutput> {
   const styleDescriptions: Record<TimelineStyle, string> = {
     vertical: "A clean vertical chronological timeline with year markers and category icons.",
@@ -61,10 +87,13 @@ export async function generateTimeline(
     minimal: "A minimal stripped-down timeline with just year, title, and one-line descriptions.",
   };
 
-  const prompt = `You are a personal brand storyteller. Create a rich timeline from this person's story/evidence.
+  const prompt = `You are a senior personal brand strategist and documentary storyteller. Create a rich timeline from this person's story and evidence.
 
 Context about the person:
 ${context}
+
+${buildFocusPrompt(options)}
+${options?.userRequest ? `User request:\n${options.userRequest}\n` : ""}
 
 Timeline style: ${style} — ${styleDescriptions[style]}
 
@@ -89,14 +118,17 @@ Rules:
 - Generate 5-12 meaningful events from the evidence
 - Order chronologically (oldest first)
 - Use vivid, active language
+- Stay grounded in the provided evidence and profile details
 - For documentary style: make descriptions feel like narration ("It was 2021 when...")
-- Mark truly pivotal moments as highlight: true`;
+- Mark truly pivotal moments as highlight: true
+- If a primary focus area is provided, make sure at least half of the timeline is directly relevant to it`;
 
-  const completion = await getOpenAI().chat.completions.create({
-    model: "gpt-4o-mini",
+  const completion = await getOpenAI(clientConfig).chat.completions.create({
+    model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
     temperature: 0.5,
+    ...(maxTokens ? { max_tokens: maxTokens } : {}),
   });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
@@ -133,7 +165,11 @@ export type VideoScriptOutput = z.infer<typeof VideoScriptOutputSchema>;
 
 export async function generateVideoScript(
   context: string,
-  style: VideoStyle = "documentary"
+  model: string,
+  style: VideoStyle = "documentary",
+  options?: AgentPromptOptions,
+  clientConfig?: { apiKey: string; baseURL?: string },
+  maxTokens?: number
 ): Promise<VideoScriptOutput> {
   const styleDescriptions: Record<VideoStyle, string> = {
     documentary: "First-person narrated documentary style — honest, reflective, professional. Like a TED Talk intro.",
@@ -143,10 +179,13 @@ export async function generateVideoScript(
     story: "Personal brand story — origin story, struggles, breakthroughs. Authentic and emotional.",
   };
 
-  const prompt = `You are a professional video director and copywriter. Create a video script for this person's portfolio/brand.
+  const prompt = `You are a professional creative director and personal brand copywriter. Create a video script for this person's portfolio and brand.
 
 Context about the person:
 ${context}
+
+${buildFocusPrompt(options)}
+${options?.userRequest ? `User request:\n${options.userRequest}\n` : ""}
 
 Video style: ${style} — ${styleDescriptions[style]}
 
@@ -175,14 +214,17 @@ Rules:
 - Generate 4-8 scenes appropriate to the total duration
 - Make narration natural and authentic — no corporate speak
 - Be specific about visual directions
+- Anchor the script in real evidence and concrete outcomes
 - ${style === "cinematic" ? "Minimize words, maximize visual impact" : ""}
-- ${style === "pitch" ? "Every second counts — be ruthlessly concise" : ""}`;
+- ${style === "pitch" ? "Every second counts — be ruthlessly concise" : ""}
+- If a primary focus area is provided, make it the center of the narrative`;
 
-  const completion = await getOpenAI().chat.completions.create({
-    model: "gpt-4o-mini",
+  const completion = await getOpenAI(clientConfig).chat.completions.create({
+    model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
     temperature: 0.6,
+    ...(maxTokens ? { max_tokens: maxTokens } : {}),
   });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
@@ -227,7 +269,11 @@ export type TreeOutput = z.infer<typeof TreeOutputSchema>;
 
 export async function generateTree(
   context: string,
-  style: TreeStyle = "skills"
+  model: string,
+  style: TreeStyle = "skills",
+  options?: AgentPromptOptions,
+  clientConfig?: { apiKey: string; baseURL?: string },
+  maxTokens?: number
 ): Promise<TreeOutput> {
   const styleDescriptions: Record<TreeStyle, string> = {
     skills: "A skills tree showing expertise areas with sub-skills branching out. Like a tech tree in a game.",
@@ -236,10 +282,13 @@ export async function generateTree(
     goals: "A goals tree showing where this person is heading — aspirations broken down into milestones.",
   };
 
-  const prompt = `You are a visual information designer. Create a hierarchical tree/mind-map for this person.
+  const prompt = `You are a visual information designer and brand strategist. Create a hierarchical tree or mind-map for this person.
 
 Context about the person:
 ${context}
+
+${buildFocusPrompt(options)}
+${options?.userRequest ? `User request:\n${options.userRequest}\n` : ""}
 
 Tree type: ${style} — ${styleDescriptions[style]}
 
@@ -274,13 +323,15 @@ Rules:
 - Use emoji icons to make it visual
 - Use different hex colors for different branches (muted, tasteful)
 - Keep labels short (1-4 words)
-- Base everything on actual evidence from the context`;
+- Base everything on actual evidence from the context
+- If a primary focus area is provided, make it a dominant branch or the root framing`;
 
-  const completion = await getOpenAI().chat.completions.create({
-    model: "gpt-4o-mini",
+  const completion = await getOpenAI(clientConfig).chat.completions.create({
+    model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
     temperature: 0.4,
+    ...(maxTokens ? { max_tokens: maxTokens } : {}),
   });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
@@ -293,10 +344,14 @@ Rules:
 export async function agentChat(
   message: string,
   context: string,
-  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>
+  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>,
+  model: string,
+  options?: AgentPromptOptions,
+  clientConfig?: { apiKey: string; baseURL?: string },
+  maxTokens?: number
 ): Promise<string> {
-  const systemPrompt = `You are a helpful AI personal brand assistant called LifeAgent. 
-You help users build and improve their personal portfolio and brand.
+  const systemPrompt = `You are LifeAgent, an advanced AI personal brand strategist, editor, and portfolio operator.
+You help users sharpen positioning, improve proof-of-work, and decide exactly what to build next.
 
 You have access to these tools you can suggest using:
 - generate_timeline: Create timeline trees in styles: ${TIMELINE_STYLES.join(", ")}
@@ -308,7 +363,16 @@ You have access to these tools you can suggest using:
 Context about this user's portfolio:
 ${context}
 
-When a user asks you to create something (timeline, video script, tree, etc.), 
+${buildFocusPrompt(options)}
+
+How to behave:
+- Be specific, grounded, and practical. Do not give generic fluff.
+- Use the selected focus area first when one is provided.
+- For critique or strategy requests, prioritize: what is strong, what is unclear, what to change next.
+- For rewriting requests, provide improved copy that is concise and usable.
+- Stay anchored to the evidence and profile context. If context is thin, say what is missing.
+
+When a user asks you to create something (timeline, video script, tree, etc.),
 respond with what you'll do and then output a special tool call marker like:
 [TOOL: generate_timeline style=documentary]
 or
@@ -317,7 +381,7 @@ or
 [TOOL: generate_tree style=skills]
 
 Otherwise, give helpful advice about personal branding, portfolio building, and career development.
-Be concise, practical, and encouraging.`;
+Be concise, practical, and direct.`;
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
@@ -325,11 +389,11 @@ Be concise, practical, and encouraging.`;
     { role: "user", content: message },
   ];
 
-  const completion = await getOpenAI().chat.completions.create({
-    model: "gpt-4o-mini",
+  const completion = await getOpenAI(clientConfig).chat.completions.create({
+    model,
     messages,
     temperature: 0.7,
-    max_tokens: 600,
+    max_tokens: maxTokens ?? 600,
   });
 
   return completion.choices[0]?.message?.content ?? "I couldn't generate a response.";

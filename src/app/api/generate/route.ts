@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { getBillingSnapshot, reserveAiModel } from "@/lib/billing";
 import { prisma } from "@/lib/db";
 import { generateProfileFromCrawl, generateProfileFromText } from "@/lib/ai";
 import type { CrawlResult } from "@/lib/crawler";
@@ -34,6 +35,9 @@ export async function POST(req: Request) {
     let profileData;
 
     if (evidenceItems.length > 0) {
+      const aiReservation = await reserveAiModel(session.user.id, {
+        task: "profile",
+      });
       const crawlResults: CrawlResult[] = evidenceItems.map((item) => ({
         url: item.url ?? "",
         title: item.title ?? "",
@@ -50,11 +54,14 @@ export async function POST(req: Request) {
         name: userInfo?.name,
         githubUrl: links?.github,
         linkedinUrl: links?.linkedin,
-      });
+      }, aiReservation.model, aiReservation.clientConfig, aiReservation.maxTokens);
     } else if (userInfo?.bio) {
+      const aiReservation = await reserveAiModel(session.user.id, {
+        task: "profile",
+      });
       profileData = await generateProfileFromText(userInfo.bio, {
         name: userInfo?.name,
-      });
+      }, aiReservation.model, aiReservation.clientConfig, aiReservation.maxTokens);
     } else {
       return NextResponse.json(
         { error: "No evidence or bio provided" },
@@ -92,7 +99,9 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({ profile });
+    const billing = await getBillingSnapshot(session.user.id);
+
+    return NextResponse.json({ profile, billing });
   } catch (err) {
     console.error("Generate error:", err);
     return NextResponse.json({ error: String(err) }, { status: 500 });

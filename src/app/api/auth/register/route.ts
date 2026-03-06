@@ -37,7 +37,12 @@ export async function POST(req: Request) {
         passwordHash,
         profile: { create: { theme: "obsidian" } },
         publicPageSettings: {
-          create: { isPublic: true, mode: "hiring", theme: "obsidian" },
+          create: {
+            isPublic: true,
+            visibility: "public",
+            mode: "hiring",
+            theme: "obsidian",
+          },
         },
       },
     });

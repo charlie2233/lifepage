@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { normalizeCustomDomain } from "@/lib/custom-domain";
+import type { PublicPageVisibility } from "@/lib/page-visibility";
 import { z } from "zod";
 
 const schema = z.object({
   isPublic: z.boolean().optional(),
+  visibility: z.enum(["public", "unlisted", "private"]).optional(),
   mode: z.enum(["hiring", "admissions"]).optional(),
   theme: z.enum(["obsidian", "paper"]).optional(),
+  customDomain: z.union([z.string(), z.null()]).optional(),
 });
 
 export async function GET() {
@@ -30,10 +34,75 @@ export async function PATCH(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
-  const settings = await prisma.publicPageSettings.upsert({
-    where: { userId: session.user.id },
-    create: { userId: session.user.id, ...parsed.data },
-    update: parsed.data,
-  });
-  return NextResponse.json({ settings });
+
+  const updateData: {
+    isPublic?: boolean;
+    visibility?: PublicPageVisibility;
+    mode?: "hiring" | "admissions";
+    theme?: "obsidian" | "paper";
+    customDomain?: string | null;
+    customDomainNormalized?: string | null;
+  } = {};
+
+  const resolvedVisibility =
+    parsed.data.visibility ??
+    (parsed.data.isPublic === undefined
+      ? undefined
+      : parsed.data.isPublic
+        ? "public"
+        : "private");
+
+  if (resolvedVisibility !== undefined) {
+    updateData.visibility = resolvedVisibility;
+    updateData.isPublic = resolvedVisibility === "public";
+  }
+
+  if (parsed.data.mode !== undefined) updateData.mode = parsed.data.mode;
+  if (parsed.data.theme !== undefined) updateData.theme = parsed.data.theme;
+
+  if (Object.prototype.hasOwnProperty.call(parsed.data, "customDomain")) {
+    const rawDomain = parsed.data.customDomain?.trim() ?? "";
+
+    if (!rawDomain) {
+      updateData.customDomain = null;
+      updateData.customDomainNormalized = null;
+    } else {
+      try {
+        const normalizedDomain = normalizeCustomDomain(rawDomain);
+        updateData.customDomain = normalizedDomain;
+        updateData.customDomainNormalized = normalizedDomain;
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Invalid custom domain." },
+          { status: 400 }
+        );
+      }
+    }
+  }
+
+  try {
+    const settings = await prisma.publicPageSettings.upsert({
+      where: { userId: session.user.id },
+      create: { userId: session.user.id, ...updateData },
+      update: updateData,
+    });
+    return NextResponse.json({ settings });
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error &&
+      "code" in error &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        { error: "That custom domain is already connected to another portfolio." },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Failed to save settings." },
+      { status: 500 }
+    );
+  }
 }

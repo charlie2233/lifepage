@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { getBillingSnapshot, reserveAiModel } from "@/lib/billing";
 import { prisma } from "@/lib/db";
+import { buildAgentContext, resolveAgentFocus } from "@/lib/agent-context";
+import { AGENT_FOCUS_KINDS } from "@/lib/agent-focus";
 import {
   agentChat,
   generateTimeline,
@@ -13,6 +16,7 @@ import {
   VIDEO_STYLES,
   TREE_STYLES,
 } from "@/lib/agent-tools";
+import { ProfileJSONSchema } from "@/lib/schema";
 import { z } from "zod";
 
 const MAX_STORED_INPUT_LENGTH = 500;
@@ -36,44 +40,14 @@ const RequestSchema = z.object({
     ])
     .optional(),
   style: z.string().optional(),
+  focus: z
+    .object({
+      kind: z.enum(AGENT_FOCUS_KINDS),
+      index: z.number().int().min(0).optional(),
+      evidenceId: z.string().min(1).optional(),
+    })
+    .optional(),
 });
-
-function buildContext(
-  profile: { data: unknown } | null,
-  evidenceItems: Array<{ title: string | null; description: string | null; url: string | null }>
-): string {
-  const parts: string[] = [];
-
-  if (profile?.data) {
-    const d = profile.data as Record<string, unknown>;
-    if (d.headline) parts.push(`Headline: ${d.headline}`);
-    if (d.about) parts.push(`About: ${d.about}`);
-    if (Array.isArray(d.skills)) {
-      parts.push(`Skills: ${(d.skills as Array<{ tag: string }>).map((s) => s.tag).join(", ")}`);
-    }
-    if (Array.isArray(d.projects)) {
-      const projs = (d.projects as Array<{ title: string; impact?: string }>)
-        .map((p) => `${p.title}${p.impact ? ` (${p.impact})` : ""}`)
-        .join("; ");
-      parts.push(`Projects: ${projs}`);
-    }
-    if (Array.isArray(d.timeline)) {
-      const tl = (d.timeline as Array<{ year: string; milestones: string[] }>)
-        .map((t) => `${t.year}: ${t.milestones.join(", ")}`)
-        .join("; ");
-      parts.push(`Timeline: ${tl}`);
-    }
-  }
-
-  if (evidenceItems.length > 0) {
-    const ev = evidenceItems
-      .map((e) => `${e.title ?? ""}${e.description ? ` — ${e.description}` : ""}`)
-      .join("; ");
-    parts.push(`Evidence sources: ${ev}`);
-  }
-
-  return parts.join("\n") || "No profile generated yet.";
-}
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -87,41 +61,105 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const { message, history, tool, style } = parsed.data;
+  const { message, history, tool, style, focus } = parsed.data;
 
   // Load user context
   const [profile, evidenceItems] = await Promise.all([
     prisma.generatedProfile.findFirst({
       where: { userId: session.user.id, isActive: true },
+      orderBy: { createdAt: "desc" },
       select: { data: true },
     }),
     prisma.evidenceItem.findMany({
-      where: { userId: session.user.id, visible: true },
-      select: { title: true, description: true, url: true },
-      take: 10,
+      where: { userId: session.user.id },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        description: true,
+        url: true,
+        rawContent: true,
+      },
+      take: 20,
     }),
   ]);
 
-  const context = buildContext(profile, evidenceItems);
+  const parsedProfile = profile?.data
+    ? ProfileJSONSchema.safeParse(profile.data)
+    : null;
+  const profileData = parsedProfile?.success ? parsedProfile.data : null;
+  const context = buildAgentContext(profileData, evidenceItems);
+  const resolvedFocus = resolveAgentFocus(profileData, evidenceItems, focus);
+
+  if (focus && !resolvedFocus) {
+    return NextResponse.json(
+      { error: "Invalid focus target." },
+      { status: 400 }
+    );
+  }
+
+  const storedInput = [
+    resolvedFocus ? `Focus: ${resolvedFocus.label}` : null,
+    message,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join("\n")
+    .slice(0, MAX_STORED_INPUT_LENGTH);
 
   // Direct tool invocation
   if (tool) {
     try {
       let output: unknown;
       let usedStyle = style ?? "";
+      const promptOptions = {
+        focusLabel: resolvedFocus?.label,
+        focusContext: resolvedFocus?.context,
+        userRequest: message,
+      };
 
       if (tool === "generate_timeline") {
+        const aiReservation = await reserveAiModel(session.user.id, {
+          task: "timeline",
+        });
         const s = (TIMELINE_STYLES.includes(style as TimelineStyle) ? style : "vertical") as TimelineStyle;
         usedStyle = s;
-        output = await generateTimeline(context, s);
+        output = await generateTimeline(
+          context,
+          aiReservation.model,
+          s,
+          promptOptions,
+          aiReservation.clientConfig,
+          aiReservation.maxTokens
+        );
       } else if (tool === "generate_video_script") {
+        const aiReservation = await reserveAiModel(session.user.id, {
+          task: "video_script",
+        });
         const s = (VIDEO_STYLES.includes(style as VideoStyle) ? style : "documentary") as VideoStyle;
         usedStyle = s;
-        output = await generateVideoScript(context, s);
+        output = await generateVideoScript(
+          context,
+          aiReservation.model,
+          s,
+          promptOptions,
+          aiReservation.clientConfig,
+          aiReservation.maxTokens
+        );
       } else if (tool === "generate_tree") {
+        const aiReservation = await reserveAiModel(session.user.id, {
+          task: "tree",
+        });
         const s = (TREE_STYLES.includes(style as TreeStyle) ? style : "skills") as TreeStyle;
         usedStyle = s;
-        output = await generateTree(context, s);
+        output = await generateTree(
+          context,
+          aiReservation.model,
+          s,
+          promptOptions,
+          aiReservation.clientConfig,
+          aiReservation.maxTokens
+        );
       }
 
       // Persist artifact
@@ -130,12 +168,22 @@ export async function POST(req: Request) {
           userId: session.user.id,
           tool,
           style: usedStyle,
-          input: context.slice(0, MAX_STORED_INPUT_LENGTH),
+          input: storedInput,
           output: output as object,
         },
       });
 
-      return NextResponse.json({ type: "tool_result", tool, style: usedStyle, output, artifactId: artifact.id });
+      const billing = await getBillingSnapshot(session.user.id);
+
+      return NextResponse.json({
+        type: "tool_result",
+        tool,
+        style: usedStyle,
+        output,
+        artifactId: artifact.id,
+        focusLabel: resolvedFocus?.label,
+        billing,
+      });
     } catch (err) {
       return NextResponse.json({ error: String(err) }, { status: 500 });
     }
@@ -143,7 +191,21 @@ export async function POST(req: Request) {
 
   // Chat mode — detect if the message implies a tool call
   try {
-    const reply = await agentChat(message, context, history);
+    const chatReservation = await reserveAiModel(session.user.id, {
+      task: "chat",
+    });
+    const reply = await agentChat(
+      message,
+      context,
+      history,
+      chatReservation.model,
+      {
+        focusLabel: resolvedFocus?.label,
+        focusContext: resolvedFocus?.context,
+      },
+      chatReservation.clientConfig,
+      chatReservation.maxTokens
+    );
 
     // Check if the reply contains a tool call marker
     const toolMatch = reply.match(/\[TOOL:\s*(\w+)\s*(?:style=(\w+))?\]/);
@@ -154,19 +216,54 @@ export async function POST(req: Request) {
 
       let toolOutput: unknown;
       let finalStyle = detectedStyle ?? "";
+      const promptOptions = {
+        focusLabel: resolvedFocus?.label,
+        focusContext: resolvedFocus?.context,
+        userRequest: message,
+      };
 
       if (detectedTool === "generate_timeline") {
+        const aiReservation = await reserveAiModel(session.user.id, {
+          task: "timeline",
+        });
         const s = (TIMELINE_STYLES.includes(detectedStyle as TimelineStyle) ? detectedStyle : "vertical") as TimelineStyle;
         finalStyle = s;
-        toolOutput = await generateTimeline(context, s);
+        toolOutput = await generateTimeline(
+          context,
+          aiReservation.model,
+          s,
+          promptOptions,
+          aiReservation.clientConfig,
+          aiReservation.maxTokens
+        );
       } else if (detectedTool === "generate_video_script") {
+        const aiReservation = await reserveAiModel(session.user.id, {
+          task: "video_script",
+        });
         const s = (VIDEO_STYLES.includes(detectedStyle as VideoStyle) ? detectedStyle : "documentary") as VideoStyle;
         finalStyle = s;
-        toolOutput = await generateVideoScript(context, s);
+        toolOutput = await generateVideoScript(
+          context,
+          aiReservation.model,
+          s,
+          promptOptions,
+          aiReservation.clientConfig,
+          aiReservation.maxTokens
+        );
       } else if (detectedTool === "generate_tree") {
+        const aiReservation = await reserveAiModel(session.user.id, {
+          task: "tree",
+        });
         const s = (TREE_STYLES.includes(detectedStyle as TreeStyle) ? detectedStyle : "skills") as TreeStyle;
         finalStyle = s;
-        toolOutput = await generateTree(context, s);
+        toolOutput = await generateTree(
+          context,
+          aiReservation.model,
+          s,
+          promptOptions,
+          aiReservation.clientConfig,
+          aiReservation.maxTokens
+        );
       }
 
       if (toolOutput) {
@@ -175,10 +272,12 @@ export async function POST(req: Request) {
             userId: session.user.id,
             tool: detectedTool,
             style: finalStyle,
-            input: message.slice(0, MAX_STORED_INPUT_LENGTH),
+            input: storedInput,
             output: toolOutput as object,
           },
         });
+
+        const billing = await getBillingSnapshot(session.user.id);
 
         return NextResponse.json({
           type: "tool_result",
@@ -187,11 +286,20 @@ export async function POST(req: Request) {
           style: finalStyle,
           output: toolOutput,
           artifactId: artifact.id,
+          focusLabel: resolvedFocus?.label,
+          billing,
         });
       }
     }
 
-    return NextResponse.json({ type: "chat", reply });
+    const billing = await getBillingSnapshot(session.user.id);
+
+    return NextResponse.json({
+      type: "chat",
+      reply,
+      focusLabel: resolvedFocus?.label,
+      billing,
+    });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

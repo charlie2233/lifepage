@@ -2,8 +2,11 @@ import OpenAI from "openai";
 import { ProfileJSONSchema, type ProfileJSON } from "@/lib/schema";
 import { type CrawlResult } from "@/lib/crawler";
 
-function getOpenAI() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getOpenAI(clientConfig?: { apiKey: string; baseURL?: string }) {
+  return new OpenAI({
+    apiKey: clientConfig?.apiKey ?? process.env.OPENAI_API_KEY,
+    baseURL: clientConfig?.baseURL,
+  });
 }
 
 const PROFILE_JSON_TEMPLATE = `{
@@ -21,7 +24,10 @@ const PROFILE_JSON_TEMPLATE = `{
 
 export async function generateProfileFromCrawl(
   crawlResults: CrawlResult[],
-  userInfo: { name?: string; githubUrl?: string; linkedinUrl?: string }
+  userInfo: { name?: string; githubUrl?: string; linkedinUrl?: string },
+  model: string,
+  clientConfig?: { apiKey: string; baseURL?: string },
+  maxTokens?: number
 ): Promise<ProfileJSON> {
   const evidenceSummary = crawlResults
     .map((r, i) => {
@@ -55,11 +61,12 @@ Generate a comprehensive profile JSON with these rules:
 Return ONLY valid JSON matching this exact structure:
 ${PROFILE_JSON_TEMPLATE}`;
 
-  const completion = await getOpenAI().chat.completions.create({
-    model: "gpt-4o-mini",
+  const completion = await getOpenAI(clientConfig).chat.completions.create({
+    model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
     temperature: 0.3,
+    ...(maxTokens ? { max_tokens: maxTokens } : {}),
   });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
@@ -69,7 +76,10 @@ ${PROFILE_JSON_TEMPLATE}`;
 
 export async function generateProfileFromText(
   text: string,
-  userInfo: { name?: string }
+  userInfo: { name?: string },
+  model: string,
+  clientConfig?: { apiKey: string; baseURL?: string },
+  maxTokens?: number
 ): Promise<ProfileJSON> {
   const prompt = `You are an expert personal brand analyst. Based on the following text description, generate a structured professional profile JSON.
 
@@ -79,11 +89,12 @@ User: ${JSON.stringify(userInfo)}
 Return ONLY valid JSON matching this exact structure:
 ${PROFILE_JSON_TEMPLATE}`;
 
-  const completion = await getOpenAI().chat.completions.create({
-    model: "gpt-4o-mini",
+  const completion = await getOpenAI(clientConfig).chat.completions.create({
+    model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
     temperature: 0.3,
+    ...(maxTokens ? { max_tokens: maxTokens } : {}),
   });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";

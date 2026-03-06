@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/db";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ArrowRight, ArrowUpRight, Compass, Globe, Sparkles } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Explore Portfolios — LifePage",
-  description: "Browse public portfolios built with LifePage AI Personal Brand Builder.",
+  title: "Explore Personal Brands — LifePage",
+  description: "Browse public personal brand sites built and deployed with LifePage.",
 };
 
 // Always dynamically rendered — needs DB access
@@ -19,7 +20,7 @@ interface ProfileData {
 export default async function ExplorePage() {
   const users = await prisma.user.findMany({
     where: {
-      publicPageSettings: { isPublic: true },
+      publicPageSettings: { is: { visibility: "public" } },
       generatedProfiles: { some: { isActive: true } },
     },
     select: {
@@ -103,28 +104,31 @@ export default async function ExplorePage() {
         {/* Header */}
         <div className="mb-10">
           <div className="flex items-center gap-2 text-xs font-mono text-gray-500 uppercase tracking-widest mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#00f5ff] animate-pulse" />
-            Public portfolios
+            <Compass className="h-3.5 w-3.5 text-[#00f5ff]" />
+            Public brand pages
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold mb-3">
-            Explore <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00f5ff] to-[#7c3aed]">Portfolios</span>
+            Explore <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00f5ff] to-[#7c3aed]">Personal Brands</span>
           </h1>
           <p className="text-gray-400 text-lg max-w-xl">
-            Discover creators, engineers, and designers who built their personal brand with LifePage.
+            Discover creators, engineers, and designers who turned their work into live personal brand sites with LifePage.
           </p>
         </div>
 
         {/* Profiles grid */}
         {profiles.length === 0 ? (
           <div className="text-center py-24">
-            <div className="text-6xl mb-6">🌱</div>
-            <h2 className="text-2xl font-bold mb-2">No public portfolios yet</h2>
-            <p className="text-gray-400 mb-8">Be the first to build yours!</p>
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#00f5ff]/20 bg-[#00f5ff]/8">
+              <Sparkles className="h-7 w-7 text-[#00f5ff]" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">No public brand pages yet</h2>
+            <p className="text-gray-400 mb-8">Be the first to launch yours.</p>
             <Link
               href="/register"
-              className="bg-[#00f5ff] text-black px-6 py-3 rounded-xl font-bold hover:bg-[#00e5ef] transition-colors"
+              className="inline-flex items-center gap-2 bg-[#00f5ff] text-black px-6 py-3 rounded-xl font-bold hover:bg-[#00e5ef] transition-colors"
             >
-              Create my portfolio →
+              Build my brand
+              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         ) : (
@@ -168,7 +172,8 @@ export default async function ExplorePage() {
                       </div>
                       {/* Public badge */}
                       <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border border-green-500/30 text-green-400 bg-green-500/10 flex-shrink-0 ml-2">
-                        <span>🌐</span> Public
+                        <Globe className="h-3 w-3" />
+                        Public
                       </span>
                     </div>
 
@@ -193,8 +198,9 @@ export default async function ExplorePage() {
                       {p.stats.yearsBuilding != null && (
                         <span><b className="text-white">{p.stats.yearsBuilding}</b> yrs</span>
                       )}
-                      <span className="ml-auto opacity-0 group-hover:opacity-100 text-[#00f5ff] transition-opacity">
-                        View →
+                      <span className="ml-auto inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 text-[#00f5ff] transition-opacity">
+                        View
+                        <ArrowUpRight className="h-3.5 w-3.5" />
                       </span>
                     </div>
                   </div>
@@ -206,12 +212,13 @@ export default async function ExplorePage() {
 
         {/* CTA at bottom */}
         <div className="mt-16 text-center border-t border-white/8 pt-12">
-          <p className="text-gray-400 mb-4">Want your portfolio here?</p>
+          <p className="text-gray-400 mb-4">Want your brand here?</p>
           <Link
             href="/register"
             className="inline-flex items-center gap-2 bg-[#00f5ff] text-black px-6 py-3 rounded-xl font-bold hover:bg-[#00e5ef] transition-all shadow-xl shadow-[#00f5ff]/20"
           >
-            Create your portfolio →
+            Build your brand
+            <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </div>

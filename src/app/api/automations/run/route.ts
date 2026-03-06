@@ -9,6 +9,7 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { reserveAiModel } from "@/lib/billing";
 import { prisma } from "@/lib/db";
 import { crawlUrl } from "@/lib/crawler";
 import { generateProfileFromCrawl } from "@/lib/ai";
@@ -82,7 +83,16 @@ async function runAutomation(automationId: string): Promise<{ ok: boolean; messa
           metadata: (item.metadata as Record<string, string>) ?? {},
         }));
 
-        const profileData = await generateProfileFromCrawl(crawlResults, {});
+        const aiReservation = await reserveAiModel(automation.userId, {
+          task: "profile",
+        });
+        const profileData = await generateProfileFromCrawl(
+          crawlResults,
+          {},
+          aiReservation.model,
+          aiReservation.clientConfig,
+          aiReservation.maxTokens
+        );
         await prisma.generatedProfile.updateMany({
           where: { userId: automation.userId, isActive: true },
           data: { isActive: false },
@@ -100,7 +110,17 @@ async function runAutomation(automationId: string): Promise<{ ok: boolean; messa
         });
         const context = profile ? JSON.stringify(profile.data).slice(0, MAX_CONTEXT_LENGTH) : "No profile";
         const style = (config.style as string) ?? "vertical";
-        const timeline = await generateTimeline(context, style as Parameters<typeof generateTimeline>[1]);
+        const aiReservation = await reserveAiModel(automation.userId, {
+          task: "timeline",
+        });
+        const timeline = await generateTimeline(
+          context,
+          aiReservation.model,
+          style as Parameters<typeof generateTimeline>[2],
+          undefined,
+          aiReservation.clientConfig,
+          aiReservation.maxTokens
+        );
         await prisma.agentArtifact.create({
           data: {
             userId: automation.userId,
@@ -120,7 +140,17 @@ async function runAutomation(automationId: string): Promise<{ ok: boolean; messa
         });
         const context = profile ? JSON.stringify(profile.data).slice(0, MAX_CONTEXT_LENGTH) : "No profile";
         const style = (config.style as string) ?? "documentary";
-        const script = await generateVideoScript(context, style as Parameters<typeof generateVideoScript>[1]);
+        const aiReservation = await reserveAiModel(automation.userId, {
+          task: "video_script",
+        });
+        const script = await generateVideoScript(
+          context,
+          aiReservation.model,
+          style as Parameters<typeof generateVideoScript>[2],
+          undefined,
+          aiReservation.clientConfig,
+          aiReservation.maxTokens
+        );
         await prisma.agentArtifact.create({
           data: {
             userId: automation.userId,

@@ -5,7 +5,7 @@ export async function GET() {
   // Return all users whose public page settings allow public visibility
   const users = await prisma.user.findMany({
     where: {
-      publicPageSettings: { isPublic: true },
+      publicPageSettings: { is: { visibility: "public" } },
       generatedProfiles: { some: { isActive: true } },
     },
     select: {
