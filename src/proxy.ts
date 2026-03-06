@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function proxy(req: NextRequest) {
-  // Check for next-auth session token (works with both HTTP and HTTPS)
+  // Support both legacy next-auth cookies and Auth.js v5 cookies.
   const hasSession =
+    req.cookies.has("authjs.session-token") ||
+    req.cookies.has("__Secure-authjs.session-token") ||
     req.cookies.has("next-auth.session-token") ||
     req.cookies.has("__Secure-next-auth.session-token");
 
