@@ -32,7 +32,9 @@ export async function GET(req: Request) {
               select: {
                 github: true,
                 linkedin: true,
+                contactEmail: true,
                 location: true,
+                phone: true,
                 website: true,
                 youtube: true,
               },
@@ -60,7 +62,9 @@ export async function GET(req: Request) {
                 select: {
                   github: true,
                   linkedin: true,
+                  contactEmail: true,
                   location: true,
+                  phone: true,
                   website: true,
                   youtube: true,
                 },
@@ -83,7 +87,7 @@ export async function GET(req: Request) {
 
   const resolvedUser =
     user ??
-    (requestedUsername ? getDemoPublicPageUser(requestedUsername) : null);
+    (requestedUsername ? await getDemoPublicPageUser(requestedUsername) : null);
 
   if (!resolvedUser) {
     return requestedUsername
@@ -120,6 +124,7 @@ export async function GET(req: Request) {
       email: resolvedUser.email,
       includeEmail: isOwner,
       name: resolvedUser.name ?? resolvedUser.username ?? "LifePage User",
+      publicContactEmail: resolvedUser.profile?.contactEmail,
       profile: parsedProfile.data,
       profileLinks: resolvedUser.profile,
       username: resolvedUser.username,

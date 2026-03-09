@@ -8,6 +8,7 @@ Turn your work into a stunning portfolio in minutes. Give LifePage a URL — you
 
 - 🕷️ **Web Crawler** — Paste any URL. The AI agent visits the page, takes a screenshot, extracts content (title, headings, meta tags, body text), and feeds it all to OpenAI. No manual input required.
 - 🤖 **AI Generation** — GPT-4o-mini synthesizes evidence into a structured profile: headline, about, skills, projects (as case studies), timeline, achievements, and resume bullets — all with Zod schema validation.
+- 🎬 **Project Demo Videos** — Generate polished 8-second Sora demo clips for portfolio projects, attach them to project cards, and render them inline on public pages.
 - 🎨 **Two Premium Themes** — **Obsidian** (dark glass neon) + **Paper** (clean editorial serif). Theme applied per user to their public page.
 - 💼 **Hiring ↔ Admissions Mode** — Same data, different emphasis. Toggle between recruiter view (skills, impact, case studies) and admissions view (story, growth, leadership).
 - 📄 **Resume PDF Export** — One-click resume download with action verbs and measurable outcomes.
@@ -24,10 +25,11 @@ Turn your work into a stunning portfolio in minutes. Give LifePage a URL — you
 | Styling | TailwindCSS v4 (custom Obsidian + Paper themes) |
 | Database | Prisma v7 + PostgreSQL |
 | Auth | NextAuth v5 (JWT, credentials provider) |
-| AI | OpenAI API (GPT-4o-mini, JSON mode) |
+| AI | OpenAI API (GPT-5 / GPT-4.1 family + Sora video generation) |
 | Schema Validation | Zod v4 |
 | Web Crawling | axios + cheerio (HTML) + puppeteer-core + @sparticuz/chromium (screenshots) |
 | PDF Export | @react-pdf/renderer |
+| Asset Storage | Cloudflare R2 (with local dev fallback for project videos) |
 | Password Hashing | bcryptjs (12 rounds) |
 
 ## 🚀 Quick Start
@@ -55,7 +57,15 @@ AUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="run: openssl rand -base64 32"
 NEXTAUTH_URL="http://localhost:3000"
 OPENAI_API_KEY="sk-your-openai-key-from-platform.openai.com"
+OPENAI_SORA_MODEL="sora-2"
+R2_ACCESS_KEY_ID="your-r2-access-key"
+R2_SECRET_ACCESS_KEY="your-r2-secret-key"
+R2_BUCKET="lifepage-project-videos"
+R2_ACCOUNT_ID="your-cloudflare-account-id"
+R2_PUBLIC_BASE_URL="https://your-public-r2-host.example.com"
 ```
+
+If the R2 variables are missing, project demo videos still work locally and are served from `/api/project-videos/assets/...` using files written under `output/project-videos/`.
 
 ### 3. Set Up Database
 
@@ -143,6 +153,34 @@ Cloudflare keeps prior Worker versions. Roll back from the dashboard or redeploy
 ### Current limitation
 
 The crawler still captures screenshots locally with Puppeteer, but the Cloudflare runtime path treats screenshots as best-effort and may return `null` until a later Browser Rendering integration is added.
+
+## 🎬 Project Demo Videos
+
+LifePage can generate inline project demo videos for public portfolio pages.
+
+### How it works
+
+1. A user or LifeAgent requests a project demo video.
+2. LifePage builds a Sora prompt from the project title, problem, approach, impact, tech stack, portfolio mode, and related evidence screenshots when available.
+3. Sora renders an 8-second polished product demo.
+4. The completed video and poster image are uploaded to Cloudflare R2 when configured, or written to local output storage during development.
+5. The active generated profile is patched with a structured media object so the demo renders inline on the public project card.
+
+### API routes
+
+- `POST /api/project-videos` queues a new project video job for a profile project.
+- `GET /api/project-videos/:artifactId` polls the job, attaches completed media, and returns the updated profile when ready.
+- `GET /api/project-videos/assets/...` serves local development assets when R2 is not configured.
+
+### Sample video rollout
+
+To generate the sample demo portfolio videos locally:
+
+```bash
+npm run demo:project-videos
+```
+
+This writes a manifest to `output/demo-project-videos/manifest.json` and stores local development assets under `output/project-videos/`.
 
 ## 🕷️ How the Web Crawler Works
 

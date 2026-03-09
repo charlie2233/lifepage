@@ -5,7 +5,10 @@ node_modules/
 .dev.vars
 *.log
 dist/
-prisma/migrations/
+output/
+prisma/migrations/*
+!prisma/migrations/20260309142000_add_public_contact_fields/
+!prisma/migrations/20260309142000_add_public_contact_fields/migration.sql
 src/generated/
 tsconfig.tsbuildinfo
 .open-next/

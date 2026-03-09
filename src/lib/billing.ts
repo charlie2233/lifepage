@@ -257,6 +257,13 @@ export interface AiModelReservation {
   snapshot: BillingSnapshot;
 }
 
+export interface VideoGenerationReservation {
+  clientConfig: {
+    apiKey: string;
+  };
+  snapshot: BillingSnapshot;
+}
+
 function normalizePlanTier(value?: string | null): PlanTier {
   return value === "plus" || value === "pro" ? value : "free";
 }
@@ -737,5 +744,44 @@ export async function reserveAiModel(
       fellBackToStandard: true,
       snapshot,
     };
+  });
+}
+
+export async function reserveVideoGeneration(
+  userId: string
+): Promise<VideoGenerationReservation> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is not configured.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const state = await getFreshBillingState(tx, userId);
+    const plan = PLAN_DEFINITIONS[state.planTier];
+
+    if (plan.monthlyAdvancedCredits === null) {
+      return {
+        clientConfig: { apiKey: process.env.OPENAI_API_KEY! },
+        snapshot: buildSnapshot(state),
+      };
+    }
+
+    if (state.advancedCreditsUsed < plan.monthlyAdvancedCredits) {
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          advancedAiCreditsUsed: { increment: 1 },
+        },
+        select: BILLING_USER_SELECT,
+      });
+
+      return {
+        clientConfig: { apiKey: process.env.OPENAI_API_KEY! },
+        snapshot: buildSnapshot(toBillingState(updatedUser)),
+      };
+    }
+
+    throw new Error(
+      "You have used all advanced AI credits for this cycle. Upgrade to Plus or Pro to generate more demo videos."
+    );
   });
 }

@@ -28,17 +28,28 @@ export function buildResumeData(args: {
   email?: string | null;
   includeEmail: boolean;
   name: string;
+  publicContactEmail?: string | null;
   profile: ReturnType<typeof ProfileJSONSchema.parse>;
   profileLinks: {
+    contactEmail?: string | null;
     github?: string | null;
     linkedin?: string | null;
     location?: string | null;
+    phone?: string | null;
     website?: string | null;
     youtube?: string | null;
   } | null;
   username?: string | null;
 }): ResumePdfData {
-  const { email, includeEmail, name, profile, profileLinks, username } = args;
+  const {
+    email,
+    includeEmail,
+    name,
+    publicContactEmail,
+    profile,
+    profileLinks,
+    username,
+  } = args;
 
   const links = [
     profileLinks?.website
@@ -60,7 +71,9 @@ export function buildResumeData(args: {
     headline: profile.headline,
     summary: profile.resume.summary || profile.about,
     username,
-    email: includeEmail ? email ?? null : null,
+    email: includeEmail
+      ? email ?? profileLinks?.contactEmail ?? publicContactEmail ?? null
+      : profileLinks?.contactEmail ?? publicContactEmail ?? null,
     location: profileLinks?.location ?? null,
     links,
     skills: profile.skills.map((skill) => skill.tag),

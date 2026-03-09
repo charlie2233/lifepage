@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   const user =
     (await getPublicPageUserByUsername(username)) ??
-    getDemoPublicPageUser(username);
+    (await getDemoPublicPageUser(username));
 
   if (!user) {
     return { title: "Not found" };
@@ -41,7 +41,7 @@ export default async function PublicResumeRoute({
   const { mode } = await searchParams;
   const user =
     (await getPublicPageUserByUsername(username)) ??
-    getDemoPublicPageUser(username);
+    (await getDemoPublicPageUser(username));
 
   if (!user) {
     notFound();

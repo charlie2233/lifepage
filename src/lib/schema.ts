@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ProjectMediaSchema } from "@/lib/project-media";
 
 export const SkillSchema = z.object({
   tag: z.string(),
@@ -22,7 +23,7 @@ export const ProjectSchema = z.object({
   impact: z.string().nullable(),
   tech: z.array(z.string()).default([]),
   links: z.array(z.object({ label: z.string(), url: z.string() })).default([]),
-  media: z.array(z.string()).default([]),
+  media: z.array(ProjectMediaSchema).default([]),
   evidenceRefs: z.array(z.string()).default([]),
 });
 

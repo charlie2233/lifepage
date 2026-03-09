@@ -71,7 +71,7 @@ Content: ${r.bodyText.slice(0, 1000)}`;
     })
     .join("\n\n");
 
-  const prompt = `You are an expert personal brand analyst and resume writer. Analyze the following web evidence about a person and generate a structured professional profile JSON.
+  const prompt = `You are an expert personal brand analyst and resume writer. Analyze the following web evidence about a person and generate a rich, specific professional profile JSON.
 
 Evidence collected from their websites/projects:
 ${evidenceSummary}
@@ -85,10 +85,13 @@ Generate a comprehensive profile JSON with these rules:
 4. Infer skills from technologies/tools mentioned
 5. Create a compelling headline (max 10 words)
 6. Write an engaging "about" paragraph (2-4 sentences)
-7. Extract or infer projects from the content
+7. Extract or infer projects from the content and make each one specific
 8. Estimate a confidence score 0-1 based on how much data you have
 9. For the timeline, group milestones by year based on any dates mentioned
 10. For stats: estimate projectsShipped, yearsBuilding, competitions based on evidence
+11. Prefer filling multiple projects, experiences, achievements, and timeline entries when the evidence supports them
+12. Make the portfolio feel content-rich, credible, and grounded in shipped work
+13. Keep writing concrete and useful for a real public portfolio page, not generic resume filler
 
 Return ONLY valid JSON matching this exact structure:
 ${PROFILE_JSON_TEMPLATE}`;
@@ -113,10 +116,12 @@ export async function generateProfileFromText(
   clientConfig?: { apiKey: string; baseURL?: string },
   maxTokens?: number
 ): Promise<ProfileJSON> {
-  const prompt = `You are an expert personal brand analyst. Based on the following text description, generate a structured professional profile JSON.
+  const prompt = `You are an expert personal brand analyst. Based on the following text description, generate a rich and specific professional profile JSON.
 
 Text: ${text}
 User: ${JSON.stringify(userInfo)}
+
+Write the output so it feels substantial enough for a real public portfolio page. Prefer multiple concrete projects, experiences, achievements, and timeline entries when the text supports them. Keep the writing specific rather than generic.
 
 Return ONLY valid JSON matching this exact structure:
 ${PROFILE_JSON_TEMPLATE}`;

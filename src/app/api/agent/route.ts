@@ -45,6 +45,7 @@ import {
   generateTree,
   setPortfolioTheme,
   setResumeModel,
+  type AgentClarificationQuestion,
   type AgentTurnStrategy,
   type ExecutableAgentTool,
   type TimelineStyle,
@@ -54,9 +55,22 @@ import {
   type ResumeModelOutput,
 } from "@/lib/agent-tools";
 import { ProfileJSONSchema } from "@/lib/schema";
+import { createProjectVideoArtifact } from "@/lib/project-videos";
 import { z } from "zod";
 
 const MAX_STORED_INPUT_LENGTH = 500;
+
+class AgentClarificationError extends Error {
+  reply: string;
+  questions: AgentClarificationQuestion[];
+
+  constructor(reply: string, questions: AgentClarificationQuestion[]) {
+    super(reply);
+    this.name = "AgentClarificationError";
+    this.reply = reply;
+    this.questions = questions;
+  }
+}
 
 const RequestSchema = z.object({
   message: z.string().min(1).max(2000),
@@ -173,6 +187,29 @@ function buildCrawlResultFromEvidence(item: {
   };
 }
 
+function resolveProjectIndexFromMessage(
+  projects: Array<{ title: string }>,
+  message: string
+) {
+  const loweredMessage = message.toLowerCase();
+  const matchingIndexes = projects
+    .map((project, index) => ({
+      index,
+      matches: loweredMessage.includes(project.title.toLowerCase()),
+    }))
+    .filter((entry) => entry.matches);
+
+  if (matchingIndexes.length === 1) {
+    return matchingIndexes[0].index;
+  }
+
+  if (projects.length === 1) {
+    return 0;
+  }
+
+  return null;
+}
+
 function getToolReply(
   tool: ExecutableAgentTool,
   style: string,
@@ -186,6 +223,8 @@ function getToolReply(
       return `I built a fresh timeline${styleLabel}${focusSuffix}.`;
     case "generate_video_script":
       return `I generated a new video script${styleLabel}${focusSuffix}.`;
+    case "generate_project_video":
+      return `I queued a real project demo video${focusSuffix}.`;
     case "generate_tree":
       return `I mapped the portfolio into a structured tree${styleLabel}${focusSuffix}.`;
     case "set_portfolio_theme":
@@ -210,6 +249,38 @@ function toSkillSummary(
     category: skill.category,
     description: skill.description,
   };
+}
+
+function buildClarificationResponse(args: {
+  reply: string;
+  questions: AgentClarificationQuestion[];
+  focusLabel?: string | null;
+  strategy: AgentTurnStrategy;
+  resolvedPersonaSkill: ReturnType<typeof getPersonaSkill> | null;
+  resolvedWorkflowSkill: ReturnType<typeof getWorkflowSkill> | null;
+  billing: Awaited<ReturnType<typeof getBillingSnapshot>>;
+}) {
+  return NextResponse.json({
+    type: "clarification",
+    reply: args.reply,
+    focusLabel: args.focusLabel,
+    executionMode: "clarify",
+    clarificationQuestions: args.questions,
+    resolvedPersonaSkill: toSkillSummary(args.resolvedPersonaSkill),
+    resolvedWorkflowSkill: toSkillSummary(args.resolvedWorkflowSkill),
+    mutationSummary: null,
+    revertable: false,
+    strategy: {
+      ...args.strategy,
+      mode: "clarify",
+      clarificationQuestions: args.questions,
+      personaSkillId: args.resolvedPersonaSkill?.id,
+      workflowSkillId: args.resolvedWorkflowSkill?.id,
+      tool: undefined,
+      style: undefined,
+    },
+    billing: args.billing,
+  });
 }
 
 async function executeAgentTool(args: {
@@ -238,15 +309,33 @@ async function executeAgentTool(args: {
     linkedin: string | null;
     youtube: string | null;
   } | null;
+  currentProfile: ReturnType<typeof ProfileJSONSchema.parse> | null;
+  mode: "hiring" | "admissions";
+  strategy: AgentTurnStrategy;
+  resolvedPersonaSkillId?: string | null;
+  resolvedWorkflowSkillId?: string | null;
   promptOptions: {
     focusLabel?: string;
     focusContext?: string;
     userRequest?: string;
   };
 }) {
-  const { userId, userName, tool, context, message, focus, evidenceItems, userProfile, promptOptions } =
-    args;
+  const {
+    userId,
+    userName,
+    tool,
+    context,
+    message,
+    focus,
+    evidenceItems,
+    userProfile,
+    currentProfile,
+    mode,
+    strategy,
+    promptOptions,
+  } = args;
   let output: unknown;
+  let artifactId: string | undefined;
   const style = normalizeAgentToolStyle(tool, args.style);
 
   if (tool === "generate_timeline") {
@@ -269,6 +358,56 @@ async function executeAgentTool(args: {
       aiReservation.clientConfig,
       aiReservation.maxTokens
     );
+  } else if (tool === "generate_project_video") {
+    if (!currentProfile) {
+      throw new Error(
+        "Generate a profile first before asking LifeAgent to create project demo videos."
+      );
+    }
+
+    const projectIndex =
+      focus?.kind === "project" && typeof focus.index === "number"
+        ? focus.index
+        : resolveProjectIndexFromMessage(currentProfile.projects, message);
+
+    if (projectIndex === null || projectIndex === undefined) {
+      throw new AgentClarificationError(
+        "I can generate a project demo video, but I need to know which project to use.",
+        [
+          {
+            id: "project_video_target",
+            label: "Project",
+            question: "Which project should I turn into a demo video?",
+            helpText:
+              "Pick one project so I can build the Sora prompt and queue the render.",
+            options: currentProfile.projects.slice(0, 4).map((project) => ({
+              label: project.title,
+              answer: `Generate a demo video for ${project.title}.`,
+            })),
+          },
+        ]
+      );
+    }
+
+    const created = await createProjectVideoArtifact({
+      userId,
+      userName,
+      mode,
+      profile: currentProfile,
+      projectIndex,
+      evidenceItems,
+      input: message,
+      strategy: {
+        ...strategy,
+        personaSkillId: args.resolvedPersonaSkillId ?? undefined,
+        workflowSkillId: args.resolvedWorkflowSkillId ?? undefined,
+      },
+      resolvedPersonaSkillId: args.resolvedPersonaSkillId ?? null,
+      resolvedWorkflowSkillId: args.resolvedWorkflowSkillId ?? null,
+    });
+
+    output = created.output;
+    artifactId = created.artifactId;
   } else if (tool === "generate_tree") {
     const aiReservation = await reserveAiModel(userId, { task: "tree" });
     output = await generateTree(
@@ -378,8 +517,18 @@ async function executeAgentTool(args: {
 
     const comparableRequestedUrl = normalizeComparableUrl(requestedUrl);
     if (!requestedUrl || !comparableRequestedUrl) {
-      throw new Error(
-        "Ask me to re-crawl a specific URL, or scope the agent to an evidence item that has one."
+      throw new AgentClarificationError(
+        "I can refresh a source for you, but I need to know which URL you want me to re-crawl.",
+        [
+          {
+            id: "recrawl_url",
+            label: "Source URL",
+            question: "Which URL should I refresh?",
+            helpText:
+              "Paste one web page, repo, or portfolio link and I’ll re-crawl that source.",
+            options: [],
+          },
+        ]
       );
     }
 
@@ -439,6 +588,7 @@ async function executeAgentTool(args: {
     output,
     style,
     reply: getToolReply(tool, style, args.focusLabel),
+    artifactId,
   };
 }
 
@@ -648,6 +798,21 @@ export async function POST(req: Request) {
         focusKind: focus?.kind ?? null,
       });
 
+    if (strategy.mode === "clarify") {
+      const billing = await getBillingSnapshot(session.user.id);
+      return buildClarificationResponse({
+        reply:
+          strategy.reply ||
+          "I need one quick clarification before I make the right change.",
+        questions: strategy.clarificationQuestions ?? [],
+        focusLabel: resolvedFocus?.label,
+        strategy,
+        resolvedPersonaSkill,
+        resolvedWorkflowSkill,
+        billing,
+      });
+    }
+
     if (strategy.mode === "artifact" && strategy.tool) {
       const executed = await executeAgentTool({
         userId: session.user.id,
@@ -660,29 +825,37 @@ export async function POST(req: Request) {
         focus,
         evidenceItems,
         userProfile,
+        currentProfile: profileData,
+        mode: settings?.mode === "admissions" ? "admissions" : "hiring",
+        strategy,
+        resolvedPersonaSkillId: resolvedPersonaSkill?.id,
+        resolvedWorkflowSkillId: resolvedWorkflowSkill?.id,
         promptOptions,
       });
 
-      const artifact = await prisma.agentArtifact.create({
-        data: {
-          userId: session.user.id,
-          tool: strategy.tool,
-          style: executed.style || null,
-          input: storedInput,
-          output: executed.output as Prisma.InputJsonValue,
-          meta: buildArtifactMeta({
-            executionMode: "artifact",
-            strategy: {
-              ...strategy,
-              personaSkillId: resolvedPersonaSkill?.id,
-              workflowSkillId: resolvedWorkflowSkill?.id,
-            },
-            resolvedPersonaSkillId: resolvedPersonaSkill?.id,
-            resolvedWorkflowSkillId: resolvedWorkflowSkill?.id,
-            revertable: false,
-          }) as Prisma.InputJsonValue,
-        },
-      });
+      const artifact =
+        executed.artifactId
+          ? { id: executed.artifactId }
+          : await prisma.agentArtifact.create({
+              data: {
+                userId: session.user.id,
+                tool: strategy.tool,
+                style: executed.style || null,
+                input: storedInput,
+                output: executed.output as Prisma.InputJsonValue,
+                meta: buildArtifactMeta({
+                  executionMode: "artifact",
+                  strategy: {
+                    ...strategy,
+                    personaSkillId: resolvedPersonaSkill?.id,
+                    workflowSkillId: resolvedWorkflowSkill?.id,
+                  },
+                  resolvedPersonaSkillId: resolvedPersonaSkill?.id,
+                  resolvedWorkflowSkillId: resolvedWorkflowSkill?.id,
+                  revertable: false,
+                }) as Prisma.InputJsonValue,
+              },
+            });
 
       const billing = await getBillingSnapshot(session.user.id);
 
@@ -695,6 +868,7 @@ export async function POST(req: Request) {
         artifactId: artifact.id,
         focusLabel: resolvedFocus?.label,
         executionMode: "artifact",
+        clarificationQuestions: [],
         resolvedPersonaSkill: toSkillSummary(resolvedPersonaSkill),
         resolvedWorkflowSkill: toSkillSummary(resolvedWorkflowSkill),
         mutationSummary: null,
@@ -782,6 +956,7 @@ export async function POST(req: Request) {
         artifactId: artifact.id,
         focusLabel: resolvedFocus?.label,
         executionMode: "mutate",
+        clarificationQuestions: [],
         resolvedPersonaSkill: toSkillSummary(resolvedPersonaSkill),
         resolvedWorkflowSkill: toSkillSummary(resolvedWorkflowSkill),
         mutationSummary,
@@ -805,6 +980,7 @@ export async function POST(req: Request) {
       reply: strategy.reply,
       focusLabel: resolvedFocus?.label,
       executionMode: "reply",
+      clarificationQuestions: [],
       resolvedPersonaSkill: toSkillSummary(resolvedPersonaSkill),
       resolvedWorkflowSkill: toSkillSummary(resolvedWorkflowSkill),
       mutationSummary: null,
@@ -818,6 +994,29 @@ export async function POST(req: Request) {
       billing,
     });
   } catch (err) {
+    if (err instanceof AgentClarificationError) {
+      const billing = await getBillingSnapshot(session.user.id);
+      const fallbackStrategy: AgentTurnStrategy = {
+        intent: "Clarify the request",
+        mode: "clarify",
+        reply: err.reply,
+        rationale:
+          "The requested action is blocked until the user provides one missing detail.",
+        nextSteps: [],
+        missingContext: err.questions.map((question) => question.question),
+        clarificationQuestions: err.questions,
+      };
+
+      return buildClarificationResponse({
+        reply: err.reply,
+        questions: err.questions,
+        strategy: fallbackStrategy,
+        resolvedPersonaSkill: null,
+        resolvedWorkflowSkill: null,
+        billing,
+      });
+    }
+
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }

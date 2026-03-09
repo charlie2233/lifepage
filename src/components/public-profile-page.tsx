@@ -10,12 +10,15 @@ import type { PublicPageUser } from "@/lib/public-page";
 import { resolvePublicPageMode } from "@/lib/public-page";
 import { normalizeVisibility } from "@/lib/page-visibility";
 import { resolvePortfolioTheme } from "@/lib/portfolio-themes";
+import { normalizeProjectMedia } from "@/lib/project-media";
 import {
   ExternalLink,
   Github,
   Globe,
   Linkedin,
+  Mail,
   MapPin,
+  Phone,
   Sparkles,
   Trophy,
   Youtube,
@@ -141,6 +144,32 @@ export function PublicProfilePage({
     resolvedTheme.proofLayout === "mosaic"
       ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
       : "grid gap-4 sm:grid-cols-2 lg:grid-cols-3";
+  const proofGallery = evidenceItems.filter((item) => item.screenshot);
+  const hasPublicContact =
+    Boolean(userProfile?.contactNote) ||
+    Boolean(userProfile?.contactEmail) ||
+    Boolean(userProfile?.phone) ||
+    Boolean(userProfile?.website) ||
+    Boolean(userProfile?.github) ||
+    Boolean(userProfile?.linkedin) ||
+    Boolean(userProfile?.youtube);
+  const contactNote =
+    userProfile?.contactNote ??
+    (mode === "hiring"
+      ? "Reach out for roles, collaborations, or product conversations."
+      : "Reach out for applications, mentorship, collaborations, or long-term opportunities.");
+  const formatContactHref = (value: string, type: "email" | "phone" | "url") => {
+    if (type === "email") {
+      return `mailto:${value}`;
+    }
+
+    if (type === "phone") {
+      const normalizedPhone = value.replace(/[^\d+]/g, "");
+      return normalizedPhone ? `tel:${normalizedPhone}` : "#";
+    }
+
+    return value;
+  };
 
   if (!profileData) {
     return (
@@ -168,8 +197,6 @@ export function PublicProfilePage({
       </div>
     );
   }
-
-  const proofGallery = evidenceItems.filter((item) => item.screenshot);
 
   return (
     <div className="portfolio-body min-h-screen" style={pageStyle}>
@@ -230,6 +257,26 @@ export function PublicProfilePage({
               </p>
 
               <div className={`mt-8 flex flex-wrap gap-3 ${heroActionsClass}`}>
+                {userProfile?.contactEmail && (
+                  <a
+                    href={formatContactHref(userProfile.contactEmail, "email")}
+                    className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm"
+                    style={outlineButtonStyle}
+                  >
+                    <Mail className="h-4 w-4" />
+                    Email
+                  </a>
+                )}
+                {userProfile?.phone && (
+                  <a
+                    href={formatContactHref(userProfile.phone, "phone")}
+                    className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm"
+                    style={outlineButtonStyle}
+                  >
+                    <Phone className="h-4 w-4" />
+                    Call
+                  </a>
+                )}
                 {userProfile?.github && (
                   <a
                     href={userProfile.github}
@@ -447,6 +494,9 @@ export function PublicProfilePage({
                       return false;
                     }
                   });
+                  const projectVideo = normalizeProjectMedia(project.media).find(
+                    (item) => item.type === "video" && item.status === "ready"
+                  );
 
                   return (
                     <article
@@ -459,7 +509,22 @@ export function PublicProfilePage({
                           : null),
                       }}
                     >
-                      {evidence?.screenshot && (
+                      {projectVideo ? (
+                        <video
+                          controls
+                          playsInline
+                          preload="metadata"
+                          poster={projectVideo.posterUrl ?? undefined}
+                          className={`w-full bg-black object-cover object-top ${
+                            resolvedTheme.projectLayout === "feature"
+                              ? "h-64"
+                              : resolvedTheme.projectLayout === "stack"
+                                ? "h-44"
+                                : "h-52"
+                          }`}
+                          src={projectVideo.url}
+                        />
+                      ) : evidence?.screenshot ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={evidence.screenshot}
@@ -472,11 +537,16 @@ export function PublicProfilePage({
                                 : "h-52"
                           }`}
                         />
-                      )}
+                      ) : null}
                       <div className={projectCardPaddingClass}>
                         <h3 className="text-2xl font-semibold tracking-tight">
                           {project.title}
                         </h3>
+                        {projectVideo ? (
+                          <p className="mt-3 text-xs uppercase tracking-[0.18em]" style={accentStyle}>
+                            Demo video
+                          </p>
+                        ) : null}
                         {mode === "hiring" ? (
                           <div className="mt-5 space-y-4">
                             {project.problem && (
@@ -551,6 +621,66 @@ export function PublicProfilePage({
                     </article>
                   );
                 })}
+              </div>
+            </section>
+          )}
+
+          {profileData.experiences?.length > 0 && (
+            <section className="mt-10">
+              <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="lp-kicker text-[11px]" style={accentStyle}>
+                    Experience
+                  </p>
+                  <h2 className="brand-display mt-2 text-4xl tracking-tight">
+                    Selected Experience
+                  </h2>
+                </div>
+                <p className="max-w-lg text-sm leading-7" style={mutedStyle}>
+                  The execution history and responsibilities behind the public work.
+                </p>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                {profileData.experiences.map((experience, index) => (
+                  <article
+                    key={`${experience.role}-${experience.org}-${index}`}
+                    className="rounded-[1.75rem] border p-6"
+                    style={panelStyle}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-xl font-semibold tracking-tight">
+                          {experience.role}
+                        </h3>
+                        <p className="mt-1 text-sm" style={accentStyle}>
+                          {experience.org}
+                        </p>
+                      </div>
+                      {(experience.startDate || experience.endDate) && (
+                        <p className="text-xs" style={mutedStyle}>
+                          {experience.startDate ?? "Start"}
+                          {experience.endDate ? ` - ${experience.endDate}` : " - Present"}
+                        </p>
+                      )}
+                    </div>
+
+                    {experience.bullets?.length > 0 && (
+                      <ul className="mt-5 space-y-2">
+                        {experience.bullets.map((bullet, bulletIndex) => (
+                          <li
+                            key={`${experience.role}-${bulletIndex}`}
+                            className="flex gap-3 text-sm leading-7"
+                            style={mutedStyle}
+                          >
+                            <span style={accentStyle}>•</span>
+                            <span>{bullet}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </article>
+                ))}
               </div>
             </section>
           )}
@@ -695,6 +825,133 @@ export function PublicProfilePage({
                     )}
                   </div>
                 ))}
+              </div>
+            </section>
+          )}
+
+          {hasPublicContact && (
+            <section className="mt-10">
+              <div className="rounded-[2rem] border p-6 md:p-7" style={panelStyle}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="lp-kicker text-[11px]" style={accentStyle}>
+                      Contact
+                    </p>
+                    <h2 className="brand-display mt-2 text-4xl tracking-tight">
+                      Reach out
+                    </h2>
+                  </div>
+                  <p className="max-w-lg text-sm leading-7" style={mutedStyle}>
+                    This portfolio is meant to start real conversations, not just collect views.
+                  </p>
+                </div>
+
+                <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                  <div className="rounded-[1.5rem] border p-5" style={statTileStyle}>
+                    <p className="text-xs uppercase tracking-[0.14em]" style={mutedStyle}>
+                      Best use
+                    </p>
+                    <p className="mt-3 text-sm leading-7" style={mutedStyle}>
+                      {contactNote}
+                    </p>
+                    {userProfile?.location && (
+                      <div
+                        className="mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs"
+                        style={chipStyle}
+                      >
+                        <MapPin className="h-3.5 w-3.5" />
+                        {userProfile.location}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {userProfile?.contactEmail && (
+                      <a
+                        href={formatContactHref(userProfile.contactEmail, "email")}
+                        className="rounded-[1.5rem] border p-5 transition-transform hover:-translate-y-0.5"
+                        style={statTileStyle}
+                      >
+                        <Mail className="h-5 w-5" style={accentStyle} />
+                        <p className="mt-4 text-sm font-semibold">Email</p>
+                        <p className="mt-2 text-sm break-all" style={mutedStyle}>
+                          {userProfile.contactEmail}
+                        </p>
+                      </a>
+                    )}
+                    {userProfile?.phone && (
+                      <a
+                        href={formatContactHref(userProfile.phone, "phone")}
+                        className="rounded-[1.5rem] border p-5 transition-transform hover:-translate-y-0.5"
+                        style={statTileStyle}
+                      >
+                        <Phone className="h-5 w-5" style={accentStyle} />
+                        <p className="mt-4 text-sm font-semibold">Phone</p>
+                        <p className="mt-2 text-sm" style={mutedStyle}>
+                          {userProfile.phone}
+                        </p>
+                      </a>
+                    )}
+                    {userProfile?.website && (
+                      <a
+                        href={formatContactHref(userProfile.website, "url")}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-[1.5rem] border p-5 transition-transform hover:-translate-y-0.5"
+                        style={statTileStyle}
+                      >
+                        <Globe className="h-5 w-5" style={accentStyle} />
+                        <p className="mt-4 text-sm font-semibold">Website</p>
+                        <p className="mt-2 text-sm break-all" style={mutedStyle}>
+                          {userProfile.website}
+                        </p>
+                      </a>
+                    )}
+                    {(userProfile?.linkedin || userProfile?.github || userProfile?.youtube) && (
+                      <div className="rounded-[1.5rem] border p-5" style={statTileStyle}>
+                        <p className="text-sm font-semibold">Social</p>
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          {userProfile.linkedin && (
+                            <a
+                              href={userProfile.linkedin}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 text-sm hover:underline"
+                              style={accentStyle}
+                            >
+                              <Linkedin className="h-4 w-4" />
+                              LinkedIn
+                            </a>
+                          )}
+                          {userProfile.github && (
+                            <a
+                              href={userProfile.github}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 text-sm hover:underline"
+                              style={accentStyle}
+                            >
+                              <Github className="h-4 w-4" />
+                              GitHub
+                            </a>
+                          )}
+                          {userProfile.youtube && (
+                            <a
+                              href={userProfile.youtube}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 text-sm hover:underline"
+                              style={accentStyle}
+                            >
+                              <Youtube className="h-4 w-4" />
+                              YouTube
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </section>
           )}

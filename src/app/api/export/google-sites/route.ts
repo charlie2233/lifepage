@@ -29,9 +29,11 @@ export async function GET() {
       username: true,
       profile: {
         select: {
+          contactEmail: true,
           website: true,
           github: true,
           linkedin: true,
+          phone: true,
           youtube: true,
         },
       },
@@ -74,6 +76,9 @@ export async function GET() {
   })();
   const appBaseUrl = getAppBaseUrl() ?? inferredBaseUrl;
   const links = [
+    user.profile?.contactEmail
+      ? { label: "Email", url: `mailto:${user.profile.contactEmail}` }
+      : null,
     user.profile?.website
       ? { label: "Website", url: user.profile.website }
       : null,
@@ -85,6 +90,9 @@ export async function GET() {
       : null,
     user.profile?.youtube
       ? { label: "YouTube", url: user.profile.youtube }
+      : null,
+    user.profile?.phone
+      ? { label: "Phone", url: `tel:${user.profile.phone.replace(/[^\d+]/g, "")}` }
       : null,
     user.username && appBaseUrl
       ? { label: "LifePage", url: `${appBaseUrl}/u/${user.username}` }

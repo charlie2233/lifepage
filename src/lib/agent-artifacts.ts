@@ -7,12 +7,14 @@ import {
   AgentMutationSummarySchema,
   AgentPortfolioPatchSchema,
 } from "@/lib/agent-mutations";
+import { ProjectVideoStateSchema } from "@/lib/project-video-types";
 
 export const AgentArtifactMetaSchema = z.object({
   executionMode: z.enum(["artifact", "mutate"]),
   strategy: z.record(z.string(), z.unknown()),
   resolvedPersonaSkillId: PersonaSkillIdSchema.nullable().optional(),
   resolvedWorkflowSkillId: WorkflowSkillIdSchema.nullable().optional(),
+  projectVideo: ProjectVideoStateSchema.nullable().optional(),
   mutationSummary: AgentMutationSummarySchema.nullable().optional(),
   beforeSnapshot: AgentPortfolioPatchSchema.nullable().optional(),
   afterSnapshot: AgentPortfolioPatchSchema.nullable().optional(),

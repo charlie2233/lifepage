@@ -32,7 +32,7 @@ export type PersonaSkillId = (typeof PERSONA_SKILL_IDS)[number];
 export type WorkflowSkillId = (typeof WORKFLOW_SKILL_IDS)[number];
 export type AgentSkillId = PersonaSkillId | WorkflowSkillId;
 
-export type AgentExecutionMode = "reply" | "artifact" | "mutate";
+export type AgentExecutionMode = "reply" | "artifact" | "mutate" | "clarify";
 
 export type AgentMutationTarget =
   | "profile.headline"
@@ -53,6 +53,7 @@ export type AgentMutationTarget =
 export type AgentToolReference =
   | "generate_timeline"
   | "generate_video_script"
+  | "generate_project_video"
   | "generate_tree"
   | "set_portfolio_theme"
   | "set_resume_model"
@@ -81,7 +82,7 @@ export interface WorkflowSkillDefinition
   category: "workflow";
   allowedTools: AgentToolReference[];
   allowedMutationTargets: AgentMutationTarget[];
-  defaultExecutionMode: Exclude<AgentExecutionMode, "reply">;
+  defaultExecutionMode: Exclude<AgentExecutionMode, "reply" | "clarify">;
 }
 
 function createPersonaSkill(
@@ -122,6 +123,7 @@ export const PERSONA_SKILLS: PersonaSkillDefinition[] = [
     allowedTools: [
       "generate_timeline",
       "generate_video_script",
+      "generate_project_video",
       "generate_tree",
       "set_portfolio_theme",
       "set_resume_model",
@@ -174,6 +176,7 @@ export const PERSONA_SKILLS: PersonaSkillDefinition[] = [
     allowedTools: [
       "generate_timeline",
       "generate_video_script",
+      "generate_project_video",
       "generate_tree",
       "set_portfolio_theme",
       "set_resume_model",
@@ -223,6 +226,7 @@ export const PERSONA_SKILLS: PersonaSkillDefinition[] = [
     allowedTools: [
       "generate_timeline",
       "generate_video_script",
+      "generate_project_video",
       "generate_tree",
       "set_resume_model",
       "regenerate_profile",
@@ -297,6 +301,7 @@ export const PERSONA_SKILLS: PersonaSkillDefinition[] = [
     supportedFocusKinds: ["theme", "resume", "projects", "project", "timeline"],
     allowedTools: [
       "generate_timeline",
+      "generate_project_video",
       "set_portfolio_theme",
       "set_resume_model",
       "generate_tree",

@@ -78,6 +78,7 @@ function getTemperatureOption(model: string, temperature: number) {
 export type ToolName =
   | "generate_timeline"
   | "generate_video_script"
+  | "generate_project_video"
   | "generate_tree"
   | "set_portfolio_theme"
   | "set_resume_model"
@@ -88,6 +89,7 @@ export type ToolName =
 export const EXECUTABLE_AGENT_TOOLS = [
   "generate_timeline",
   "generate_video_script",
+  "generate_project_video",
   "generate_tree",
   "set_portfolio_theme",
   "set_resume_model",
@@ -133,7 +135,30 @@ export interface AgentTurnStrategy {
   rationale: string;
   nextSteps: string[];
   missingContext: string[];
+  clarificationQuestions?: AgentClarificationQuestion[];
 }
+
+const AgentClarificationOptionSchema = z.object({
+  label: z.string().min(1).max(60),
+  answer: z.string().min(1).max(180),
+});
+
+const AgentClarificationQuestionSchema = z.object({
+  id: z
+    .string()
+    .trim()
+    .min(1)
+    .max(40)
+    .regex(/^[a-z0-9_:-]+$/i),
+  label: z.string().min(1).max(40),
+  question: z.string().min(1).max(180),
+  helpText: z.string().min(1).max(180).nullable().optional(),
+  options: z.array(AgentClarificationOptionSchema).max(4).default([]),
+});
+
+export type AgentClarificationQuestion = z.infer<
+  typeof AgentClarificationQuestionSchema
+>;
 
 interface AgentToolSpec {
   label: string;
@@ -161,6 +186,14 @@ const AGENT_TOOL_SPECS: Record<ExecutableAgentTool, AgentToolSpec> = {
     whenToUse:
       "Use when the user wants a narrated brand video, pitch video, portfolio reel, or scene-by-scene script.",
     styleGuide: "Pick one of: documentary, pitch, cinematic, tutorial, story.",
+  },
+  generate_project_video: {
+    label: "Project demo video",
+    defaultStyle: "polished-product-demo",
+    whenToUse:
+      "Use when the user wants an actual short demo clip for one specific project on the public portfolio page.",
+    styleGuide:
+      "Use polished-product-demo. This requires a concrete project target and creates a queued video job.",
   },
   generate_tree: {
     label: "Tree / map",
@@ -223,6 +256,8 @@ export function normalizeAgentToolStyle(
       return VIDEO_STYLES.includes(trimmedStyle as VideoStyle)
         ? trimmedStyle!
         : (AGENT_TOOL_SPECS[tool].defaultStyle ?? "documentary");
+    case "generate_project_video":
+      return "polished-product-demo";
     case "generate_tree":
       return TREE_STYLES.includes(trimmedStyle as TreeStyle)
         ? trimmedStyle!
@@ -739,7 +774,7 @@ Rules:
 
 const AgentTurnStrategySchema = z.object({
   intent: z.string().min(1).max(160),
-  mode: z.enum(["reply", "artifact", "mutate"]),
+  mode: z.enum(["reply", "artifact", "mutate", "clarify"]),
   personaSkillId: PersonaSkillIdSchema.optional(),
   workflowSkillId: WorkflowSkillIdSchema.optional(),
   tool: z.string().max(120).optional(),
@@ -748,6 +783,10 @@ const AgentTurnStrategySchema = z.object({
   rationale: z.string().min(1).max(280),
   nextSteps: z.array(z.string().min(1).max(180)).max(4).default([]),
   missingContext: z.array(z.string().min(1).max(180)).max(4).default([]),
+  clarificationQuestions: z
+    .array(AgentClarificationQuestionSchema)
+    .max(3)
+    .default([]),
 });
 
 const AgentMutationPlanSchema = z.object({
@@ -805,18 +844,21 @@ How to behave:
 - If the runtime context says only certain providers are configured, do not recommend unavailable ones as if they are active.
 - Choose mode=artifact when the user explicitly wants a generated artifact or one of the executable tools.
 - Choose mode=mutate when the best outcome is a direct live change to allowed portfolio fields.
+- Choose mode=clarify when you are blocked by one or two critical unknowns and should ask targeted follow-up questions before replying, mutating, or running a tool.
 - Choose mode=reply when the user mainly needs advice, prioritization, critique, or lightweight copy without saving changes.
+- Use clarify instead of guessing when the request is genuinely ambiguous about target surface, audience, goal, or required source URL.
 - Never choose more than one tool.
 - Only choose recrawl_url if a specific URL is available from the user's message or focused evidence.
 - If you choose regenerate_profile, assume the system will rebuild the active profile from visible evidence.
 - If you choose a tool with no style, leave style empty.
 - If mode=mutate, you must pick a workflowSkillId.
+- If mode=clarify, include 1-3 short clarificationQuestions. Each question should be concrete and fast to answer. Add 2-4 options when useful.
 - If the user pinned a persona or workflow skill, preserve it in the response.
 
 Return JSON only with this structure:
 {
   "intent": "short summary of what the user is trying to do",
-  "mode": "reply | artifact | mutate",
+  "mode": "reply | artifact | mutate | clarify",
   "personaSkillId": "one persona skill id or omit",
   "workflowSkillId": "one workflow skill id or omit",
   "tool": "one tool name when mode=artifact and a tool is needed",
@@ -824,7 +866,19 @@ Return JSON only with this structure:
   "reply": "what you tell the user right now inside the chat UI",
   "rationale": "one short sentence explaining why this mode/tool is the right move",
   "nextSteps": ["up to 4 short next steps"],
-  "missingContext": ["up to 4 short missing pieces if context is thin"]
+  "missingContext": ["up to 4 short missing pieces if context is thin"],
+  "clarificationQuestions": [
+    {
+      "id": "audience",
+      "label": "Audience",
+      "question": "Who should this page speak to first?",
+      "helpText": "Use this only when a concrete answer would change the output.",
+      "options": [
+        { "label": "Recruiters", "answer": "Make it employer-facing first." },
+        { "label": "Admissions", "answer": "Make it admissions-facing first." }
+      ]
+    }
+  ]
 }`;
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -851,6 +905,31 @@ Return JSON only with this structure:
     ? (parsed.tool as ExecutableAgentTool)
     : undefined;
 
+  if (parsed.mode === "clarify") {
+    const clarificationQuestions =
+      parsed.clarificationQuestions.length > 0
+        ? parsed.clarificationQuestions
+        : parsed.missingContext.slice(0, 2).map((item, index) => ({
+            id: `clarify_${index + 1}`,
+            label: `Question ${index + 1}`,
+            question: item,
+            helpText: null,
+            options: [],
+          }));
+
+    return {
+      ...parsed,
+      personaSkillId: resolvedPersonaSkillId,
+      workflowSkillId: resolvedWorkflowSkillId,
+      tool: undefined,
+      style: undefined,
+      clarificationQuestions,
+      reply:
+        parsed.reply ||
+        "I need one quick clarification before I make the right change.",
+    };
+  }
+
   if (parsed.mode === "artifact" && !normalizedTool) {
     return {
       ...parsed,
@@ -867,6 +946,7 @@ Return JSON only with this structure:
         ...parsed.missingContext,
         "Which artifact or portfolio surface should I change?",
       ].slice(0, 4),
+      clarificationQuestions: [],
     };
   }
 
@@ -886,6 +966,7 @@ Return JSON only with this structure:
         ...parsed.missingContext,
         "Which part of the portfolio should I update live?",
       ].slice(0, 4),
+      clarificationQuestions: [],
     };
   }
 
@@ -896,6 +977,7 @@ Return JSON only with this structure:
       workflowSkillId: resolvedWorkflowSkillId,
       tool: normalizedTool,
       style: normalizeAgentToolStyle(normalizedTool, parsed.style),
+      clarificationQuestions: [],
     };
   }
 
@@ -905,6 +987,7 @@ Return JSON only with this structure:
     workflowSkillId: resolvedWorkflowSkillId,
     tool: undefined,
     style: undefined,
+    clarificationQuestions: [],
   };
 }
 

@@ -87,6 +87,20 @@ interface GeneratedProfile {
       approach?: string | null;
       impact?: string | null;
       tech: string[];
+      media?: Array<
+        | string
+        | {
+            type: "video" | "image" | "link";
+            url: string;
+            posterUrl?: string | null;
+            title?: string | null;
+            provider?: string | null;
+            status?: "processing" | "ready" | "failed";
+            durationSeconds?: number | null;
+            sourceArtifactId?: string | null;
+            error?: string | null;
+          }
+      >;
     }>;
     achievements: Array<{ title: string; date?: string | null }>;
     timeline: Array<{ year: string; milestones: string[] }>;
@@ -129,6 +143,7 @@ interface AgentArtifact {
     executionMode?: "artifact" | "mutate";
     resolvedPersonaSkillId?: string | null;
     resolvedWorkflowSkillId?: string | null;
+    projectVideo?: ProjectVideoArtifactOutput | null;
     mutationSummary?: AgentMutationSummary | null;
     revertable?: boolean;
     revertedAt?: string | null;
@@ -161,6 +176,19 @@ interface AgentMutationSummary {
   changedFields: string[];
 }
 
+interface AgentClarificationOption {
+  label: string;
+  answer: string;
+}
+
+interface AgentClarificationQuestion {
+  id: string;
+  label: string;
+  question: string;
+  helpText?: string | null;
+  options: AgentClarificationOption[];
+}
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -170,11 +198,12 @@ interface ChatMessage {
   artifactId?: string;
   focusLabel?: string;
   strategy?: AgentStrategy;
-  executionMode?: "reply" | "artifact" | "mutate";
+  executionMode?: "reply" | "artifact" | "mutate" | "clarify";
   resolvedPersonaSkill?: AgentSkillSummary | null;
   resolvedWorkflowSkill?: AgentSkillSummary | null;
   mutationSummary?: AgentMutationSummary | null;
   revertable?: boolean;
+  clarificationQuestions?: AgentClarificationQuestion[];
 }
 
 interface ApiEvidenceResponse { items?: EvidenceItem[] }
@@ -236,7 +265,7 @@ interface BillingSnapshot {
   standardModel: string;
 }
 interface ApiAgentResponse {
-  type?: "chat" | "tool_result" | "mutation_result";
+  type?: "chat" | "tool_result" | "mutation_result" | "clarification";
   reply?: string;
   tool?: string;
   style?: string;
@@ -244,11 +273,12 @@ interface ApiAgentResponse {
   artifactId?: string;
   focusLabel?: string;
   strategy?: AgentStrategy;
-  executionMode?: "reply" | "artifact" | "mutate";
+  executionMode?: "reply" | "artifact" | "mutate" | "clarify";
   resolvedPersonaSkill?: AgentSkillSummary | null;
   resolvedWorkflowSkill?: AgentSkillSummary | null;
   mutationSummary?: AgentMutationSummary | null;
   revertable?: boolean;
+  clarificationQuestions?: AgentClarificationQuestion[];
   profile?: GeneratedProfile["data"] | null;
   settings?: {
     visibility: PublicPageVisibility;
@@ -314,6 +344,20 @@ interface RecrawlArtifactOutput {
   screenshotCaptured: boolean;
   itemId: string;
 }
+interface ProjectVideoArtifactOutput {
+  status: "queued" | "in_progress" | "completed" | "failed";
+  summary: string;
+  projectIndex: number;
+  projectTitle: string;
+  style: "polished-product-demo";
+  durationSeconds: 4 | 8 | 12;
+  prompt: string;
+  progress?: number | null;
+  soraVideoId?: string | null;
+  videoUrl?: string | null;
+  posterUrl?: string | null;
+  error?: string | null;
+}
 interface ApiBillingResponse {
   billing?: BillingSnapshot;
   plans?: BillingPlan[];
@@ -321,11 +365,28 @@ interface ApiBillingResponse {
   usageRates?: BillingUsageRate[];
   error?: string;
 }
+interface ApiProjectVideoResponse {
+  artifactId?: string;
+  output?: ProjectVideoArtifactOutput;
+  profile?: GeneratedProfile["data"] | null;
+  billing?: BillingSnapshot;
+  error?: string;
+}
 interface AccountSettings {
   name: string | null;
   username: string | null;
   email: string;
   createdAt: string;
+  profile?: {
+    location: string | null;
+    website: string | null;
+    github: string | null;
+    linkedin: string | null;
+    youtube: string | null;
+    contactEmail: string | null;
+    phone: string | null;
+    contactNote: string | null;
+  };
   agentPreferences?: {
     pinnedPersonaSkillId: string | null;
     pinnedWorkflowSkillId: string | null;
@@ -408,6 +469,22 @@ function splitCrawlInput(value: string) {
     .filter(Boolean);
 }
 
+function normalizeOptionalFormValue(value: string) {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+const EMPTY_PUBLIC_CONTACT_INPUT = {
+  location: "",
+  website: "",
+  github: "",
+  linkedin: "",
+  youtube: "",
+  contactEmail: "",
+  phone: "",
+  contactNote: "",
+};
+
 function humanizeAgentToolName(tool: string) {
   if (tool === "set_portfolio_theme") {
     return "portfolio theme";
@@ -420,6 +497,9 @@ function humanizeAgentToolName(tool: string) {
   }
   if (tool === "regenerate_profile") {
     return "regenerate profile";
+  }
+  if (tool === "generate_project_video") {
+    return "project demo video";
   }
   if (tool === "mutate_portfolio") {
     return "live portfolio edit";
@@ -440,9 +520,12 @@ function formatAgentActionLabel(tool: string, style?: string) {
   return style ? `${action} (${style})` : action;
 }
 
-function formatExecutionModeLabel(mode?: "reply" | "artifact" | "mutate") {
+function formatExecutionModeLabel(
+  mode?: "reply" | "artifact" | "mutate" | "clarify"
+) {
   if (mode === "artifact") return "Artifact";
   if (mode === "mutate") return "Live edit";
+  if (mode === "clarify") return "Clarify";
   return "Reply";
 }
 
@@ -452,6 +535,32 @@ function isRevertableArtifact(artifact?: AgentArtifact | null) {
       artifact.meta?.revertable &&
       !artifact.meta?.revertedAt
   );
+}
+
+function getProjectVideoOutput(artifact?: AgentArtifact | null) {
+  if (!artifact || artifact.tool !== "generate_project_video") {
+    return null;
+  }
+
+  const output = artifact.output as ProjectVideoArtifactOutput | undefined;
+  if (output?.projectTitle) {
+    return output;
+  }
+
+  const projectVideo = artifact.meta?.projectVideo;
+  if (!projectVideo) {
+    return null;
+  }
+
+  return {
+    ...projectVideo,
+    summary:
+      projectVideo.status === "completed"
+        ? `Generated an ${projectVideo.durationSeconds}s demo video for ${projectVideo.projectTitle}.`
+        : projectVideo.status === "failed"
+          ? `Video generation failed for ${projectVideo.projectTitle}.`
+          : `Queued an ${projectVideo.durationSeconds}s demo video for ${projectVideo.projectTitle}.`,
+  };
 }
 
 function buildAgentFocusOptions(
@@ -812,6 +921,85 @@ function RegeneratedProfileArtifact({ output }: { output: unknown }) {
   );
 }
 
+function ProjectVideoArtifact({ output }: { output: unknown }) {
+  const video = output as ProjectVideoArtifactOutput;
+  const isFinished = video.status === "completed" && Boolean(video.videoUrl);
+  const isRunning =
+    video.status === "queued" || video.status === "in_progress";
+
+  return (
+    <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">{video.projectTitle}</p>
+          <p className="mt-1 text-xs text-gray-400">{video.summary}</p>
+        </div>
+        <span
+          className={`rounded-full border px-3 py-1 text-xs ${
+            video.status === "completed"
+              ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+              : video.status === "failed"
+                ? "border-red-400/20 bg-red-400/10 text-red-300"
+                : "border-[#00f5ff]/25 bg-[#00f5ff]/10 text-[#7ef4ff]"
+          }`}
+        >
+          {video.status.replace("_", " ")}
+        </span>
+      </div>
+
+      {typeof video.progress === "number" && isRunning ? (
+        <div className="mt-3">
+          <div className="h-2 overflow-hidden rounded-full bg-white/8">
+            <div
+              className="h-full rounded-full bg-[#00f5ff]"
+              style={{ width: `${Math.max(6, Math.min(100, video.progress))}%` }}
+            />
+          </div>
+          <p className="mt-1 text-[11px] text-gray-500">
+            Render progress: {Math.round(video.progress)}%
+          </p>
+        </div>
+      ) : null}
+
+      {isFinished ? (
+        <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-black/25">
+          <video
+            controls
+            playsInline
+            preload="metadata"
+            poster={video.posterUrl ?? undefined}
+            className="aspect-video w-full bg-black"
+            src={video.videoUrl ?? undefined}
+          />
+        </div>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300">
+          {video.durationSeconds}s
+        </span>
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300">
+          {video.style}
+        </span>
+        {video.posterUrl ? (
+          <a
+            href={video.posterUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300 hover:text-white"
+          >
+            Poster
+          </a>
+        ) : null}
+      </div>
+
+      {video.error ? (
+        <p className="mt-3 text-[11px] text-red-300">{video.error}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function RecrawlArtifact({ output }: { output: unknown }) {
   const recrawl = output as RecrawlArtifactOutput;
   return (
@@ -913,7 +1101,7 @@ function AgentSkillBadges({
 }: {
   personaSkill?: AgentSkillSummary | null;
   workflowSkill?: AgentSkillSummary | null;
-  executionMode?: "reply" | "artifact" | "mutate";
+  executionMode?: "reply" | "artifact" | "mutate" | "clarify";
 }) {
   if (!personaSkill && !workflowSkill && !executionMode) {
     return null;
@@ -974,6 +1162,53 @@ function AgentStrategyCard({ strategy }: { strategy: AgentStrategy }) {
   );
 }
 
+function AgentClarificationCard({
+  questions,
+  onOptionSelect,
+}: {
+  questions?: AgentClarificationQuestion[];
+  onOptionSelect: (answer: string) => void;
+}) {
+  if (!questions?.length) {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-3">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-yellow-300">
+        Clarification needed
+      </p>
+      <div className="mt-3 space-y-3">
+        {questions.map((question) => (
+          <div key={question.id} className="rounded-lg border border-white/10 bg-black/20 p-3">
+            <p className="text-xs font-medium text-white">
+              {question.label}: {question.question}
+            </p>
+            {question.helpText ? (
+              <p className="mt-1 text-[11px] leading-relaxed text-gray-400">
+                {question.helpText}
+              </p>
+            ) : null}
+            {question.options.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {question.options.map((option) => (
+                  <button
+                    key={`${question.id}-${option.label}`}
+                    onClick={() => onOptionSelect(option.answer)}
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-gray-200 transition-colors hover:border-[#00f5ff]/30 hover:text-[#7ef4ff]"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Artifact renderer dispatcher ─────────────────────────────────────────────
 
 function ArtifactRenderer({
@@ -989,6 +1224,7 @@ function ArtifactRenderer({
 }) {
   if (tool === "generate_timeline") return <TimelineArtifact output={output} />;
   if (tool === "generate_video_script") return <VideoScriptArtifact output={output} />;
+  if (tool === "generate_project_video") return <ProjectVideoArtifact output={output} />;
   if (tool === "generate_tree") return <TreeArtifact output={output} />;
   if (tool === "set_portfolio_theme") return <ThemeArtifact output={output} />;
   if (tool === "set_resume_model") return <ResumeModelArtifact output={output} />;
@@ -1106,6 +1342,13 @@ const AGENT_TOOL_META: Array<{
     desc: "Scene-by-scene script",
   },
   {
+    tool: "generate_project_video",
+    icon: Clapperboard,
+    label: "Project Demo",
+    styles: ["polished-product-demo"],
+    desc: "Queue a real short demo clip for one focused project",
+  },
+  {
     tool: "generate_tree",
     icon: GitBranch,
     label: "Tree / Map",
@@ -1190,6 +1433,9 @@ export default function DashboardPage() {
   const [account, setAccount] = useState<AccountSettings | null>(null);
   const [accountNameInput, setAccountNameInput] = useState("");
   const [accountUsernameInput, setAccountUsernameInput] = useState("");
+  const [publicContactInput, setPublicContactInput] = useState(
+    EMPTY_PUBLIC_CONTACT_INPUT
+  );
   const [savingAccount, setSavingAccount] = useState(false);
   const [billing, setBilling] = useState<BillingSnapshot | null>(null);
   const [availablePlans, setAvailablePlans] = useState<BillingPlan[]>([]);
@@ -1249,6 +1495,19 @@ export default function DashboardPage() {
   const activeAgentFocus = parseAgentFocusValue(
     activeFocusValue
   ) as AgentFocusSelection | null;
+  const activeProjectVideoArtifacts = savedArtifacts.filter((artifact) => {
+    const output = getProjectVideoOutput(artifact);
+    return Boolean(
+      output &&
+        (output.status === "queued" || output.status === "in_progress")
+    );
+  });
+  const activeProjectVideoPollKey = activeProjectVideoArtifacts
+    .map((artifact) => {
+      const output = getProjectVideoOutput(artifact);
+      return `${artifact.id}:${output?.status ?? "unknown"}`;
+    })
+    .join("|");
 
   const fetchData = useCallback(async () => {
     const [ev, pr, st, arts, billingRes, accountRes, autos, agentSkillsRes] = await Promise.all([
@@ -1297,6 +1556,26 @@ export default function DashboardPage() {
     setAccount(accountRes.account ?? null);
     setAccountNameInput(accountRes.account?.name ?? "");
     setAccountUsernameInput(accountRes.account?.username ?? "");
+    setPublicContactInput({
+      location: accountRes.account?.profile?.location ?? "",
+      website: accountRes.account?.profile?.website ?? "",
+      github: accountRes.account?.profile?.github ?? "",
+      linkedin: accountRes.account?.profile?.linkedin ?? "",
+      youtube: accountRes.account?.profile?.youtube ?? "",
+      contactEmail: accountRes.account?.profile?.contactEmail ?? "",
+      phone: accountRes.account?.profile?.phone ?? "",
+      contactNote: accountRes.account?.profile?.contactNote ?? "",
+    });
+    setLinks((current) => ({
+      ...current,
+      github: accountRes.account?.profile?.github ?? "",
+      linkedin: accountRes.account?.profile?.linkedin ?? "",
+      youtube: accountRes.account?.profile?.youtube ?? "",
+    }));
+    setUserInfo((current) => ({
+      ...current,
+      name: accountRes.account?.name ?? current.name,
+    }));
     const savedPersona = accountRes.account?.agentPreferences?.pinnedPersonaSkillId ?? "auto";
     const savedWorkflow = accountRes.account?.agentPreferences?.pinnedWorkflowSkillId ?? "auto";
     setDefaultPersonaSkillId(savedPersona);
@@ -1497,7 +1776,20 @@ export default function DashboardPage() {
   const handleSaveAccount = async () => {
     const normalizedName = accountNameInput.trim();
     const normalizedUsername = accountUsernameInput.trim().toLowerCase();
-    const payload: { name?: string | null; username?: string } = {};
+    const payload: {
+      name?: string | null;
+      username?: string;
+      profile?: {
+        location?: string | null;
+        website?: string | null;
+        github?: string | null;
+        linkedin?: string | null;
+        youtube?: string | null;
+        contactEmail?: string | null;
+        phone?: string | null;
+        contactNote?: string | null;
+      };
+    } = {};
 
     if (normalizedName !== (account?.name ?? "")) {
       payload.name = normalizedName || null;
@@ -1508,6 +1800,35 @@ export default function DashboardPage() {
         return;
       }
       payload.username = normalizedUsername;
+    }
+
+    const normalizedProfile = {
+      location: normalizeOptionalFormValue(publicContactInput.location),
+      website: normalizeOptionalFormValue(publicContactInput.website),
+      github: normalizeOptionalFormValue(publicContactInput.github),
+      linkedin: normalizeOptionalFormValue(publicContactInput.linkedin),
+      youtube: normalizeOptionalFormValue(publicContactInput.youtube),
+      contactEmail: normalizeOptionalFormValue(publicContactInput.contactEmail),
+      phone: normalizeOptionalFormValue(publicContactInput.phone),
+      contactNote: normalizeOptionalFormValue(publicContactInput.contactNote),
+    };
+    const currentProfile = {
+      location: account?.profile?.location ?? null,
+      website: account?.profile?.website ?? null,
+      github: account?.profile?.github ?? null,
+      linkedin: account?.profile?.linkedin ?? null,
+      youtube: account?.profile?.youtube ?? null,
+      contactEmail: account?.profile?.contactEmail ?? null,
+      phone: account?.profile?.phone ?? null,
+      contactNote: account?.profile?.contactNote ?? null,
+    };
+    const profilePatch = Object.fromEntries(
+      Object.entries(normalizedProfile).filter(([key, value]) => {
+        return currentProfile[key as keyof typeof currentProfile] !== value;
+      })
+    ) as NonNullable<typeof payload.profile>;
+    if (Object.keys(profilePatch).length > 0) {
+      payload.profile = profilePatch;
     }
 
     if (Object.keys(payload).length === 0) {
@@ -1529,6 +1850,22 @@ export default function DashboardPage() {
       setAccount(data.account);
       setAccountNameInput(data.account.name ?? "");
       setAccountUsernameInput(data.account.username ?? "");
+      setPublicContactInput({
+        location: data.account.profile?.location ?? "",
+        website: data.account.profile?.website ?? "",
+        github: data.account.profile?.github ?? "",
+        linkedin: data.account.profile?.linkedin ?? "",
+        youtube: data.account.profile?.youtube ?? "",
+        contactEmail: data.account.profile?.contactEmail ?? "",
+        phone: data.account.profile?.phone ?? "",
+        contactNote: data.account.profile?.contactNote ?? "",
+      });
+      setLinks((current) => ({
+        ...current,
+        github: data.account?.profile?.github ?? "",
+        linkedin: data.account?.profile?.linkedin ?? "",
+        youtube: data.account?.profile?.youtube ?? "",
+      }));
       setMessage({ type: "success", text: "Personal info saved." });
     } catch (error) {
       setMessage({
@@ -1677,17 +2014,67 @@ export default function DashboardPage() {
     setCurrentHost(window.location.hostname);
   }, []);
 
+  useEffect(() => {
+    if (!activeProjectVideoArtifacts.length) {
+      return;
+    }
+
+    const poll = async () => {
+      const results = await Promise.all(
+        activeProjectVideoArtifacts.map((artifact) =>
+          fetch(`/api/project-videos/${artifact.id}`)
+            .then((r) => r.json() as Promise<ApiProjectVideoResponse>)
+            .then((data) => ({ artifactId: artifact.id, data }))
+            .catch(() => null)
+        )
+      );
+
+      let shouldRefreshArtifacts = false;
+      for (const result of results) {
+        if (!result?.data?.output) continue;
+        shouldRefreshArtifacts = true;
+        if (result.data.billing) {
+          setBilling(result.data.billing);
+        }
+        if (result.data.profile) {
+          setProfile((current) =>
+            current
+              ? { ...current, data: result.data.profile! }
+              : {
+                  id: crypto.randomUUID(),
+                  data: result.data.profile!,
+                  createdAt: new Date().toISOString(),
+                }
+          );
+        }
+      }
+
+      if (shouldRefreshArtifacts) {
+        const arts = await fetch("/api/agent").then(
+          (r) => r.json() as Promise<ApiAgentResponse>
+        );
+        setSavedArtifacts(arts.artifacts ?? []);
+      }
+    };
+
+    const intervalId = window.setInterval(poll, 8000);
+    void poll();
+    return () => window.clearInterval(intervalId);
+  }, [activeProjectVideoArtifacts, activeProjectVideoPollKey]);
+
   // ── Agent handlers ──────────────────────────────────────────────────────────
 
-  const handleAgentChat = async () => {
-    if (!chatInput.trim() && !selectedTool) return;
+  const sendAgentMessage = async (messageOverride?: string) => {
+    if (!messageOverride?.trim() && !chatInput.trim() && !selectedTool) return;
     const focusLabel =
       activeFocusValue === "all" ? undefined : activeFocusOption?.label;
     const userMsg =
+      messageOverride?.trim() ||
       chatInput.trim() ||
       `${formatAgentActionLabel(selectedTool, selectedStyle)}${
         focusLabel ? ` for ${focusLabel}` : ""
       }`;
+    let shouldResetSelectedTool = true;
     setAgentLoading(true);
     setChatInput("");
 
@@ -1732,6 +2119,9 @@ export default function DashboardPage() {
       const data = (await res.json()) as ApiAgentResponse;
       if (!res.ok) throw new Error(data.error ?? "Agent error");
       if (data.billing) setBilling(data.billing);
+      if (data.executionMode === "clarify") {
+        shouldResetSelectedTool = false;
+      }
       if (data.tool === "set_portfolio_theme" && data.output) {
         const themeOutput = data.output as ThemeArtifactOutput;
         setTheme(themeOutput.themeId);
@@ -1775,6 +2165,7 @@ export default function DashboardPage() {
         resolvedWorkflowSkill: data.resolvedWorkflowSkill ?? null,
         mutationSummary: data.mutationSummary ?? null,
         revertable: data.revertable ?? false,
+        clarificationQuestions: data.clarificationQuestions ?? [],
       };
       setChatHistory([...newHistory, assistantMsg]);
 
@@ -1811,9 +2202,15 @@ export default function DashboardPage() {
       setChatHistory([...newHistory, { role: "assistant", content: `Error: ${String(err)}` }]);
     } finally {
       setAgentLoading(false);
-      setSelectedTool("");
-      setSelectedStyle("");
+      if (shouldResetSelectedTool) {
+        setSelectedTool("");
+        setSelectedStyle("");
+      }
     }
+  };
+
+  const handleAgentChat = async () => {
+    await sendAgentMessage();
   };
 
   // ── Automation handlers ────────────────────────────────────────────────────
@@ -1932,6 +2329,46 @@ export default function DashboardPage() {
     }
   };
 
+  const handleGenerateProjectVideo = async (projectIndex: number) => {
+    setMessage(null);
+    setAgentLoading(true);
+    try {
+      const res = await fetch("/api/project-videos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectIndex, durationSeconds: 8 }),
+      });
+      const data = (await res.json()) as ApiProjectVideoResponse;
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to queue project demo video.");
+      }
+      if (data.billing) {
+        setBilling(data.billing);
+      }
+
+      const arts = await fetch("/api/agent").then(
+        (r) => r.json() as Promise<ApiAgentResponse>
+      );
+      setSavedArtifacts(arts.artifacts ?? []);
+      setMessage({
+        type: "success",
+        text:
+          data.output?.summary ??
+          "Queued a new project demo video. It will attach automatically when the render finishes.",
+      });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to queue project demo video.",
+      });
+    } finally {
+      setAgentLoading(false);
+    }
+  };
+
   const toggleVisibility = async (id: string, visible: boolean) => {
     await fetch(`/api/evidence/${id}`, {
       method: "PATCH",
@@ -2002,7 +2439,23 @@ export default function DashboardPage() {
       normalizedPreferredAiModelInput !== (billing.preferredAiModel ?? ""));
   const accountDirty =
     (accountNameInput.trim() || "") !== (account?.name ?? "") ||
-    accountUsernameInput.trim().toLowerCase() !== (account?.username ?? "");
+    accountUsernameInput.trim().toLowerCase() !== (account?.username ?? "") ||
+    normalizeOptionalFormValue(publicContactInput.location) !==
+      (account?.profile?.location ?? null) ||
+    normalizeOptionalFormValue(publicContactInput.website) !==
+      (account?.profile?.website ?? null) ||
+    normalizeOptionalFormValue(publicContactInput.github) !==
+      (account?.profile?.github ?? null) ||
+    normalizeOptionalFormValue(publicContactInput.linkedin) !==
+      (account?.profile?.linkedin ?? null) ||
+    normalizeOptionalFormValue(publicContactInput.youtube) !==
+      (account?.profile?.youtube ?? null) ||
+    normalizeOptionalFormValue(publicContactInput.contactEmail) !==
+      (account?.profile?.contactEmail ?? null) ||
+    normalizeOptionalFormValue(publicContactInput.phone) !==
+      (account?.profile?.phone ?? null) ||
+    normalizeOptionalFormValue(publicContactInput.contactNote) !==
+      (account?.profile?.contactNote ?? null);
   const agentPreferencesDirty =
     defaultPersonaSkillId !==
       (account?.agentPreferences?.pinnedPersonaSkillId ?? "auto") ||
@@ -2027,6 +2480,19 @@ export default function DashboardPage() {
   const activeChatModelLabel = billing
     ? `${billing.provider.label} · ${activeChatModel}`
     : null;
+  const latestClarificationMessage = [...chatHistory]
+    .reverse()
+    .find(
+      (message) =>
+        message.role === "assistant" &&
+        message.executionMode === "clarify" &&
+        message.clarificationQuestions?.length
+    );
+  const chatInputPlaceholder = latestClarificationMessage
+    ? "Answer the agent's clarification so it can continue…"
+    : activeFocusValue === "all"
+      ? "Ask anything or say 'create a skills tree'…"
+      : `Ask about ${activeFocusOption.label.toLowerCase()}…`;
   const activeTabCopy = TAB_COPY[activeTab];
   const publishStatusLabel =
     visibility === "public"
@@ -2609,12 +3075,45 @@ export default function DashboardPage() {
                         PROJECTS
                       </div>
                       <div className="space-y-4">
-                        {profile.data.projects.slice(0, 3).map((p) => (
+                        {profile.data.projects.slice(0, 3).map((p, index) => {
+                          const latestVideoArtifact =
+                            savedArtifacts.find((artifact) => {
+                              const output = getProjectVideoOutput(artifact);
+                              return output?.projectIndex === index;
+                            }) ?? null;
+                          const videoOutput =
+                            getProjectVideoOutput(latestVideoArtifact) ??
+                            null;
+                          const completedMedia = (p.media ?? []).find((item) => {
+                            if (!item || typeof item === "string") return false;
+                            return item.type === "video" && item.status === "ready";
+                          });
+
+                          return (
                           <div
                             key={p.title}
                             className="border border-white/10 rounded-xl p-4"
                           >
-                            <h4 className="font-semibold mb-2">{p.title}</h4>
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <h4 className="font-semibold mb-2">{p.title}</h4>
+                              <button
+                                onClick={() => handleGenerateProjectVideo(index)}
+                                disabled={
+                                  agentLoading ||
+                                  videoOutput?.status === "queued" ||
+                                  videoOutput?.status === "in_progress"
+                                }
+                                className="inline-flex items-center gap-2 rounded-full border border-[#00f5ff]/20 bg-[#00f5ff]/10 px-3 py-1.5 text-xs text-[#7ef4ff] disabled:opacity-40"
+                              >
+                                <Clapperboard className="h-3.5 w-3.5" />
+                                {videoOutput?.status === "queued" ||
+                                videoOutput?.status === "in_progress"
+                                  ? "Rendering..."
+                                  : completedMedia
+                                    ? "Regenerate demo"
+                                    : "Generate demo"}
+                              </button>
+                            </div>
                             {p.problem && (
                               <p className="text-sm text-gray-400 mb-1">
                                 Problem: {p.problem}
@@ -2637,8 +3136,25 @@ export default function DashboardPage() {
                                 ))}
                               </div>
                             )}
+                            {videoOutput ? (
+                              <p className="mt-3 text-xs text-gray-500">
+                                {videoOutput.summary}
+                              </p>
+                            ) : null}
+                            {completedMedia && typeof completedMedia !== "string" ? (
+                              <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                                <video
+                                  controls
+                                  playsInline
+                                  preload="metadata"
+                                  poster={completedMedia.posterUrl ?? undefined}
+                                  className="aspect-video w-full bg-black"
+                                  src={completedMedia.url}
+                                />
+                              </div>
+                            ) : null}
                           </div>
-                        ))}
+                        )})}
                       </div>
                     </div>
                   )}
@@ -2798,6 +3314,7 @@ export default function DashboardPage() {
                     <div className="mt-4 space-y-3 text-sm text-gray-300">
                       <p>Profile generation uses 1 advanced credit when it runs on the advanced model.</p>
                       <p>Agent runs and advanced tool generations use 1 advanced credit per run.</p>
+                      <p>Project demo videos use 1 advanced credit per render and do not have a lightweight fallback model.</p>
                       <p>Automation runs only spend a credit when they use the advanced model.</p>
                       <p>Fallback runs do not spend advanced credits after your allowance is exhausted.</p>
                     </div>
@@ -2862,7 +3379,7 @@ export default function DashboardPage() {
                 <h2 className="text-lg font-semibold">AI Agent Workspace</h2>
               </div>
               <p className="text-sm text-gray-400 mb-4">
-                Ask the agent to rewrite copy, improve structure, rethink the UI, or generate artifacts like timelines and scripts. Life edits now apply directly when the agent resolves a mutate workflow, and every live change can be reverted.
+                Ask the agent to rewrite copy, improve structure, rethink the UI, or generate artifacts like timelines, scripts, and real project demo videos. Life edits now apply directly when the agent resolves a mutate workflow, and every live change can be reverted.
               </p>
 
               {billing && (
@@ -3074,6 +3591,11 @@ export default function DashboardPage() {
                       Ask for advice, generate artifacts, or say &quot;redesign my portfolio theme&quot;. Current focus:{" "}
                       <span className="text-white">{activeFocusOption.label}</span>.
                     </p>
+                    {latestClarificationMessage ? (
+                      <p className="mt-1 text-[11px] text-yellow-300">
+                        The agent is waiting on a clarification before it continues.
+                      </p>
+                    ) : null}
                   </div>
                   {billing && activeChatModelLabel && (
                     <div className="text-right">
@@ -3154,6 +3676,14 @@ export default function DashboardPage() {
                           executionMode={msg.executionMode}
                         />
                       )}
+                      {msg.executionMode === "clarify" ? (
+                        <AgentClarificationCard
+                          questions={msg.clarificationQuestions}
+                          onOptionSelect={(answer) => {
+                            void sendAgentMessage(answer);
+                          }}
+                        />
+                      ) : null}
                       {msg.focusLabel && (
                         <p
                           className={`mt-1 px-1 text-[11px] ${
@@ -3195,11 +3725,7 @@ export default function DashboardPage() {
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleAgentChat()}
-                  placeholder={
-                    activeFocusValue === "all"
-                      ? "Ask anything or say 'create a skills tree'…"
-                      : `Ask about ${activeFocusOption.label.toLowerCase()}…`
-                  }
+                  placeholder={chatInputPlaceholder}
                   className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#00f5ff]/40"
                 />
                 <button
@@ -3227,6 +3753,8 @@ export default function DashboardPage() {
                           {a.tool === "generate_timeline" ? (
                             <ChartColumn className="h-4 w-4 text-[#00f5ff]" />
                           ) : a.tool === "generate_video_script" ? (
+                            <Clapperboard className="h-4 w-4 text-[#00f5ff]" />
+                          ) : a.tool === "generate_project_video" ? (
                             <Clapperboard className="h-4 w-4 text-[#00f5ff]" />
                           ) : a.tool === "regenerate_profile" ? (
                             <WandSparkles className="h-4 w-4 text-[#00f5ff]" />
@@ -3573,7 +4101,7 @@ export default function DashboardPage() {
                 <h2 className="text-lg font-semibold">Personal Info</h2>
               </div>
               <p className="text-sm text-gray-400 mb-5">
-                Manage the identity attached to your public brand page.
+                Manage the identity and contact details attached to your public brand page.
               </p>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -3605,6 +4133,160 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              <div className="mt-6">
+                <div className="mb-3 flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-[#00f5ff]" />
+                  <h3 className="text-sm font-semibold text-white">Public Contact</h3>
+                </div>
+                <p className="mb-4 max-w-2xl text-xs leading-relaxed text-gray-500">
+                  These details show up on your public portfolio and give visitors a way to reach you. Leave any field empty if you do not want it displayed.
+                </p>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm text-gray-400">
+                      Public contact email
+                    </label>
+                    <input
+                      type="email"
+                      value={publicContactInput.contactEmail}
+                      onChange={(e) =>
+                        setPublicContactInput((current) => ({
+                          ...current,
+                          contactEmail: e.target.value,
+                        }))
+                      }
+                      placeholder="hello@yourbrand.com"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/40 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm text-gray-400">
+                      Phone
+                    </label>
+                    <input
+                      value={publicContactInput.phone}
+                      onChange={(e) =>
+                        setPublicContactInput((current) => ({
+                          ...current,
+                          phone: e.target.value,
+                        }))
+                      }
+                      placeholder="+1 (555) 123-4567"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/40 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm text-gray-400">
+                      Location
+                    </label>
+                    <input
+                      value={publicContactInput.location}
+                      onChange={(e) =>
+                        setPublicContactInput((current) => ({
+                          ...current,
+                          location: e.target.value,
+                        }))
+                      }
+                      placeholder="San Francisco, CA"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/40 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm text-gray-400">
+                      Website
+                    </label>
+                    <input
+                      type="url"
+                      value={publicContactInput.website}
+                      onChange={(e) =>
+                        setPublicContactInput((current) => ({
+                          ...current,
+                          website: e.target.value,
+                        }))
+                      }
+                      placeholder="https://yourbrand.com"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/40 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm text-gray-400">
+                      GitHub
+                    </label>
+                    <input
+                      type="url"
+                      value={publicContactInput.github}
+                      onChange={(e) =>
+                        setPublicContactInput((current) => ({
+                          ...current,
+                          github: e.target.value,
+                        }))
+                      }
+                      placeholder="https://github.com/yourname"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/40 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm text-gray-400">
+                      LinkedIn
+                    </label>
+                    <input
+                      type="url"
+                      value={publicContactInput.linkedin}
+                      onChange={(e) =>
+                        setPublicContactInput((current) => ({
+                          ...current,
+                          linkedin: e.target.value,
+                        }))
+                      }
+                      placeholder="https://linkedin.com/in/yourname"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/40 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm text-gray-400">
+                      YouTube
+                    </label>
+                    <input
+                      type="url"
+                      value={publicContactInput.youtube}
+                      onChange={(e) =>
+                        setPublicContactInput((current) => ({
+                          ...current,
+                          youtube: e.target.value,
+                        }))
+                      }
+                      placeholder="https://youtube.com/@yourname"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/40 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="mb-1 block text-sm text-gray-400">
+                    Contact note
+                  </label>
+                  <textarea
+                    value={publicContactInput.contactNote}
+                    onChange={(e) =>
+                      setPublicContactInput((current) => ({
+                        ...current,
+                        contactNote: e.target.value,
+                      }))
+                    }
+                    rows={3}
+                    placeholder="Example: Reach out for internships, collaborations, design critiques, or speaking opportunities."
+                    className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/40 focus:outline-none"
+                  />
+                </div>
+              </div>
+
               <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
                 <div className="rounded-xl border border-white/10 bg-white/3 p-4 text-sm text-gray-400">
                   <p>
@@ -3618,7 +4300,7 @@ export default function DashboardPage() {
                   </p>
                   <p className="mt-1 text-xs text-gray-500">
                     Joined {account?.createdAt ? new Date(account.createdAt).toLocaleDateString() : "recently"}.
-                    Email changes are not editable here.
+                    Account email changes are not editable here. Public contact email is optional and separate.
                   </p>
                 </div>
 

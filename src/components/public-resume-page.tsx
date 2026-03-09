@@ -334,6 +334,7 @@ export function PublicResumePage({
     email: user.email,
     includeEmail: false,
     name: user.name ?? username,
+    publicContactEmail: userProfile?.contactEmail ?? null,
     profile: parsedProfile.data,
     profileLinks: userProfile,
     username: user.username,

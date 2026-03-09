@@ -25,6 +25,7 @@ import {
   type ResumeModelConfig,
   type ResumeModelId,
 } from "@/lib/resume-models";
+import { type ProjectVideoState } from "@/lib/project-video-types";
 import {
   getWorkflowSkill,
   type AgentMutationTarget,
@@ -438,6 +439,7 @@ export function buildArtifactMeta(input: {
   strategy: Record<string, unknown>;
   resolvedPersonaSkillId?: string | null;
   resolvedWorkflowSkillId?: string | null;
+  projectVideo?: ProjectVideoState | null;
   mutationSummary?: AgentMutationSummary | null;
   beforeSnapshot?: AgentPortfolioPatch | null;
   afterSnapshot?: AgentPortfolioPatch | null;
@@ -451,6 +453,7 @@ export function buildArtifactMeta(input: {
     strategy: input.strategy,
     resolvedPersonaSkillId: input.resolvedPersonaSkillId ?? null,
     resolvedWorkflowSkillId: input.resolvedWorkflowSkillId ?? null,
+    projectVideo: input.projectVideo ?? null,
     mutationSummary: input.mutationSummary ?? null,
     beforeSnapshot: input.beforeSnapshot ?? null,
     afterSnapshot: input.afterSnapshot ?? null,

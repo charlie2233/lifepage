@@ -1,6 +1,10 @@
+import { cache } from "react";
 import type { PublicPageUser } from "@/lib/public-page";
 import type { PortfolioThemePresetId } from "@/lib/portfolio-themes";
 import type { ProfileJSON } from "@/lib/schema";
+import { ProjectMediaObjectSchema } from "@/lib/project-media";
+import { ProfileJSONSchema } from "@/lib/schema";
+import { z } from "zod";
 
 interface DemoPublicProfileDefinition {
   username: string;
@@ -10,14 +14,24 @@ interface DemoPublicProfileDefinition {
   mode: "hiring" | "admissions";
   profile: ProfileJSON;
   links: {
+    contactEmail?: string;
     github?: string;
     linkedin?: string;
+    phone?: string;
     youtube?: string;
     website?: string;
     location?: string;
+    contactNote?: string;
   };
   joinedAt: string;
 }
+
+const DemoProjectVideoManifestSchema = z.object({
+  profiles: z.record(
+    z.string(),
+    z.record(z.string(), z.array(ProjectMediaObjectSchema).default([]))
+  ),
+});
 
 const DEMO_PUBLIC_PROFILE_DEFINITIONS: DemoPublicProfileDefinition[] = [
   {
@@ -28,10 +42,13 @@ const DEMO_PUBLIC_PROFILE_DEFINITIONS: DemoPublicProfileDefinition[] = [
     mode: "hiring",
     joinedAt: "2025-09-12T00:00:00.000Z",
     links: {
+      contactEmail: "alex@alexchen.dev",
       github: "https://github.com/alexchen",
       linkedin: "https://linkedin.com/in/alexchen",
       website: "https://alexchen.dev",
       location: "San Francisco, CA",
+      contactNote:
+        "Reach out for product engineering roles, AI product collaborations, or student-tool partnerships.",
     },
     profile: {
       headline: "Full-Stack Engineer building AI products and student tools",
@@ -119,9 +136,12 @@ const DEMO_PUBLIC_PROFILE_DEFINITIONS: DemoPublicProfileDefinition[] = [
     mode: "hiring",
     joinedAt: "2025-08-02T00:00:00.000Z",
     links: {
+      contactEmail: "hello@sarahjones.design",
       linkedin: "https://linkedin.com/in/sarahjones",
       website: "https://sarahjones.design",
       location: "New York, NY",
+      contactNote:
+        "Open to product design roles, design-system work, and creative portfolio collaborations.",
     },
     profile: {
       headline: "Product Designer turning research into sharp digital systems",
@@ -205,7 +225,47 @@ export function getDemoExploreProfiles() {
   }));
 }
 
-export function getDemoPublicPageUser(username: string): PublicPageUser | null {
+export function getDemoProjectVideoSeedData() {
+  return DEMO_PUBLIC_PROFILE_DEFINITIONS.map((profile) => ({
+    username: profile.username,
+    name: profile.name,
+    mode: profile.mode,
+    headline: profile.profile.headline,
+    projects: profile.profile.projects,
+  }));
+}
+
+const loadDemoProjectVideoManifest = cache(async () => {
+  try {
+    const [{ readFile }, pathModule] = await Promise.all([
+      import("node:fs/promises"),
+      import("node:path"),
+    ]);
+    const manifestPath = pathModule.join(
+      process.cwd(),
+      "output",
+      "demo-project-videos",
+      "manifest.json"
+    );
+    const raw = await readFile(manifestPath, "utf8");
+    const parsed = JSON.parse(raw) as unknown;
+    const manifest = DemoProjectVideoManifestSchema.safeParse(parsed);
+    return manifest.success ? manifest.data : null;
+  } catch {
+    return null;
+  }
+});
+
+function slugifyProjectTitle(title: string) {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export async function getDemoPublicPageUser(
+  username: string
+): Promise<PublicPageUser | null> {
   const demo = DEMO_PUBLIC_PROFILE_DEFINITIONS.find(
     (profile) => profile.username === username
   );
@@ -213,6 +273,22 @@ export function getDemoPublicPageUser(username: string): PublicPageUser | null {
   if (!demo) {
     return null;
   }
+
+  const manifest = await loadDemoProjectVideoManifest();
+  const manifestProjects: Record<
+    string,
+    Array<z.infer<typeof ProjectMediaObjectSchema>>
+  > = manifest?.profiles?.[demo.username] ?? {};
+  const hydratedProfile = ProfileJSONSchema.parse({
+    ...demo.profile,
+    projects: demo.profile.projects.map((project) => ({
+      ...project,
+      media:
+        manifestProjects[slugifyProjectTitle(project.title)]?.length
+          ? manifestProjects[slugifyProjectTitle(project.title)]
+          : project.media,
+    })),
+  });
 
   return {
     id: `demo-${demo.username}`,
@@ -248,7 +324,7 @@ export function getDemoPublicPageUser(username: string): PublicPageUser | null {
       {
         id: `demo-generated-${demo.username}`,
         userId: `demo-${demo.username}`,
-        data: demo.profile,
+        data: hydratedProfile,
         version: 1,
         isActive: true,
         createdAt: new Date(demo.joinedAt),
@@ -266,6 +342,9 @@ export function getDemoPublicPageUser(username: string): PublicPageUser | null {
       github: demo.links.github ?? null,
       linkedin: demo.links.linkedin ?? null,
       youtube: demo.links.youtube ?? null,
+      contactEmail: demo.links.contactEmail ?? null,
+      phone: demo.links.phone ?? null,
+      contactNote: demo.links.contactNote ?? null,
       theme: demo.theme,
       createdAt: new Date(demo.joinedAt),
       updatedAt: new Date(demo.joinedAt),
