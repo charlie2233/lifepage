@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ProfileJSONSchema } from "@/lib/schema";
 import { buildGoogleSitesHtml } from "@/lib/google-sites-export";
+import { getAppBaseUrl } from "@/lib/runtime-env";
 
 export const runtime = "nodejs";
 
@@ -61,7 +63,16 @@ export async function GET() {
     );
   }
 
-  const appBaseUrl = process.env.NEXTAUTH_URL?.replace(/\/$/, "");
+  const requestHeaders = await headers();
+  const inferredBaseUrl = (() => {
+    const host =
+      requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+    if (!host) return null;
+
+    const protocol = requestHeaders.get("x-forwarded-proto") ?? "https";
+    return `${protocol}://${host}`.replace(/\/$/, "");
+  })();
+  const appBaseUrl = getAppBaseUrl() ?? inferredBaseUrl;
   const links = [
     user.profile?.website
       ? { label: "Website", url: user.profile.website }

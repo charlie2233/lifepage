@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
-import type { EvidenceItem as PrismaEvidenceItem, UserProfile } from "@/generated/prisma";
+import type {
+  EvidenceItem as PrismaEvidenceItem,
+  UserProfile,
+} from "@prisma/client";
 import { PublicPageNav } from "@/components/public-page-nav";
 import type { ProfileJSON } from "@/lib/schema";
 import type { PublicPageUser } from "@/lib/public-page";
@@ -156,10 +159,10 @@ export function PublicProfilePage({
             <Sparkles className="h-7 w-7" style={accentStyle} />
           </div>
           <h1 className="brand-display text-4xl tracking-tight">
-            Profile coming soon
+            Brand page coming soon
           </h1>
           <p className="mt-3 text-base leading-7" style={mutedStyle}>
-            @{username} is still building their LifePage.
+            @{username} is still shaping this LifePage and has not published the full story yet.
           </p>
         </div>
       </div>
@@ -222,6 +225,9 @@ export function PublicProfilePage({
               <p className={`mt-6 text-lg leading-8 ${heroCopyClass}`} style={mutedStyle}>
                 {profileData.about}
               </p>
+              <p className={`mt-4 text-sm leading-7 ${heroCopyClass}`} style={mutedStyle}>
+                A public brand page built from projects, proof, and the story behind the work.
+              </p>
 
               <div className={`mt-8 flex flex-wrap gap-3 ${heroActionsClass}`}>
                 {userProfile?.github && (
@@ -278,7 +284,7 @@ export function PublicProfilePage({
             <aside className={heroAsideClass}>
               <div className="rounded-[2rem] border p-5" style={panelStyle}>
                 <p className="lp-kicker text-[11px]" style={accentStyle}>
-                  Snapshot
+                  Brand snapshot
                 </p>
                 {resolvedTheme.statsLayout === "pills" ? (
                   <div className="mt-4 flex flex-wrap gap-3">
@@ -338,7 +344,7 @@ export function PublicProfilePage({
 
               <div className="rounded-[2rem] border p-5" style={panelStyle}>
                 <p className="lp-kicker text-[11px]" style={accentStyle}>
-                  Profile details
+                  Identity details
                 </p>
                 <div className="mt-4 space-y-3">
                   <div className="rounded-[1.25rem] border p-4" style={statTileStyle}>
@@ -367,8 +373,8 @@ export function PublicProfilePage({
                     </p>
                     <p className="mt-2 text-sm leading-7">
                       {mode === "hiring"
-                        ? "Structured proof, impact, and project clarity."
-                        : "Story, growth, and trajectory across time."}
+                        ? "Structured around proof, impact, and project clarity."
+                        : "Structured around growth, motivation, and long-term trajectory."}
                     </p>
                   </div>
                 </div>
@@ -382,7 +388,7 @@ export function PublicProfilePage({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <p className="lp-kicker text-[11px]" style={accentStyle}>
-                      Skill stack
+                      Capabilities
                     </p>
                     <h2 className="brand-display mt-2 text-4xl tracking-tight">
                       Skills
@@ -417,16 +423,16 @@ export function PublicProfilePage({
                   <p className="lp-kicker text-[11px]" style={accentStyle}>
                     Work
                   </p>
-                  <h2 className="brand-display mt-2 text-4xl tracking-tight">
-                    {mode === "hiring" ? "Case Studies" : "Projects & Work"}
-                  </h2>
+                    <h2 className="brand-display mt-2 text-4xl tracking-tight">
+                      {mode === "hiring" ? "Case Studies" : "Projects & Work"}
+                    </h2>
+                  </div>
+                  <p className="max-w-lg text-sm leading-7" style={mutedStyle}>
+                    {mode === "hiring"
+                      ? "Structured around the problem, approach, and measurable outcome."
+                      : "Structured around the arc of the work and what it reveals about the person behind it."}
+                  </p>
                 </div>
-                <p className="max-w-lg text-sm leading-7" style={mutedStyle}>
-                  {mode === "hiring"
-                    ? "Structured around the problem, approach, and measurable outcome."
-                    : "Structured around the arc of the work and what it says about the person."}
-                </p>
-              </div>
 
               <div className={projectGridClass}>
                 {profileData.projects.map((project, index) => {
@@ -555,7 +561,7 @@ export function PublicProfilePage({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <p className="lp-kicker text-[11px]" style={accentStyle}>
-                      Journey
+                      Narrative arc
                     </p>
                     <h2 className="brand-display mt-2 text-4xl tracking-tight">
                       Timeline
@@ -647,7 +653,7 @@ export function PublicProfilePage({
             <section className="mt-10">
               <div className="mb-6">
                 <p className="lp-kicker text-[11px]" style={accentStyle}>
-                  Wins
+                  Signal
                 </p>
                 <h2 className="brand-display mt-2 text-4xl tracking-tight">
                   Achievements
@@ -697,7 +703,7 @@ export function PublicProfilePage({
             <section className="mt-10 pb-16">
               <div className="mb-6">
                 <p className="lp-kicker text-[11px]" style={accentStyle}>
-                  Proof
+                  Evidence
                 </p>
                 <h2 className="brand-display mt-2 text-4xl tracking-tight">
                   Proof Gallery
@@ -753,7 +759,7 @@ export function PublicProfilePage({
         style={{ borderTopColor: resolvedTheme.footerBorder }}
       >
         <div className="lp-shell text-center text-xs" style={mutedStyle}>
-          Built with LifePage personal brand builder · Powered by AI ·{" "}
+          Built with LifePage personal brand studio · Powered by AI ·{" "}
           <a
             href="https://atrak.dev"
             target="_blank"

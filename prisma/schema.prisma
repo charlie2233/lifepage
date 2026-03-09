@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  provider      = "prisma-client-js"
+  compilerBuild = "small"
 }
 
 datasource db {
@@ -18,6 +18,7 @@ model User {
   aiProvider    String    @default("kimi")
   preferredAiModel String?
   aiUsageRate   String    @default("auto")
+  agentPreferences Json?
   aiUsageCycleStartedAt DateTime @default(now())
   advancedAiCreditsUsed Int @default(0)
   createdAt     DateTime  @default(now())
@@ -119,5 +120,6 @@ model AgentArtifact {
   style     String?  // e.g. "documentary" | "minimal" | "cinematic" for video; "vertical" | "horizontal" | "radial" for tree
   input     String?  @db.Text
   output    Json
+  meta      Json?
   createdAt DateTime @default(now())
 }

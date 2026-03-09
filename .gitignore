@@ -2,8 +2,12 @@ node_modules/
 .next/
 .env
 .env.local
+.dev.vars
 *.log
 dist/
 prisma/migrations/
 src/generated/
 tsconfig.tsbuildinfo
+.open-next/
+.wrangler/
+cloudflare-env.d.ts

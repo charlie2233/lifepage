@@ -1,5 +1,5 @@
 import { cache } from "react";
-import type { Prisma } from "@/generated/prisma";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { normalizeCustomDomain } from "@/lib/custom-domain";
 import { isVisibilityAccessible, normalizeVisibility } from "@/lib/page-visibility";

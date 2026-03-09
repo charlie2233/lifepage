@@ -10,6 +10,12 @@ import {
   describeResumeModelsForAgent,
   resolveResumeModel,
 } from "@/lib/resume-models";
+import type { AiProvider } from "@/lib/billing";
+import type { AgentPreferences } from "@/lib/agent-preferences";
+import {
+  getPersonaSkill,
+  getWorkflowSkill,
+} from "@/lib/agent-skills";
 
 export interface AgentEvidenceContextItem {
   id: string;
@@ -23,6 +29,24 @@ export interface AgentEvidenceContextItem {
 export interface ResolvedAgentFocus {
   label: string;
   context: string;
+}
+
+export interface AgentRuntimeContextInput {
+  displayName?: string | null;
+  username?: string | null;
+  mode?: string | null;
+  visibility?: string | null;
+  customDomain?: string | null;
+  evidenceCount: number;
+  hasProfile: boolean;
+  planLabel?: string | null;
+  providerLabel?: string | null;
+  providerId?: AiProvider | null;
+  activeModel?: string | null;
+  fallbackModel?: string | null;
+  fallbackActive?: boolean;
+  aiUsageRateLabel?: string | null;
+  configuredProviders?: string[];
 }
 
 function collapseText(value: string | null | undefined) {
@@ -39,6 +63,75 @@ function truncateText(value: string | null | undefined, max = 320) {
 
 function joinNonEmpty(parts: Array<string | null | undefined>) {
   return parts.filter((part): part is string => Boolean(part && part.trim())).join("\n");
+}
+
+export function buildAgentProductContext() {
+  return joinNonEmpty([
+    "LIFEPAGE PRODUCT BRIEF",
+    "Mission: help users build their personal brand and deploy it as a public portfolio site.",
+    "Core audiences: personal brand builders, students applying to college, job applicants, and people documenting their life story.",
+    "Existing product capabilities:",
+    "- Crawl one or multiple URLs from the web to collect evidence.",
+    "- Generate a public portfolio profile from evidence and user context.",
+    "- Publish a public portfolio page plus a separate public resume page.",
+    "- Apply portfolio themes and resume models.",
+    "- Support public, unlisted, and private visibility.",
+    "- Support custom domain publishing.",
+    "- Export resume PDF.",
+    "- Export HTML for Google Sites manual use.",
+    "Important constraints:",
+    "- Do not claim there is one-click publish to modern Google Sites.",
+    "- Do not claim an integration exists unless it is explicitly described in the runtime context.",
+    "- You can directly edit allowed portfolio content and presentation fields inside the app.",
+    "- Allowed direct edits: profile copy, profile structure, resume summary/bullets, mode, visibility, theme, and resume model.",
+    "- Not allowed: billing changes, auth/account credentials, evidence deletion, or custom-domain writes.",
+  ]);
+}
+
+export function buildAgentRuntimeContext(input: AgentRuntimeContextInput) {
+  return joinNonEmpty([
+    "CURRENT APP + ACCOUNT STATE",
+    input.displayName ? `User: ${input.displayName}` : null,
+    input.username ? `Username: ${input.username}` : null,
+    input.mode ? `Portfolio mode: ${input.mode}` : null,
+    input.visibility ? `Visibility: ${input.visibility}` : null,
+    input.customDomain ? `Custom domain: ${input.customDomain}` : "Custom domain: not set",
+    `Evidence count: ${input.evidenceCount}`,
+    `Generated profile: ${input.hasProfile ? "available" : "not generated yet"}`,
+    input.planLabel ? `Plan: ${input.planLabel}` : null,
+    input.providerLabel || input.activeModel
+      ? `Active AI route: ${[input.providerLabel, input.activeModel]
+          .filter(Boolean)
+          .join(" · ")}`
+      : null,
+    input.providerId ? `Provider selection: ${input.providerId}` : null,
+    input.aiUsageRateLabel ? `AI intensity: ${input.aiUsageRateLabel}` : null,
+    input.fallbackModel ? `Fallback model: ${input.fallbackModel}` : null,
+    input.fallbackActive
+      ? "Fallback status: currently using the fallback model."
+      : "Fallback status: advanced model currently active.",
+    input.configuredProviders?.length
+      ? `Configured providers in this runtime: ${input.configuredProviders.join(", ")}`
+      : "Configured providers in this runtime: none",
+  ]);
+}
+
+export function buildAgentPreferenceContext(preferences: AgentPreferences) {
+  const personaSkill = getPersonaSkill(preferences.pinnedPersonaSkillId);
+  const workflowSkill = getWorkflowSkill(preferences.pinnedWorkflowSkillId);
+
+  return joinNonEmpty([
+    "AGENT PREFERENCES",
+    personaSkill
+      ? `Pinned expert mode: ${personaSkill.label} (${personaSkill.id})`
+      : "Pinned expert mode: auto",
+    workflowSkill
+      ? `Pinned workflow: ${workflowSkill.label} (${workflowSkill.id})`
+      : "Pinned workflow: auto",
+    preferences.brandVoiceInstruction
+      ? `Brand / voice instruction: ${preferences.brandVoiceInstruction}`
+      : "Brand / voice instruction: none",
+  ]);
 }
 
 function formatProject(

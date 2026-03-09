@@ -82,22 +82,22 @@ const HOW_IT_WORKS: Array<{
   {
     step: "01",
     icon: Link2,
-    title: "Paste a URL",
-    desc: "Your website, GitHub profile, YouTube channel, or any project link.",
+    title: "Import real proof",
+    desc: "Paste links from your site, GitHub, YouTube, Google Sites, or project pages and pull the work into one place.",
     color: "#00f5ff",
   },
   {
     step: "02",
     icon: Bot,
-    title: "AI crawls & understands",
-    desc: "Screenshots, content extraction, metadata — the AI reads everything you built.",
+    title: "Shape the narrative",
+    desc: "LifePage reads the evidence, extracts the signal, and turns it into a portfolio story, resume, and positioning.",
     color: "#7c3aed",
   },
   {
     step: "03",
     icon: Sparkles,
-    title: "Deploy your brand",
-    desc: "Launch a polished personal brand site at /u/yourname or your own domain, with full control over access.",
+    title: "Deploy your site",
+    desc: "Publish a polished public brand page and resume at /u/yourname or your own domain, with real access controls.",
     color: "#f97316",
   },
 ];
@@ -107,15 +107,15 @@ const FEATURES: Array<{
   title: string;
   desc: string;
 }> = [
-  { icon: Search, title: "Proof-of-Work Ingest", desc: "Paste any URL and we turn your work into structured personal brand material." },
-  { icon: Globe, title: "Deploy Anywhere", desc: "Publish at /u/yourname or connect your own domain for a branded live site." },
-  { icon: Lock, title: "Visibility Controls", desc: "Choose public, anyone-with-link, or private access for each portfolio." },
-  { icon: BriefcaseBusiness, title: "Hiring Mode", desc: "Emphasizes skills, case studies, and measurable impact for recruiters." },
-  { icon: GraduationCap, title: "Admissions Mode", desc: "Tells your story — growth, leadership, and projects — for applications." },
-  { icon: FileText, title: "Resume Export", desc: "One-click PDF with action verbs and ATS-friendly formatting." },
-  { icon: Palette, title: "Two Themes", desc: "Obsidian (dark neon glass) or Paper (clean editorial serif)." },
-  { icon: ChartColumn, title: "Story Timeline", desc: "A documentary-style journey of how you leveled up over the years." },
-  { icon: LayoutGrid, title: "Explore Page", desc: "Browse public personal brands and discover creators, engineers, and builders." },
+  { icon: Search, title: "Evidence Import", desc: "Bring in multiple links, screenshots, and proof so the portfolio is grounded in real work." },
+  { icon: Globe, title: "Deploy Anywhere", desc: "Launch on /u/yourname, a custom domain, or a shareable link-only page." },
+  { icon: Lock, title: "Visibility Controls", desc: "Choose public, link-only, or private access depending on what you want to show." },
+  { icon: BriefcaseBusiness, title: "Hiring Mode", desc: "Frame the page around projects, proof, impact, and recruiter-friendly scanning." },
+  { icon: GraduationCap, title: "Admissions Mode", desc: "Shift the story toward growth, initiative, leadership, and long-term trajectory." },
+  { icon: FileText, title: "Resume System", desc: "Publish a separate resume page and export a polished PDF when you need it." },
+  { icon: Palette, title: "Portfolio Models", desc: "Choose from 30 preset portfolio directions or let the agent reshape the UI for you." },
+  { icon: ChartColumn, title: "Narrative Outputs", desc: "Generate timelines, scripts, trees, and structured brand artifacts from the same evidence." },
+  { icon: LayoutGrid, title: "Explore Feed", desc: "Browse public LifePage launches and study how others frame their work and identity." },
 ];
 
 const WHO_ITS_FOR: Array<{
@@ -150,21 +150,21 @@ const PRICING = [
     name: "Free",
     price: "$0",
     detail: "20 advanced AI credits each month",
-    body: "Start building your personal brand and keep going on a lighter fallback model after your advanced credits run out.",
+    body: "Start building the site, the story, and the resume, then keep going on a lighter model after advanced credits run out.",
     badge: "Start here",
   },
   {
     name: "Plus",
     price: "$5",
     detail: "150 advanced AI credits each month",
-    body: "For active students and builders who want more advanced AI generations without jumping to an unlimited plan.",
+    body: "For active students, applicants, and builders who want room to iterate without paying for unlimited usage.",
     badge: "Most practical",
   },
   {
     name: "Pro",
     price: "$10",
     detail: "Unlimited advanced AI usage",
-    body: "For heavy iteration, constant editing, and teams or creators who want advanced AI on every request.",
+    body: "For constant editing, heavier agent workflows, and teams or creators who want the advanced route on every request.",
     badge: "Unlimited",
   },
 ] as const;
@@ -269,7 +269,7 @@ function LandingPage() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#79e5d2] opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-[#79e5d2]" />
               </span>
-              AI personal brand builder
+              AI personal brand studio
             </div>
 
             <h1 className="brand-display mt-8 max-w-4xl text-[3.4rem] leading-[0.95] tracking-[-0.05em] text-[#f8f3ea] sm:text-[4.4rem] lg:text-[5.6rem]">
@@ -280,9 +280,9 @@ function LandingPage() {
             </h1>
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-[#a4b1ba] sm:text-xl">
-              Paste a URL and LifePage turns scattered proof into a sharp public
-              site. It crawls your work, structures the story, and publishes it
-              as a brand page you can keep public, link-only, or private.
+              Turn scattered links, projects, and proof into a clear public
+              presence. LifePage imports your work, writes the story, builds the
+              page, and deploys it as a brand site and resume you can actually share.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -311,7 +311,8 @@ function LandingPage() {
 
             <div className="mt-8 flex flex-wrap gap-3 text-sm text-[#8d9aa5]">
               <span className="lp-chip px-3 py-1.5">Free to start</span>
-              <span className="lp-chip px-3 py-1.5">No credit card</span>
+              <span className="lp-chip px-3 py-1.5">Multiple URL import</span>
+              <span className="lp-chip px-3 py-1.5">Custom domain ready</span>
               <span className="lp-chip px-3 py-1.5">Built by {SITE_AUTHOR}</span>
             </div>
           </div>
@@ -324,13 +325,13 @@ function LandingPage() {
                     <span className="lp-kicker text-[10px] text-[#79e5d2]">
                       Brand flow
                     </span>
-                    <span>2 min launch</span>
+                    <span>From proof to publish</span>
                   </div>
                   <div className="mt-4 space-y-3">
                     {[
-                      { icon: Link2, label: "Import proof", copy: "Website, GitHub, YouTube, Google Sites" },
-                      { icon: Bot, label: "Shape the story", copy: "AI turns evidence into projects, timeline, and resume" },
-                      { icon: Globe, label: "Deploy anywhere", copy: "/u/yourname or your own domain with access controls" },
+                      { icon: Link2, label: "Import proof", copy: "Site, GitHub, docs, videos, school work, or Google Sites" },
+                      { icon: Bot, label: "Shape the story", copy: "AI turns raw evidence into positioning, projects, a resume, and a stronger narrative" },
+                      { icon: Globe, label: "Deploy anywhere", copy: "Launch on /u/yourname or your own domain with public, link-only, or private access" },
                     ].map((item, i) => {
                       const Icon = item.icon;
                       return (
@@ -363,6 +364,9 @@ function LandingPage() {
                       </p>
                       <p className="mt-2 brand-display text-2xl tracking-tight">
                         alexchen.com
+                      </p>
+                      <p className="mt-1 text-xs text-[#94a2ad]">
+                        A live portfolio and resume deployment
                       </p>
                     </div>
                     <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200">
@@ -407,13 +411,13 @@ function LandingPage() {
                           1
                         </p>
                         <p className="mt-1 text-xs text-[#8e9ca6]">
-                          Resume export
+                          Resume page
                         </p>
                       </div>
                     </div>
 
                     <div className="mt-5 flex flex-wrap gap-2">
-                      {["Hiring mode", "Admissions mode", "Custom domain"].map(
+                      {["Hiring mode", "Admissions mode", "Separate resume page"].map(
                         (label) => (
                           <span
                             key={label}
@@ -429,9 +433,9 @@ function LandingPage() {
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   {[
-                    { title: "Visibility", value: "Public, link-only, private" },
-                    { title: "AI usage", value: "Kimi, Qwen, Auto" },
-                    { title: "Deploy", value: "/u/yourname or custom domain" },
+                    { title: "Visibility", value: "Public, link-only, or private" },
+                    { title: "AI layer", value: "Credits, models, agent workflows" },
+                    { title: "Deploy", value: "Profile path, resume page, custom domain" },
                   ].map((item) => (
                     <div key={item.title} className="lp-stat-tile p-4">
                       <p className="lp-kicker text-[10px] text-[#79e5d2]">
@@ -461,8 +465,8 @@ function LandingPage() {
               </h2>
             </div>
             <p className="max-w-xl text-base leading-7 text-[#97a4ae]">
-              Public pages read like a real product launch, not a link dump. Each
-              one can ship to a direct URL or a custom domain.
+              Public pages should read like a considered launch, not a link dump.
+              Each one can ship to a direct URL, a resume page, or a custom domain.
             </p>
           </div>
 
@@ -576,7 +580,7 @@ function LandingPage() {
               href="/explore"
               className="group inline-flex items-center gap-2 text-sm text-[#79e5d2] transition-colors hover:text-[#cffff6]"
             >
-              Browse all public portfolios
+              Browse all public brand sites
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
           </div>
@@ -644,8 +648,8 @@ function LandingPage() {
               </h2>
             </div>
             <p className="max-w-lg text-base leading-7 text-[#97a4ae]">
-              LifePage covers the audiences that most portfolio tools flatten:
-              creators, applicants, professionals, and people archiving their life.
+              LifePage is opinionated about audiences that most portfolio tools flatten:
+              creators, applicants, professionals, and people documenting a life in motion.
             </p>
           </div>
 
@@ -687,8 +691,8 @@ function LandingPage() {
               </h2>
             </div>
             <p className="max-w-lg text-base leading-7 text-[#97a4ae]">
-              The value is not just generation. It is the whole loop: import,
-              structure, edit, export, host, and deploy.
+              The value is not just generation. It is the full loop: import,
+              structure, edit, present, export, host, and deploy.
             </p>
           </div>
 
@@ -723,8 +727,8 @@ function LandingPage() {
               </h2>
             </div>
             <p className="max-w-lg text-base leading-7 text-[#97a4ae]">
-              Free gets advanced credits each month. Plus adds room. Pro removes
-              the ceiling for heavy builders.
+              Free gets advanced credits each month. Plus adds room to iterate.
+              Pro removes the ceiling for heavy builders and constant agent use.
             </p>
           </div>
 
@@ -778,8 +782,8 @@ function LandingPage() {
               Ready to launch your brand?
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-[#97a4ae]">
-              Turn your work into a polished brand site, export the resume, and
-              publish it in minutes.
+              Turn your work into a sharper public story, publish the page, and
+              walk away with a resume that actually matches the site.
             </p>
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Link
@@ -799,7 +803,7 @@ function LandingPage() {
                 href="#contact"
                 className="lp-button-secondary px-8 py-3.5 text-base"
               >
-                Contact us
+                Talk to us
               </Link>
             </div>
           </div>
@@ -819,7 +823,7 @@ function LandingPage() {
                 LifePage
               </p>
               <p className="mt-1 text-xs text-[#8f9ca6]">
-                Brand builder for people with proof
+                Personal brand builder for people with proof
               </p>
             </div>
           </div>

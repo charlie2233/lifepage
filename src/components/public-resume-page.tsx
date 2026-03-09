@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import type { UserProfile } from "@/generated/prisma";
+import type { UserProfile } from "@prisma/client";
 import { PublicPageNav } from "@/components/public-page-nav";
 import type { PublicPageUser } from "@/lib/public-page";
 import { buildPublicPageModeHref, resolvePublicPageMode } from "@/lib/public-page";

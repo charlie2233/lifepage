@@ -7,7 +7,8 @@ import { resolvePortfolioTheme } from "@/lib/portfolio-themes";
 
 export const metadata: Metadata = {
   title: "Explore Personal Brands — LifePage",
-  description: "Browse public personal brand sites built and deployed with LifePage.",
+  description:
+    "Browse public personal brand sites, proof-driven portfolios, and resume-ready launches built with LifePage.",
 };
 
 export const dynamic = "force-dynamic";
@@ -145,14 +146,14 @@ export default async function ExplorePage() {
             <div>
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-[#79e5d2]">
                 <Compass className="h-3.5 w-3.5" />
-                <span className="lp-kicker text-[11px]">Explore brands</span>
+                <span className="lp-kicker text-[11px]">Explore launches</span>
               </div>
               <h1 className="brand-display mt-4 text-5xl tracking-tight text-[#f8f3ea] md:text-6xl">
-                Browse personal brands that already feel deployed
+                Browse public brand sites that already feel shipped
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-8 text-[#99a6af]">
-                Discover creators, engineers, designers, and applicants who turned
-                their proof of work into live brand sites with LifePage.
+                Discover creators, engineers, designers, students, and applicants
+                who turned scattered work into a sharper public story with LifePage.
               </p>
             </div>
 
@@ -171,7 +172,7 @@ export default async function ExplorePage() {
                     Access
                   </p>
                   <p className="mt-3 text-sm leading-6 text-[#d4dce2]">
-                    Public pages only
+                    Public launches only
                   </p>
                 </div>
                 <div className="lp-stat-tile p-4">
@@ -179,7 +180,7 @@ export default async function ExplorePage() {
                     Format
                   </p>
                   <p className="mt-3 text-sm leading-6 text-[#d4dce2]">
-                    Brand story, projects, proof
+                    Story, proof, resume-ready framing
                   </p>
                 </div>
               </div>
@@ -194,10 +195,10 @@ export default async function ExplorePage() {
                 <Sparkles className="h-7 w-7 text-[#79e5d2]" />
               </div>
               <h2 className="brand-display text-4xl tracking-tight text-[#f8f3ea]">
-                No public brand pages yet
+                No public launches yet
               </h2>
               <p className="mx-auto mt-3 max-w-md text-base leading-7 text-[#97a4ae]">
-                Be the first to launch yours.
+                Be the first to turn your work into a live brand site.
               </p>
               <Link
                 href="/register"
@@ -237,7 +238,7 @@ export default async function ExplorePage() {
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_48%)]" />
                         <div className="relative">
                           <p className="lp-kicker text-[10px] text-[#c7d2d9]">
-                            Public brand
+                            Public launch
                           </p>
                           <p className="mt-2 brand-display text-3xl tracking-tight text-[#f8f3ea]">
                             {profile.name}
@@ -335,7 +336,7 @@ export default async function ExplorePage() {
 
                       <div className="mt-auto pt-6">
                         <span className="inline-flex items-center gap-2 text-sm font-medium text-[#f7f1e8] group-hover:text-[#79e5d2]">
-                          View brand page
+                          Open brand site
                           <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                         </span>
                       </div>
@@ -347,7 +348,7 @@ export default async function ExplorePage() {
 
             <div className="mt-12 border-t border-white/8 pt-8 text-center">
               <p className="text-sm text-[#97a4ae]">
-                Want your brand here?
+                Want your launch here?
               </p>
               <Link
                 href="/register"

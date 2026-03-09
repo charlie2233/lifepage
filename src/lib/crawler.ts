@@ -150,10 +150,32 @@ export async function crawlUrl(url: string): Promise<CrawlResult> {
   };
 }
 
+type DynamicImportFn = <T>(specifier: string) => Promise<T>;
+
+function canUseEmbeddedBrowserScreenshots() {
+  return !(
+    typeof navigator !== "undefined" &&
+    navigator.userAgent === "Cloudflare-Workers"
+  );
+}
+
 async function takeScreenshot(url: string): Promise<string | null> {
+  if (!canUseEmbeddedBrowserScreenshots()) {
+    return null;
+  }
+
   try {
-    const puppeteer = await import("puppeteer-core");
-    const chromium = await import("@sparticuz/chromium");
+    // Keep Puppeteer out of the default Worker bundle; it only runs in Node-like runtimes.
+    const dynamicImport = new Function(
+      "specifier",
+      "return import(specifier)"
+    ) as DynamicImportFn;
+    const puppeteer = await dynamicImport<typeof import("puppeteer-core")>(
+      "puppeteer-core"
+    );
+    const chromium = await dynamicImport<typeof import("@sparticuz/chromium")>(
+      "@sparticuz/chromium"
+    );
 
     const browser = await puppeteer.default.launch({
       args: chromium.default.args,

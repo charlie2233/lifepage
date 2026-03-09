@@ -125,6 +125,40 @@ interface AgentArtifact {
   style?: string | null;
   output: unknown;
   createdAt: string;
+  meta?: {
+    executionMode?: "artifact" | "mutate";
+    resolvedPersonaSkillId?: string | null;
+    resolvedWorkflowSkillId?: string | null;
+    mutationSummary?: AgentMutationSummary | null;
+    revertable?: boolean;
+    revertedAt?: string | null;
+  } | null;
+}
+
+interface AgentStrategy {
+  intent: string;
+  mode: "reply" | "artifact" | "mutate";
+  personaSkillId?: string;
+  workflowSkillId?: string;
+  tool?: string;
+  style?: string;
+  rationale: string;
+  nextSteps: string[];
+  missingContext: string[];
+}
+
+interface AgentSkillSummary {
+  id: string;
+  label: string;
+  category: "persona" | "workflow";
+  description: string;
+}
+
+interface AgentMutationSummary {
+  title: string;
+  summary: string;
+  changes: string[];
+  changedFields: string[];
 }
 
 interface ChatMessage {
@@ -135,6 +169,12 @@ interface ChatMessage {
   output?: unknown;
   artifactId?: string;
   focusLabel?: string;
+  strategy?: AgentStrategy;
+  executionMode?: "reply" | "artifact" | "mutate";
+  resolvedPersonaSkill?: AgentSkillSummary | null;
+  resolvedWorkflowSkill?: AgentSkillSummary | null;
+  mutationSummary?: AgentMutationSummary | null;
+  revertable?: boolean;
 }
 
 interface ApiEvidenceResponse { items?: EvidenceItem[] }
@@ -196,16 +236,42 @@ interface BillingSnapshot {
   standardModel: string;
 }
 interface ApiAgentResponse {
-  type?: "chat" | "tool_result";
+  type?: "chat" | "tool_result" | "mutation_result";
   reply?: string;
   tool?: string;
   style?: string;
   output?: unknown;
   artifactId?: string;
   focusLabel?: string;
+  strategy?: AgentStrategy;
+  executionMode?: "reply" | "artifact" | "mutate";
+  resolvedPersonaSkill?: AgentSkillSummary | null;
+  resolvedWorkflowSkill?: AgentSkillSummary | null;
+  mutationSummary?: AgentMutationSummary | null;
+  revertable?: boolean;
+  profile?: GeneratedProfile["data"] | null;
+  settings?: {
+    visibility: PublicPageVisibility;
+    mode: "hiring" | "admissions";
+    theme: PortfolioThemeId;
+    themeConfig?: PortfolioThemeConfig | null;
+    resumeModel: ResumeModelId;
+    resumeModelConfig?: ResumeModelConfig | null;
+  } | null;
   billing?: BillingSnapshot;
   error?: string;
   artifacts?: AgentArtifact[];
+  recentRuns?: Array<{
+    id: string;
+    tool: string;
+    createdAt: string;
+    executionMode: "artifact" | "mutate";
+    resolvedPersonaSkill?: AgentSkillSummary | null;
+    resolvedWorkflowSkill?: AgentSkillSummary | null;
+    mutationSummary?: AgentMutationSummary | null;
+    revertable: boolean;
+    revertedAt?: string | null;
+  }>;
 }
 interface ThemeArtifactOutput {
   themeId: PortfolioThemeId;
@@ -223,6 +289,31 @@ interface ResumeModelArtifactOutput {
   rationale: string;
   changes: string[];
 }
+interface RegeneratedProfileArtifactOutput {
+  summary: string;
+  headline: string;
+  about: string;
+  resumeSummary: string;
+  confidence: number;
+  refreshedFromEvidenceCount: number;
+  stats: {
+    projectsShipped: number;
+    yearsBuilding: number;
+    competitions: number;
+  };
+  profile?: GeneratedProfile["data"];
+}
+interface RecrawlArtifactOutput {
+  summary: string;
+  title: string;
+  url: string;
+  description: string;
+  headings: string[];
+  bodyPreview: string;
+  usedExistingItem: boolean;
+  screenshotCaptured: boolean;
+  itemId: string;
+}
 interface ApiBillingResponse {
   billing?: BillingSnapshot;
   plans?: BillingPlan[];
@@ -235,6 +326,11 @@ interface AccountSettings {
   username: string | null;
   email: string;
   createdAt: string;
+  agentPreferences?: {
+    pinnedPersonaSkillId: string | null;
+    pinnedWorkflowSkillId: string | null;
+    brandVoiceInstruction: string | null;
+  };
 }
 interface ApiAccountResponse {
   account?: AccountSettings;
@@ -252,6 +348,59 @@ interface AgentFocusOption {
   hint: string;
 }
 
+interface AgentSkillOption {
+  id: string;
+  label: string;
+  category: "persona" | "workflow";
+  description: string;
+}
+
+interface ApiAgentSkillsResponse {
+  personaSkills?: AgentSkillOption[];
+  workflowSkills?: AgentSkillOption[];
+  error?: string;
+}
+
+interface ProviderModelOption {
+  value: string;
+  label: string;
+  note?: string;
+}
+
+const PROVIDER_MODEL_OPTIONS: Record<
+  Exclude<BillingProvider["id"], "auto">,
+  ProviderModelOption[]
+> = {
+  openai: [
+    { value: "gpt-5", label: "GPT-5" },
+    { value: "gpt-5-mini", label: "GPT-5 mini" },
+    { value: "gpt-5-nano", label: "GPT-5 nano" },
+    { value: "gpt-5.1", label: "GPT-5.1", note: "Recommended by OpenAI" },
+    { value: "gpt-5.1-mini", label: "GPT-5.1 mini" },
+    { value: "gpt-4.1", label: "GPT-4.1" },
+    { value: "gpt-4.1-mini", label: "GPT-4.1 mini" },
+    { value: "gpt-4o", label: "GPT-4o" },
+    { value: "gpt-4o-mini", label: "GPT-4o mini" },
+  ],
+  kimi: [
+    { value: "moonshot-v1-32k", label: "Moonshot v1 32k" },
+    { value: "moonshot-v1-8k", label: "Moonshot v1 8k" },
+  ],
+  qwen: [
+    { value: "qwen-plus", label: "Qwen Plus" },
+    { value: "qwen-turbo", label: "Qwen Turbo" },
+  ],
+};
+
+function getProviderModelOptions(
+  provider: BillingProvider["id"]
+): ProviderModelOption[] {
+  if (provider === "auto") {
+    return [];
+  }
+  return PROVIDER_MODEL_OPTIONS[provider] ?? [];
+}
+
 function splitCrawlInput(value: string) {
   return value
     .split(/[\n,]+/)
@@ -266,7 +415,43 @@ function humanizeAgentToolName(tool: string) {
   if (tool === "set_resume_model") {
     return "resume model";
   }
+  if (tool === "recrawl_url") {
+    return "re-crawl URL";
+  }
+  if (tool === "regenerate_profile") {
+    return "regenerate profile";
+  }
+  if (tool === "mutate_portfolio") {
+    return "live portfolio edit";
+  }
+  if (tool === "revert_agent_mutation") {
+    return "reverted agent change";
+  }
   return tool.replace(/^generate_/, "").replace(/_/g, " ");
+}
+
+function formatAgentActionLabel(tool: string, style?: string) {
+  const action = tool.startsWith("set_")
+    ? `Apply ${humanizeAgentToolName(tool)}`
+    : tool.startsWith("generate_")
+      ? `Generate ${humanizeAgentToolName(tool)}`
+      : humanizeAgentToolName(tool);
+
+  return style ? `${action} (${style})` : action;
+}
+
+function formatExecutionModeLabel(mode?: "reply" | "artifact" | "mutate") {
+  if (mode === "artifact") return "Artifact";
+  if (mode === "mutate") return "Live edit";
+  return "Reply";
+}
+
+function isRevertableArtifact(artifact?: AgentArtifact | null) {
+  return Boolean(
+    artifact?.meta?.executionMode === "mutate" &&
+      artifact.meta?.revertable &&
+      !artifact.meta?.revertedAt
+  );
 }
 
 function buildAgentFocusOptions(
@@ -593,14 +778,231 @@ function ResumeModelArtifact({ output }: { output: unknown }) {
   );
 }
 
+function RegeneratedProfileArtifact({ output }: { output: unknown }) {
+  const profileRefresh = output as RegeneratedProfileArtifactOutput;
+  return (
+    <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">{profileRefresh.headline}</p>
+          <p className="mt-1 text-xs text-gray-400">{profileRefresh.summary}</p>
+        </div>
+        <span className="rounded-full border border-[#00f5ff]/25 bg-[#00f5ff]/10 px-3 py-1 text-xs text-[#7ef4ff]">
+          {(profileRefresh.confidence * 100).toFixed(0)}% confidence
+        </span>
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-gray-300">
+        {profileRefresh.resumeSummary}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300">
+          {profileRefresh.refreshedFromEvidenceCount} evidence sources
+        </span>
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300">
+          {profileRefresh.stats.projectsShipped} projects shipped
+        </span>
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300">
+          {profileRefresh.stats.yearsBuilding} years building
+        </span>
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300">
+          {profileRefresh.stats.competitions} competitions
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function RecrawlArtifact({ output }: { output: unknown }) {
+  const recrawl = output as RecrawlArtifactOutput;
+  return (
+    <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">
+            {recrawl.title || recrawl.url}
+          </p>
+          <a
+            href={recrawl.url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 inline-flex items-center gap-1 text-xs text-[#7ef4ff] hover:text-white"
+          >
+            {recrawl.url}
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+        <span className="rounded-full border border-[#00f5ff]/25 bg-[#00f5ff]/10 px-3 py-1 text-xs text-[#7ef4ff]">
+          {recrawl.usedExistingItem ? "updated" : "new source"}
+        </span>
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-gray-300">
+        {recrawl.description || recrawl.summary}
+      </p>
+      {recrawl.headings?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {recrawl.headings.slice(0, 4).map((heading) => (
+            <span
+              key={heading}
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300"
+            >
+              {heading}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <p className="mt-3 text-[11px] text-gray-500">
+        Screenshot {recrawl.screenshotCaptured ? "captured" : "not available"}.
+      </p>
+    </div>
+  );
+}
+
+function MutationArtifact({
+  output,
+  revertable,
+  onRevert,
+}: {
+  output: unknown;
+  revertable?: boolean;
+  onRevert?: (() => void) | null;
+}) {
+  const mutation = output as AgentMutationSummary;
+
+  return (
+    <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">{mutation.title}</p>
+          <p className="mt-1 text-xs text-gray-400">{mutation.summary}</p>
+        </div>
+        {revertable && onRevert ? (
+          <button
+            onClick={onRevert}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-gray-300 hover:border-[#00f5ff]/30 hover:text-white"
+          >
+            <RefreshCcw className="h-3.5 w-3.5" />
+            Revert
+          </button>
+        ) : null}
+      </div>
+      {mutation.changes?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {mutation.changes.map((change) => (
+            <span
+              key={change}
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300"
+            >
+              {change}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {mutation.changedFields?.length ? (
+        <p className="mt-3 text-[11px] text-gray-500">
+          Changed: {mutation.changedFields.join(" · ")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function AgentSkillBadges({
+  personaSkill,
+  workflowSkill,
+  executionMode,
+}: {
+  personaSkill?: AgentSkillSummary | null;
+  workflowSkill?: AgentSkillSummary | null;
+  executionMode?: "reply" | "artifact" | "mutate";
+}) {
+  if (!personaSkill && !workflowSkill && !executionMode) {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {executionMode ? (
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-gray-300">
+          {formatExecutionModeLabel(executionMode)}
+        </span>
+      ) : null}
+      {personaSkill ? (
+        <span className="rounded-full border border-[#00f5ff]/20 bg-[#00f5ff]/10 px-3 py-1 text-[11px] text-[#7ef4ff]">
+          Expert: {personaSkill.label}
+        </span>
+      ) : null}
+      {workflowSkill ? (
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-gray-300">
+          Workflow: {workflowSkill.label}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function AgentStrategyCard({ strategy }: { strategy: AgentStrategy }) {
+  const modeLabel = formatExecutionModeLabel(strategy.mode);
+  return (
+    <div className="mt-2 rounded-xl border border-white/10 bg-black/20 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded-full border border-[#00f5ff]/20 bg-[#00f5ff]/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-[#7ef4ff]">
+          {modeLabel}
+        </span>
+        <span className="text-xs font-medium text-white">{strategy.intent}</span>
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-gray-400">
+        {strategy.rationale}
+      </p>
+      {strategy.nextSteps?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {strategy.nextSteps.map((step) => (
+            <span
+              key={step}
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-gray-300"
+            >
+              {step}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {strategy.missingContext?.length ? (
+        <p className="mt-3 text-[11px] text-yellow-300">
+          Missing: {strategy.missingContext.join(" · ")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 // ── Artifact renderer dispatcher ─────────────────────────────────────────────
 
-function ArtifactRenderer({ tool, output }: { tool: string; output: unknown }) {
+function ArtifactRenderer({
+  tool,
+  output,
+  revertable,
+  onRevert,
+}: {
+  tool: string;
+  output: unknown;
+  revertable?: boolean;
+  onRevert?: (() => void) | null;
+}) {
   if (tool === "generate_timeline") return <TimelineArtifact output={output} />;
   if (tool === "generate_video_script") return <VideoScriptArtifact output={output} />;
   if (tool === "generate_tree") return <TreeArtifact output={output} />;
   if (tool === "set_portfolio_theme") return <ThemeArtifact output={output} />;
   if (tool === "set_resume_model") return <ResumeModelArtifact output={output} />;
+  if (tool === "regenerate_profile") return <RegeneratedProfileArtifact output={output} />;
+  if (tool === "recrawl_url") return <RecrawlArtifact output={output} />;
+  if (tool === "mutate_portfolio" || tool === "revert_agent_mutation") {
+    return (
+      <MutationArtifact
+        output={output}
+        revertable={revertable}
+        onRevert={onRevert}
+      />
+    );
+  }
   return (
     <pre className="mt-2 text-xs bg-white/5 rounded p-3 overflow-auto max-h-48">
       {JSON.stringify(output, null, 2)}
@@ -625,6 +1027,48 @@ const TAB_META: Record<DashboardTab, { icon: LucideIcon; label: string }> = {
   agent: { icon: Bot, label: "Agent" },
   automations: { icon: Clock3, label: "Automations" },
   settings: { icon: Settings, label: "Settings" },
+};
+
+const TAB_COPY: Record<
+  DashboardTab,
+  { eyebrow: string; title: string; summary: string }
+> = {
+  crawl: {
+    eyebrow: "Import",
+    title: "Bring proof in from the web",
+    summary:
+      "Collect URLs, screenshots, and source material so LifePage has real evidence to work from.",
+  },
+  profile: {
+    eyebrow: "Profile",
+    title: "Shape the public story",
+    summary:
+      "Review the generated headline, about section, proof, and public positioning before you publish.",
+  },
+  usage: {
+    eyebrow: "Usage",
+    title: "Track credits and model behavior",
+    summary:
+      "Monitor advanced credit usage, fallback behavior, and the current cycle for your account.",
+  },
+  agent: {
+    eyebrow: "Agent",
+    title: "Direct the AI like a real operator",
+    summary:
+      "Chat, scope the work to a specific section, and generate structured artifacts without losing context.",
+  },
+  automations: {
+    eyebrow: "Automations",
+    title: "Keep the portfolio fresh automatically",
+    summary:
+      "Schedule recurring crawls and regenerations so your public site stays current without manual cleanup.",
+  },
+  settings: {
+    eyebrow: "Settings",
+    title: "Tune the brand, deployment, and AI",
+    summary:
+      "Manage identity, billing, AI preferences, visibility, theme direction, resume models, and custom domains.",
+  },
 };
 
 const ACTION_META: Record<string, { icon: LucideIcon; label: string; desc: string }> = {
@@ -682,6 +1126,38 @@ const AGENT_TOOL_META: Array<{
     styles: ["custom", ...RESUME_MODEL_PRESETS.map((model) => model.id)],
     desc: "Apply a structured resume model or generate a custom resume direction",
   },
+  {
+    tool: "regenerate_profile",
+    icon: WandSparkles,
+    label: "Regenerate Profile",
+    styles: [],
+    desc: "Rebuild the active AI profile from current visible evidence",
+  },
+  {
+    tool: "recrawl_url",
+    icon: RefreshCcw,
+    label: "Re-crawl URL",
+    styles: [],
+    desc: "Refresh one URL source and replace stale evidence with fresh content",
+  },
+];
+
+const DEFAULT_PERSONA_SKILL_OPTIONS: AgentSkillOption[] = [
+  {
+    id: "auto",
+    label: "Auto",
+    category: "persona",
+    description: "Let LifeAgent choose the expert mode.",
+  },
+];
+
+const DEFAULT_WORKFLOW_SKILL_OPTIONS: AgentSkillOption[] = [
+  {
+    id: "auto",
+    label: "Auto",
+    category: "workflow",
+    description: "Let LifeAgent choose the workflow.",
+  },
 ];
 
 // ── Main dashboard ────────────────────────────────────────────────────────────
@@ -734,9 +1210,21 @@ export default function DashboardPage() {
   const [chatInput, setChatInput] = useState("");
   const [agentLoading, setAgentLoading] = useState(false);
   const [savedArtifacts, setSavedArtifacts] = useState<AgentArtifact[]>([]);
+  const [personaSkillOptions, setPersonaSkillOptions] = useState<AgentSkillOption[]>(
+    DEFAULT_PERSONA_SKILL_OPTIONS
+  );
+  const [workflowSkillOptions, setWorkflowSkillOptions] = useState<AgentSkillOption[]>(
+    DEFAULT_WORKFLOW_SKILL_OPTIONS
+  );
+  const [selectedPersonaSkillId, setSelectedPersonaSkillId] = useState("auto");
+  const [selectedWorkflowSkillId, setSelectedWorkflowSkillId] = useState("auto");
+  const [defaultPersonaSkillId, setDefaultPersonaSkillId] = useState("auto");
+  const [defaultWorkflowSkillId, setDefaultWorkflowSkillId] = useState("auto");
+  const [brandVoiceInstructionInput, setBrandVoiceInstructionInput] = useState("");
   const [selectedTool, setSelectedTool] = useState<string>("");
   const [selectedStyle, setSelectedStyle] = useState<string>("");
   const [selectedFocusValue, setSelectedFocusValue] = useState("all");
+  const [savingAgentPreferences, setSavingAgentPreferences] = useState(false);
 
   // ── Automation state ───────────────────────────────────────────────────────
   const [automations, setAutomations] = useState<Automation[]>([]);
@@ -763,7 +1251,7 @@ export default function DashboardPage() {
   ) as AgentFocusSelection | null;
 
   const fetchData = useCallback(async () => {
-    const [ev, pr, st, arts, billingRes, accountRes, autos] = await Promise.all([
+    const [ev, pr, st, arts, billingRes, accountRes, autos, agentSkillsRes] = await Promise.all([
       fetch("/api/evidence").then((r) => r.json() as Promise<ApiEvidenceResponse>),
       fetch("/api/profile").then((r) => r.json() as Promise<ApiProfileResponse>),
       fetch("/api/settings").then((r) =>
@@ -784,6 +1272,7 @@ export default function DashboardPage() {
       fetch("/api/billing").then((r) => r.json() as Promise<ApiBillingResponse>),
       fetch("/api/account").then((r) => r.json() as Promise<ApiAccountResponse>),
       fetch("/api/automations").then((r) => r.json() as Promise<ApiAutomationResponse>),
+      fetch("/api/agent/skills").then((r) => r.json() as Promise<ApiAgentSkillsResponse>),
     ]);
     setEvidence(ev.items ?? []);
     if (pr.profile) setProfile(pr.profile);
@@ -808,7 +1297,22 @@ export default function DashboardPage() {
     setAccount(accountRes.account ?? null);
     setAccountNameInput(accountRes.account?.name ?? "");
     setAccountUsernameInput(accountRes.account?.username ?? "");
+    const savedPersona = accountRes.account?.agentPreferences?.pinnedPersonaSkillId ?? "auto";
+    const savedWorkflow = accountRes.account?.agentPreferences?.pinnedWorkflowSkillId ?? "auto";
+    setDefaultPersonaSkillId(savedPersona);
+    setDefaultWorkflowSkillId(savedWorkflow);
+    setSelectedPersonaSkillId(savedPersona);
+    setSelectedWorkflowSkillId(savedWorkflow);
+    setBrandVoiceInstructionInput(
+      accountRes.account?.agentPreferences?.brandVoiceInstruction ?? ""
+    );
     setAutomations(autos.automations ?? []);
+    setPersonaSkillOptions(
+      agentSkillsRes.personaSkills ?? DEFAULT_PERSONA_SKILL_OPTIONS
+    );
+    setWorkflowSkillOptions(
+      agentSkillsRes.workflowSkills ?? DEFAULT_WORKFLOW_SKILL_OPTIONS
+    );
   }, []);
 
   const saveSettings = async (patch: {
@@ -1039,6 +1543,119 @@ export default function DashboardPage() {
     }
   };
 
+  const handleSaveAgentPreferences = async () => {
+    setSavingAgentPreferences(true);
+    try {
+      const res = await fetch("/api/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agentPreferences: {
+            pinnedPersonaSkillId:
+              defaultPersonaSkillId === "auto" ? null : defaultPersonaSkillId,
+            pinnedWorkflowSkillId:
+              defaultWorkflowSkillId === "auto" ? null : defaultWorkflowSkillId,
+            brandVoiceInstruction:
+              brandVoiceInstructionInput.trim() || null,
+          },
+        }),
+      });
+      const data = (await res.json()) as ApiAccountResponse;
+      if (!res.ok || !data.account) {
+        throw new Error(data.error ?? "Failed to save agent defaults.");
+      }
+
+      setAccount(data.account);
+      setDefaultPersonaSkillId(
+        data.account.agentPreferences?.pinnedPersonaSkillId ?? "auto"
+      );
+      setDefaultWorkflowSkillId(
+        data.account.agentPreferences?.pinnedWorkflowSkillId ?? "auto"
+      );
+      setBrandVoiceInstructionInput(
+        data.account.agentPreferences?.brandVoiceInstruction ?? ""
+      );
+      setMessage({ type: "success", text: "Agent defaults saved." });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to save agent defaults.",
+      });
+    } finally {
+      setSavingAgentPreferences(false);
+    }
+  };
+
+  const handleRevertAgentArtifact = async (artifactId: string) => {
+    setAgentLoading(true);
+    try {
+      const res = await fetch("/api/agent/revert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artifactId }),
+      });
+      const data = (await res.json()) as ApiAgentResponse & {
+        reply?: string;
+        profile?: GeneratedProfile["data"] | null;
+        settings?: ApiAgentResponse["settings"];
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to revert agent change.");
+      }
+
+      if (data.billing) setBilling(data.billing);
+      if (data.profile) {
+        setProfile((current) =>
+          current
+            ? { ...current, data: data.profile! }
+            : {
+                id: crypto.randomUUID(),
+                data: data.profile!,
+                createdAt: new Date().toISOString(),
+              }
+        );
+      }
+      if (data.settings) {
+        setVisibility(data.settings.visibility);
+        setMode(data.settings.mode);
+        setTheme(normalizePortfolioThemeId(data.settings.theme));
+        setThemeConfig(data.settings.themeConfig ?? null);
+        setResumeModel(normalizeResumeModelId(data.settings.resumeModel));
+        setResumeModelConfig(data.settings.resumeModelConfig ?? null);
+      }
+
+      setChatHistory((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: data.reply ?? "Reverted the selected agent change.",
+          tool: "revert_agent_mutation",
+          output: data.mutationSummary,
+          executionMode: "mutate",
+          mutationSummary: data.mutationSummary ?? null,
+          revertable: false,
+        },
+      ]);
+
+      const arts = await fetch("/api/agent").then((r) => r.json() as Promise<ApiAgentResponse>);
+      setSavedArtifacts(arts.artifacts ?? []);
+      setMessage({ type: "success", text: data.reply ?? "Agent change reverted." });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to revert agent change.",
+      });
+    } finally {
+      setAgentLoading(false);
+    }
+  };
+
   const openSettingsSection = (sectionId: string) => {
     setActiveTab("settings");
     window.setTimeout(() => {
@@ -1068,7 +1685,7 @@ export default function DashboardPage() {
       activeFocusValue === "all" ? undefined : activeFocusOption?.label;
     const userMsg =
       chatInput.trim() ||
-      `Generate ${humanizeAgentToolName(selectedTool)} (${selectedStyle})${
+      `${formatAgentActionLabel(selectedTool, selectedStyle)}${
         focusLabel ? ` for ${focusLabel}` : ""
       }`;
     setAgentLoading(true);
@@ -1076,7 +1693,15 @@ export default function DashboardPage() {
 
     const newHistory: ChatMessage[] = [
       ...chatHistory,
-      { role: "user", content: userMsg, focusLabel },
+      {
+        role: "user",
+        content: userMsg,
+        focusLabel,
+        resolvedPersonaSkill:
+          selectedPersonaSkillId === "auto" ? null : selectedPersonaSkill,
+        resolvedWorkflowSkill:
+          selectedWorkflowSkillId === "auto" ? null : selectedWorkflowSkill,
+      },
     ];
     setChatHistory(newHistory);
 
@@ -1091,6 +1716,12 @@ export default function DashboardPage() {
       if (selectedTool) {
         body.tool = selectedTool;
         body.style = selectedStyle;
+      }
+      if (selectedPersonaSkillId !== "auto") {
+        body.personaSkillId = selectedPersonaSkillId;
+      }
+      if (selectedWorkflowSkillId !== "auto") {
+        body.workflowSkillId = selectedWorkflowSkillId;
       }
 
       const res = await fetch("/api/agent", {
@@ -1109,6 +1740,19 @@ export default function DashboardPage() {
         const resumeModelOutput = data.output as ResumeModelArtifactOutput;
         setResumeModel(normalizeResumeModelId(resumeModelOutput.modelId));
         setResumeModelConfig(resumeModelOutput.modelConfig ?? null);
+      } else if (data.tool === "regenerate_profile" && data.output) {
+        const refreshed = data.output as RegeneratedProfileArtifactOutput;
+        if (refreshed.profile) {
+          setProfile((current) =>
+            current
+              ? { ...current, data: refreshed.profile! }
+              : {
+                  id: crypto.randomUUID(),
+                  data: refreshed.profile!,
+                  createdAt: new Date().toISOString(),
+                }
+          );
+        }
       }
 
       const assistantMsg: ChatMessage = {
@@ -1116,19 +1760,49 @@ export default function DashboardPage() {
         content:
           data.reply ??
           (data.type === "tool_result"
-            ? `Generated ${humanizeAgentToolName(data.tool ?? "")}${
-                data.style ? ` (${data.style} style)` : ""
-              }${data.focusLabel ? ` for ${data.focusLabel}` : ""}`
+            ? `${formatAgentActionLabel(data.tool ?? "", data.style)}${
+                data.focusLabel ? ` for ${data.focusLabel}` : ""
+              }`
             : ""),
         tool: data.tool,
         style: data.style,
         output: data.output,
         artifactId: data.artifactId,
         focusLabel: data.focusLabel,
+        strategy: data.strategy,
+        executionMode: data.executionMode,
+        resolvedPersonaSkill: data.resolvedPersonaSkill ?? null,
+        resolvedWorkflowSkill: data.resolvedWorkflowSkill ?? null,
+        mutationSummary: data.mutationSummary ?? null,
+        revertable: data.revertable ?? false,
       };
       setChatHistory([...newHistory, assistantMsg]);
 
-      if (data.artifactId) {
+      if (data.executionMode === "mutate") {
+        if (data.profile) {
+          setProfile((current) =>
+            current
+              ? { ...current, data: data.profile! }
+              : {
+                  id: crypto.randomUUID(),
+                  data: data.profile!,
+                  createdAt: new Date().toISOString(),
+                }
+          );
+        }
+        if (data.settings) {
+          setVisibility(data.settings.visibility);
+          setMode(data.settings.mode);
+          setTheme(normalizePortfolioThemeId(data.settings.theme));
+          setThemeConfig(data.settings.themeConfig ?? null);
+          setResumeModel(normalizeResumeModelId(data.settings.resumeModel));
+          setResumeModelConfig(data.settings.resumeModelConfig ?? null);
+        }
+        const arts = await fetch("/api/agent").then((r) => r.json() as Promise<ApiAgentResponse>);
+        setSavedArtifacts(arts.artifacts ?? []);
+      } else if (data.tool === "recrawl_url" || data.tool === "regenerate_profile") {
+        await fetchData();
+      } else if (data.artifactId) {
         // Refresh saved artifacts
         const arts = await fetch("/api/agent").then((r) => r.json() as Promise<ApiAgentResponse>);
         setSavedArtifacts(arts.artifacts ?? []);
@@ -1300,10 +1974,25 @@ export default function DashboardPage() {
     availableProviders.find((provider) => provider.id === selectedAiProvider) ??
     availableProviders[0] ??
     null;
+  const selectedProviderModelOptions = getProviderModelOptions(selectedAiProvider);
+  const selectedModelPresetValue =
+    selectedAiProvider === "auto"
+      ? "auto"
+      : !preferredAiModelInput
+        ? ""
+        : selectedProviderModelOptions.some(
+              (option) => option.value === preferredAiModelInput
+            )
+          ? preferredAiModelInput
+          : "__custom__";
   const selectedUsageRateDef =
     availableUsageRates.find((rate) => rate.id === selectedAiUsageRate) ??
     availableUsageRates[0] ??
     null;
+  const selectedPersonaSkill =
+    personaSkillOptions.find((skill) => skill.id === selectedPersonaSkillId) ?? null;
+  const selectedWorkflowSkill =
+    workflowSkillOptions.find((skill) => skill.id === selectedWorkflowSkillId) ?? null;
   const normalizedPreferredAiModelInput =
     selectedAiProvider === "auto" ? "auto" : preferredAiModelInput;
   const aiPreferencesDirty =
@@ -1314,6 +2003,13 @@ export default function DashboardPage() {
   const accountDirty =
     (accountNameInput.trim() || "") !== (account?.name ?? "") ||
     accountUsernameInput.trim().toLowerCase() !== (account?.username ?? "");
+  const agentPreferencesDirty =
+    defaultPersonaSkillId !==
+      (account?.agentPreferences?.pinnedPersonaSkillId ?? "auto") ||
+    defaultWorkflowSkillId !==
+      (account?.agentPreferences?.pinnedWorkflowSkillId ?? "auto") ||
+    brandVoiceInstructionInput.trim() !==
+      (account?.agentPreferences?.brandVoiceInstruction ?? "");
   const advancedCreditsCap = billing?.plan.monthlyAdvancedCredits ?? null;
   const advancedCreditsUsed = billing?.advancedCreditsUsed ?? 0;
   const advancedCreditsRemaining = billing?.advancedCreditsRemaining ?? null;
@@ -1323,6 +2019,26 @@ export default function DashboardPage() {
         Math.min(100, (advancedCreditsUsed / Math.max(1, advancedCreditsCap)) * 100)
       )
     : 0;
+  const activeChatModel = billing
+    ? billing.fallbackToStandard
+      ? billing.standardModel
+      : billing.advancedModel
+    : null;
+  const activeChatModelLabel = billing
+    ? `${billing.provider.label} · ${activeChatModel}`
+    : null;
+  const activeTabCopy = TAB_COPY[activeTab];
+  const publishStatusLabel =
+    visibility === "public"
+      ? "Public"
+      : visibility === "unlisted"
+        ? "Link-only"
+        : "Private";
+  const profileStatusLabel = profile
+    ? "Generated"
+    : evidence.length > 0
+      ? "Ready to generate"
+      : "Waiting for proof";
 
   return (
     <div className="min-h-screen bg-[#080d10] text-white"
@@ -1381,6 +2097,72 @@ export default function DashboardPage() {
           </div>
         )}
 
+        <div className="mb-8 grid gap-4 lg:grid-cols-[minmax(0,1.12fr)_minmax(280px,0.88fr)]">
+          <div className="rounded-[1.75rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] p-6 backdrop-blur-sm">
+            <p className="lp-kicker text-[11px] text-[#00f5ff]">
+              {activeTabCopy.eyebrow}
+            </p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-4xl">
+              {activeTabCopy.title}
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-gray-400">
+              {activeTabCopy.summary}
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              {username && (
+                <Link
+                  href={`/u/${username}`}
+                  target="_blank"
+                  className="inline-flex items-center gap-2 rounded-full border border-[#00f5ff]/20 bg-[#00f5ff]/8 px-4 py-2 text-sm text-[#00f5ff] transition-colors hover:bg-[#00f5ff]/14"
+                >
+                  View public site
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              )}
+              <button
+                onClick={() => setActiveTab("settings")}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300 transition-colors hover:border-white/20 hover:text-white"
+              >
+                Open settings
+                <Settings className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+              <p className="lp-kicker text-[10px] text-[#00f5ff]">Evidence</p>
+              <p className="mt-3 text-2xl font-semibold text-white">{evidence.length}</p>
+              <p className="mt-1 text-xs leading-6 text-gray-400">
+                URLs, screenshots, and imported proof currently attached to the profile.
+              </p>
+            </div>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+              <p className="lp-kicker text-[10px] text-[#00f5ff]">Profile</p>
+              <p className="mt-3 text-sm font-semibold text-white">{profileStatusLabel}</p>
+              <p className="mt-1 text-xs leading-6 text-gray-400">
+                {profile
+                  ? "The public story is generated and ready to refine."
+                  : evidence.length > 0
+                    ? "You have enough proof to generate the first version."
+                    : "Import more source material before asking the AI to write."}
+              </p>
+            </div>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+              <p className="lp-kicker text-[10px] text-[#00f5ff]">Publishing</p>
+              <p className="mt-3 text-sm font-semibold text-white">
+                {publishStatusLabel}
+                {billing ? ` · ${billing.plan.label}` : ""}
+              </p>
+              <p className="mt-1 text-xs leading-6 text-gray-400">
+                {username
+                  ? `Live path: /u/${username}`
+                  : "Add a username in settings to get a clean public path."}
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Tabs */}
         <div className="mb-8 flex flex-wrap gap-1 w-fit rounded-xl border border-white/10 bg-white/5 p-1">
           {(Object.entries(TAB_META) as Array<[DashboardTab, { icon: LucideIcon; label: string }]>).map(([tab, meta]) => {
@@ -1409,45 +2191,60 @@ export default function DashboardPage() {
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
               <div className="mb-2 flex items-center gap-2">
                 <Search className="h-[18px] w-[18px] text-[#00f5ff]" />
-                <h2 className="text-lg font-semibold">Web Crawler</h2>
+                <h2 className="text-lg font-semibold">Import proof from the web</h2>
               </div>
               <p className="text-gray-400 text-sm mb-4">
-                Paste any URL — your website, GitHub profile, project page, or
-                YouTube channel. Separate multiple URLs with commas and the AI
-                agent will crawl each source, take screenshots, and extract your
-                story automatically. Google Sites roots expand into linked
-                subpages from the same portfolio.
+                Paste one or many URLs and LifePage will crawl each source,
+                capture screenshots, and turn the useful signal into portfolio-ready proof.
+                Google Sites roots also expand into linked pages from the same site.
               </p>
-              <div className="flex gap-3">
-                <input
-                  type="text"
+              <div className="mb-3 flex flex-wrap gap-2">
+                {["Multiple URLs", "GitHub + websites", "YouTube + docs", "Google Sites roots"].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-gray-300"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <div className="flex flex-col gap-3 md:flex-row">
+                <textarea
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleCrawl()}
-                  placeholder="https://atrak.dev, https://github.com/yourname..."
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                      handleCrawl();
+                    }
+                  }}
+                  placeholder={"https://your-site.com\nhttps://github.com/yourname\nhttps://youtube.com/@yourname"}
                   autoCapitalize="off"
                   autoCorrect="off"
                   spellCheck={false}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-[#00f5ff]/50"
+                  rows={4}
+                  className="min-h-[120px] flex-1 resize-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#00f5ff]/50"
                 />
                 <button
                   onClick={handleCrawl}
                   disabled={crawling || !urlInput.trim()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[linear-gradient(135deg,#00f5ff,#79e5d2)] px-6 py-2.5 font-medium text-black shadow-[0_8px_24px_rgba(0,245,255,0.2)] transition-all hover:shadow-[0_12px_32px_rgba(0,245,255,0.3)] hover:-translate-y-0.5 disabled:opacity-50 disabled:translate-y-0 whitespace-nowrap"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#00f5ff,#79e5d2)] px-6 py-3 font-medium text-black shadow-[0_8px_24px_rgba(0,245,255,0.2)] transition-all hover:shadow-[0_12px_32px_rgba(0,245,255,0.3)] hover:-translate-y-0.5 disabled:opacity-50 disabled:translate-y-0 whitespace-nowrap md:self-start"
                 >
                   {crawling ? (
                     <>
                       <LoaderCircle className="h-4 w-4 animate-spin" />
-                      Crawling...
+                      Importing...
                     </>
                   ) : (
                     <>
-                      Crawl
+                      Import sources
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}
                 </button>
               </div>
+              <p className="mt-3 text-xs text-gray-500">
+                Use one URL per line or separate them with commas. Press Cmd/Ctrl + Enter to start.
+              </p>
             </div>
 
             {/* Links */}
@@ -2062,10 +2859,10 @@ export default function DashboardPage() {
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
               <div className="mb-1 flex items-center gap-2">
                 <Bot className="h-[18px] w-[18px] text-[#00f5ff]" />
-                <h2 className="text-lg font-semibold">AI Agent Tools</h2>
+                <h2 className="text-lg font-semibold">AI Agent Workspace</h2>
               </div>
               <p className="text-sm text-gray-400 mb-4">
-                Ask the agent anything, or pick a tool to generate timelines, video scripts, and skill trees. You can scope it to a specific part so it knows exactly where to work.
+                Ask the agent to rewrite copy, improve structure, rethink the UI, or generate artifacts like timelines and scripts. Life edits now apply directly when the agent resolves a mutate workflow, and every live change can be reverted.
               </p>
 
               {billing && (
@@ -2090,7 +2887,49 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <div className="mb-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                <div>
+                  <label className="mb-1 block text-xs text-gray-400">
+                    Expert mode
+                  </label>
+                  <select
+                    value={selectedPersonaSkillId}
+                    onChange={(e) => setSelectedPersonaSkillId(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-[#00f5ff]/40 focus:outline-none"
+                  >
+                    {personaSkillOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    {selectedPersonaSkill?.description ??
+                      "LifeAgent picks the expert mode automatically."}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs text-gray-400">
+                    Workflow
+                  </label>
+                  <select
+                    value={selectedWorkflowSkillId}
+                    onChange={(e) => setSelectedWorkflowSkillId(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-[#00f5ff]/40 focus:outline-none"
+                  >
+                    {workflowSkillOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    {selectedWorkflowSkill?.description ??
+                      "LifeAgent picks the workflow automatically."}
+                  </p>
+                </div>
+
                 <div>
                   <label className="mb-1 block text-xs text-gray-400">
                     Focus area
@@ -2110,13 +2949,20 @@ export default function DashboardPage() {
 
                 <div className="rounded-xl border border-white/10 bg-white/3 px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
-                    Active focus
+                    Current routing
                   </p>
                   <p className="mt-1 text-sm font-medium text-white">
-                    {activeFocusOption.label}
+                    {selectedPersonaSkillId === "auto"
+                      ? "Expert mode: Auto"
+                      : `Expert mode: ${selectedPersonaSkill?.label ?? "Custom"}`}
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-gray-400">
-                    {activeFocusOption.hint}
+                    {selectedWorkflowSkillId === "auto"
+                      ? "Workflow: Auto"
+                      : `Workflow: ${selectedWorkflowSkill?.label ?? "Custom"}`}
+                  </p>
+                  <p className="mt-2 text-xs leading-relaxed text-gray-500">
+                    Focus: {activeFocusOption.label}. Save persistent defaults in Settings if you want these skills to stay pinned.
                   </p>
                 </div>
               </div>
@@ -2133,8 +2979,9 @@ export default function DashboardPage() {
                         : "border-white/10 bg-white/3 hover:border-white/20"
                     }`}
                     onClick={() => {
-                      setSelectedTool(t.tool === selectedTool ? "" : t.tool);
-                      setSelectedStyle(t.styles[0] ?? "");
+                      const isDeselecting = t.tool === selectedTool;
+                      setSelectedTool(isDeselecting ? "" : t.tool);
+                      setSelectedStyle(isDeselecting ? "" : (t.styles[0] ?? ""));
                     }}
                   >
                     <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5">
@@ -2170,7 +3017,7 @@ export default function DashboardPage() {
                                 ))}
                           </select>
                         </div>
-                      ) : (
+                      ) : t.styles.length > 0 ? (
                         <div className="mt-3 flex flex-wrap gap-1">
                           {t.styles.map((s) => (
                             <button
@@ -2186,6 +3033,10 @@ export default function DashboardPage() {
                             </button>
                           ))}
                         </div>
+                      ) : (
+                        <p className="mt-3 text-xs leading-relaxed text-gray-500">
+                          No style selection needed. The agent will use the current focus and evidence.
+                        </p>
                       )
                     )}
                   </div>
@@ -2201,7 +3052,7 @@ export default function DashboardPage() {
                 >
                   {agentLoading
                     ? "Generating…"
-                    : `Generate ${humanizeAgentToolName(selectedTool)} (${selectedStyle})${
+                    : `${formatAgentActionLabel(selectedTool, selectedStyle)}${
                         activeFocusValue === "all"
                           ? ""
                           : ` for ${activeFocusOption.label}`
@@ -2213,14 +3064,46 @@ export default function DashboardPage() {
             {/* Chat interface */}
             <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
               <div className="px-5 py-4 border-b border-white/10">
-                <p className="inline-flex items-center gap-2 font-medium text-sm">
-                  <MessageSquare className="h-4 w-4 text-[#00f5ff]" />
-                  Chat with Agent
-                </p>
-                <p className="text-xs text-gray-400">
-                  Ask for advice, generate artifacts, or say &quot;redesign my portfolio theme&quot;. Current focus:{" "}
-                  <span className="text-white">{activeFocusOption.label}</span>.
-                </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="inline-flex items-center gap-2 font-medium text-sm">
+                      <MessageSquare className="h-4 w-4 text-[#00f5ff]" />
+                      Chat with Agent
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Ask for advice, generate artifacts, or say &quot;redesign my portfolio theme&quot;. Current focus:{" "}
+                      <span className="text-white">{activeFocusOption.label}</span>.
+                    </p>
+                  </div>
+                  {billing && activeChatModelLabel && (
+                    <div className="text-right">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+                        Active model
+                      </p>
+                      <div className="mt-1 inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white">
+                        <span
+                          className={`inline-block h-2 w-2 rounded-full ${
+                            billing.fallbackToStandard
+                              ? "bg-yellow-400"
+                              : "bg-[#00f5ff]"
+                          }`}
+                        />
+                        <span className="truncate">{activeChatModelLabel}</span>
+                      </div>
+                      <p
+                        className={`mt-1 text-[11px] ${
+                          billing.fallbackToStandard
+                            ? "text-yellow-300"
+                            : "text-gray-500"
+                        }`}
+                      >
+                        {billing.fallbackToStandard
+                          ? "Fallback is active"
+                          : "Advanced model is active"}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Messages */}
@@ -2230,13 +3113,13 @@ export default function DashboardPage() {
                     <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
                       <Bot className="h-5 w-5 text-[#00f5ff]" />
                     </div>
-                    <p>Hi! I&apos;m your LifeAgent. Ask me to create a timeline, video script, skill tree, or any portfolio advice.</p>
+                    <p>I can rewrite sections, improve positioning, redesign the theme direction, generate artifacts, or apply live portfolio edits with a revert trail.</p>
                     <div className="flex flex-wrap gap-2 justify-center mt-4">
                       {[
+                        "Rewrite my headline to sound sharper",
+                        "Redesign my portfolio theme for hiring",
                         "Make me a documentary timeline",
-                        "Write a pitch video script",
-                        "Create a skills tree",
-                        "How can I improve my portfolio?",
+                        "What should I improve next?",
                       ].map((suggestion) => (
                         <button
                           key={suggestion}
@@ -2259,8 +3142,18 @@ export default function DashboardPage() {
                             : "bg-white/8 border border-white/10 rounded-bl-sm"
                         }`}
                       >
-                        {msg.content || (msg.tool ? `Generated ${msg.tool?.replace("generate_", "")} (${msg.style} style)` : "")}
+                        {msg.content || (msg.tool ? formatAgentActionLabel(msg.tool, msg.style) : "")}
                       </div>
+                      {msg.role === "assistant" && msg.strategy && (
+                        <AgentStrategyCard strategy={msg.strategy} />
+                      )}
+                      {(msg.resolvedPersonaSkill || msg.resolvedWorkflowSkill || msg.executionMode) && (
+                        <AgentSkillBadges
+                          personaSkill={msg.resolvedPersonaSkill}
+                          workflowSkill={msg.resolvedWorkflowSkill}
+                          executionMode={msg.executionMode}
+                        />
+                      )}
                       {msg.focusLabel && (
                         <p
                           className={`mt-1 px-1 text-[11px] ${
@@ -2273,7 +3166,16 @@ export default function DashboardPage() {
                         </p>
                       )}
                       {msg.tool && msg.output != null && (
-                        <ArtifactRenderer tool={msg.tool} output={msg.output} />
+                        <ArtifactRenderer
+                          tool={msg.tool}
+                          output={msg.output}
+                          revertable={msg.revertable}
+                          onRevert={
+                            msg.revertable && msg.artifactId
+                              ? () => handleRevertAgentArtifact(msg.artifactId!)
+                              : null
+                          }
+                        />
                       )}
                     </div>
                   </div>
@@ -2326,10 +3228,16 @@ export default function DashboardPage() {
                             <ChartColumn className="h-4 w-4 text-[#00f5ff]" />
                           ) : a.tool === "generate_video_script" ? (
                             <Clapperboard className="h-4 w-4 text-[#00f5ff]" />
+                          ) : a.tool === "regenerate_profile" ? (
+                            <WandSparkles className="h-4 w-4 text-[#00f5ff]" />
+                          ) : a.tool === "recrawl_url" ? (
+                            <RefreshCcw className="h-4 w-4 text-[#00f5ff]" />
                           ) : a.tool === "set_resume_model" ? (
                             <FileText className="h-4 w-4 text-[#00f5ff]" />
                           ) : a.tool === "set_portfolio_theme" ? (
                             <Palette className="h-4 w-4 text-[#00f5ff]" />
+                          ) : a.tool === "mutate_portfolio" || a.tool === "revert_agent_mutation" ? (
+                            <Bot className="h-4 w-4 text-[#00f5ff]" />
                           ) : (
                             <GitBranch className="h-4 w-4 text-[#00f5ff]" />
                           )}
@@ -2341,7 +3249,38 @@ export default function DashboardPage() {
                         <span className="text-xs text-gray-500">{new Date(a.createdAt).toLocaleDateString()}</span>
                       </div>
                       <div className="px-4 pb-4">
-                        <ArtifactRenderer tool={a.tool} output={a.output} />
+                        <AgentSkillBadges
+                          personaSkill={
+                            a.meta?.resolvedPersonaSkillId
+                              ? personaSkillOptions.find(
+                                  (skill) => skill.id === a.meta?.resolvedPersonaSkillId
+                                ) ?? null
+                              : null
+                          }
+                          workflowSkill={
+                            a.meta?.resolvedWorkflowSkillId
+                              ? workflowSkillOptions.find(
+                                  (skill) => skill.id === a.meta?.resolvedWorkflowSkillId
+                                ) ?? null
+                              : null
+                          }
+                          executionMode={a.meta?.executionMode}
+                        />
+                        <ArtifactRenderer
+                          tool={a.tool}
+                          output={a.output}
+                          revertable={isRevertableArtifact(a)}
+                          onRevert={
+                            isRevertableArtifact(a)
+                              ? () => handleRevertAgentArtifact(a.id)
+                              : null
+                          }
+                        />
+                        {a.meta?.revertedAt ? (
+                          <p className="mt-3 text-[11px] text-gray-500">
+                            Reverted on {new Date(a.meta.revertedAt).toLocaleString()}.
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   ))}
@@ -2604,6 +3543,7 @@ export default function DashboardPage() {
                   { href: "#settings-usage", icon: ChartColumn, label: "Usage" },
                   { href: "#settings-billing", icon: Sparkles, label: "Billing" },
                   { href: "#settings-ai", icon: Bot, label: "AI Preferences" },
+                  { href: "#settings-agent", icon: WandSparkles, label: "Agent" },
                   { href: "#settings-public", icon: Globe, label: "Public Site" },
                   { href: "#settings-theme", icon: Palette, label: "Theme" },
                   { href: "#settings-resume", icon: FileText, label: "Resume" },
@@ -2906,13 +3846,57 @@ export default function DashboardPage() {
                   <label className="mb-1 block text-sm text-gray-400">
                     Preferred advanced model
                   </label>
-                  <input
-                    value={selectedAiProvider === "auto" ? "auto" : preferredAiModelInput}
-                    onChange={(e) => setPreferredAiModelInput(e.target.value)}
-                    disabled={selectedAiProvider === "auto"}
-                    placeholder={selectedProviderDef?.defaultAdvancedModel ?? "Enter model name"}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/40 focus:outline-none"
-                  />
+                  <div className="space-y-2">
+                    <select
+                      value={selectedModelPresetValue}
+                      disabled={selectedAiProvider === "auto"}
+                      onChange={(e) => {
+                        const nextValue = e.target.value;
+                        if (nextValue === "__custom__") {
+                          if (
+                            !preferredAiModelInput ||
+                            selectedProviderModelOptions.some(
+                              (option) => option.value === preferredAiModelInput
+                            ) ||
+                            preferredAiModelInput === "auto"
+                          ) {
+                            setPreferredAiModelInput("");
+                          }
+                          return;
+                        }
+                        setPreferredAiModelInput(nextValue);
+                      }}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-[#00f5ff]/40 focus:outline-none disabled:opacity-60"
+                    >
+                      {selectedAiProvider === "auto" && (
+                        <option value="auto">auto</option>
+                      )}
+                      {selectedAiProvider !== "auto" && (
+                        <option value="">
+                          Use provider default ({selectedProviderDef?.defaultAdvancedModel ?? "default"})
+                        </option>
+                      )}
+                      {selectedProviderModelOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.note
+                            ? `${option.label} · ${option.note}`
+                            : option.label}
+                        </option>
+                      ))}
+                      {selectedAiProvider !== "auto" && (
+                        <option value="__custom__">Custom model…</option>
+                      )}
+                    </select>
+                    {selectedAiProvider !== "auto" &&
+                      selectedModelPresetValue === "__custom__" && (
+                        <input
+                          value={preferredAiModelInput}
+                          onChange={(e) => setPreferredAiModelInput(e.target.value)}
+                          placeholder={selectedProviderDef?.defaultAdvancedModel ?? "Enter model name"}
+                          className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/40 focus:outline-none"
+                        />
+                      )}
+                  </div>
                 </div>
 
                 <button
@@ -2934,6 +3918,11 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-500">
                     Default fallback model: {selectedProviderDef.defaultStandardModel}
                   </p>
+                  {selectedAiProvider === "openai" && (
+                    <p className="mt-2 text-xs text-[#7ef4ff]">
+                      GPT-5, GPT-5 mini, GPT-5 nano, and GPT-5.1 presets are available.
+                    </p>
+                  )}
                   <p className="mt-3 text-xs text-gray-500">
                     Current rate: {selectedAiUsageRate === "auto" ? "Auto (1x)" : selectedAiUsageRate}
                   </p>
@@ -2947,6 +3936,98 @@ export default function DashboardPage() {
                   </p>
                 </div>
               )}
+            </div>
+
+            <div
+              id="settings-agent"
+              className="scroll-mt-24 bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
+            >
+              <div className="mb-1 flex items-center gap-2">
+                <WandSparkles className="h-[18px] w-[18px] text-[#00f5ff]" />
+                <h2 className="text-lg font-semibold">Agent Defaults</h2>
+              </div>
+              <p className="text-sm text-gray-400 mb-5">
+                Pin default expert and workflow skills for LifeAgent, and add a brand voice note the agent should keep in mind on every turn.
+              </p>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm text-gray-400">
+                    Default expert mode
+                  </label>
+                  <select
+                    value={defaultPersonaSkillId}
+                    onChange={(e) => setDefaultPersonaSkillId(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-[#00f5ff]/40 focus:outline-none"
+                  >
+                    {personaSkillOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm text-gray-400">
+                    Default workflow
+                  </label>
+                  <select
+                    value={defaultWorkflowSkillId}
+                    onChange={(e) => setDefaultWorkflowSkillId(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-[#00f5ff]/40 focus:outline-none"
+                  >
+                    {workflowSkillOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="mb-1 block text-sm text-gray-400">
+                  Brand / voice instruction
+                </label>
+                <textarea
+                  value={brandVoiceInstructionInput}
+                  onChange={(e) => setBrandVoiceInstructionInput(e.target.value)}
+                  placeholder="Example: Keep the tone calm, ambitious, and specific. Avoid hype words and make the work feel product-focused."
+                  rows={4}
+                  className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/40 focus:outline-none"
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  The agent reads this on every run. Use it for tone, voice, and how your personal brand should feel.
+                </p>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="rounded-xl border border-white/10 bg-white/3 px-4 py-3 text-sm text-gray-400">
+                  <p className="text-white">
+                    Current defaults:{" "}
+                    <span className="text-[#00f5ff]">
+                      {defaultPersonaSkillId === "auto"
+                        ? "Auto expert"
+                        : personaSkillOptions.find((option) => option.id === defaultPersonaSkillId)?.label ?? "Custom expert"}
+                    </span>
+                    {" · "}
+                    <span className="text-[#00f5ff]">
+                      {defaultWorkflowSkillId === "auto"
+                        ? "Auto workflow"
+                        : workflowSkillOptions.find((option) => option.id === defaultWorkflowSkillId)?.label ?? "Custom workflow"}
+                    </span>
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleSaveAgentPreferences}
+                  disabled={savingAgentPreferences || !agentPreferencesDirty}
+                  className="rounded-xl bg-[#00f5ff] px-4 py-2.5 text-sm font-semibold text-black hover:bg-[#00e5ef] disabled:opacity-50"
+                >
+                  Save Agent Defaults
+                </button>
+              </div>
             </div>
 
             {/* ── Page Visibility — GitHub-style ── */}
@@ -3278,7 +4359,7 @@ export default function DashboardPage() {
                 <h2 className="text-lg font-semibold">Deploy</h2>
               </div>
               <p className="text-sm text-gray-400 mb-5">
-                Connect a custom domain and deploy your personal brand site at the root of that hostname.
+                The first Cloudflare launch goes live on a <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1 rounded">workers.dev</code> URL. Save a custom domain here if you want to map it later, but domain verification and Cloudflare routing are still a manual step in this version.
               </p>
 
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end">
@@ -3321,14 +4402,14 @@ export default function DashboardPage() {
                     Point <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1.5 py-0.5 rounded">{normalizedCustomDomainInput || "portfolio.example.com"}</code> to
                     {" "}
                     <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1.5 py-0.5 rounded">{dnsTargetHost}</code>.
-                    Use a CNAME for subdomains, or ALIAS/ANAME flattening if you want to use an apex domain.
+                    Use a CNAME for subdomains, or ALIAS/ANAME flattening if you want to use an apex domain. This app stores the hostname now; the Cloudflare route attachment still happens outside the dashboard.
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-white/3 p-4 text-sm text-gray-400">
                   <p className="font-medium text-white mb-2">Behavior</p>
                   <p className="leading-relaxed">
-                    Once DNS resolves here, this app will serve your public LifePage as a live personal brand site at the root of that host. Unmapped external hosts return a 404 instead of the generic landing page.
+                    The public site already knows how to serve mapped hosts. What is missing today is the self-serve Cloudflare verification and routing workflow, so treat this as deployment metadata rather than a one-click publish button.
                   </p>
                   {customDomain && (
                     <a

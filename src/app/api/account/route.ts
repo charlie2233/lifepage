@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Prisma } from "@/generated/prisma";
+import { Prisma } from "@prisma/client";
+import {
+  AgentPreferencesSchema,
+  parseAgentPreferences,
+} from "@/lib/agent-preferences";
 import { z } from "zod";
 
 const AccountPatchSchema = z.object({
@@ -23,6 +27,7 @@ const AccountPatchSchema = z.object({
     )
     .transform((value) => value.toLowerCase())
     .optional(),
+  agentPreferences: AgentPreferencesSchema.optional(),
 });
 
 export async function GET() {
@@ -38,6 +43,7 @@ export async function GET() {
       username: true,
       email: true,
       createdAt: true,
+      agentPreferences: true,
     },
   });
 
@@ -45,7 +51,12 @@ export async function GET() {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ account: user });
+  return NextResponse.json({
+    account: {
+      ...user,
+      agentPreferences: parseAgentPreferences(user.agentPreferences),
+    },
+  });
 }
 
 export async function PATCH(req: Request) {
@@ -66,7 +77,11 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Invalid account input." }, { status: 400 });
   }
 
-  if (parsed.data.name === undefined && parsed.data.username === undefined) {
+  if (
+    parsed.data.name === undefined &&
+    parsed.data.username === undefined &&
+    parsed.data.agentPreferences === undefined
+  ) {
     return NextResponse.json({ error: "No account changes provided." }, { status: 400 });
   }
 
@@ -93,16 +108,29 @@ export async function PATCH(req: Request) {
       data: {
         ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
         ...(parsed.data.username !== undefined ? { username: parsed.data.username } : {}),
+        ...(parsed.data.agentPreferences !== undefined
+          ? {
+              agentPreferences: parsed.data.agentPreferences
+                ? (parsed.data.agentPreferences as Prisma.InputJsonValue)
+                : Prisma.JsonNull,
+            }
+          : {}),
       },
       select: {
         name: true,
         username: true,
         email: true,
         createdAt: true,
+        agentPreferences: true,
       },
     });
 
-    return NextResponse.json({ account: user });
+    return NextResponse.json({
+      account: {
+        ...user,
+        agentPreferences: parseAgentPreferences(user.agentPreferences),
+      },
+    });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json(

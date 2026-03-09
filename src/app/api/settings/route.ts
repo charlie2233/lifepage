@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Prisma } from "@/generated/prisma";
+import { Prisma } from "@prisma/client";
 import { normalizeCustomDomain } from "@/lib/custom-domain";
 import type { PublicPageVisibility } from "@/lib/page-visibility";
 import {

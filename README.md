@@ -50,6 +50,8 @@ Edit `.env` with your values:
 
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/lifepage"
+AUTH_SECRET="run: openssl rand -base64 32"
+AUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="run: openssl rand -base64 32"
 NEXTAUTH_URL="http://localhost:3000"
 OPENAI_API_KEY="sk-your-openai-key-from-platform.openai.com"
@@ -72,6 +74,75 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
+
+## ☁️ Cloudflare Workers Deploy
+
+LifePage now includes an OpenNext + Wrangler path for Cloudflare Workers.
+
+### Local preview
+
+```bash
+cp .dev.vars.example .dev.vars
+npm run cf:preview
+```
+
+This builds the production Worker bundle and serves it through Wrangler on `http://127.0.0.1:8787`.
+
+### Production secrets
+
+Verify Wrangler auth before the first deploy:
+
+```bash
+npx wrangler whoami
+```
+
+If that fails, authenticate with `wrangler login` locally or set `CLOUDFLARE_API_TOKEN` in CI.
+
+Set secrets before the first deploy:
+
+```bash
+npx wrangler secret put DATABASE_URL
+npx wrangler secret put AUTH_SECRET
+npx wrangler secret put OPENAI_API_KEY
+npx wrangler secret put CRON_SECRET
+```
+
+If you want Auth.js to use a fixed canonical hostname instead of trusting forwarded headers, also set:
+
+```bash
+npx wrangler secret put AUTH_URL
+```
+
+For the first production launch, set `AUTH_URL` to your Worker hostname, for example:
+
+```text
+https://lifepage-web.<your-subdomain>.workers.dev
+```
+
+### Deploy
+
+```bash
+npm run cf:deploy
+```
+
+The initial launch target is the Worker's `*.workers.dev` hostname defined in `wrangler.jsonc`.
+
+### Rollback
+
+Cloudflare keeps prior Worker versions. Roll back from the dashboard or redeploy the last known-good commit.
+
+### Smoke checks after deploy
+
+1. Load `/`
+2. Register or sign in
+3. Confirm `/dashboard` opens without redirect loops
+4. Open `/explore`
+5. Open a public portfolio and `/resume`
+6. Hit one AI-backed action and one Prisma-backed save flow
+
+### Current limitation
+
+The crawler still captures screenshots locally with Puppeteer, but the Cloudflare runtime path treats screenshots as best-effort and may return `null` until a later Browser Rendering integration is added.
 
 ## 🕷️ How the Web Crawler Works
 

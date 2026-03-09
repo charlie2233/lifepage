@@ -18,12 +18,59 @@ import {
   normalizeResumeModelId,
   ResumeModelConfigSchema,
 } from "@/lib/resume-models";
+import {
+  describePersonaSkillsForPrompt,
+  describeSkillInstructionsForPrompt,
+  describeWorkflowSkillsForPrompt,
+  getWorkflowSkill,
+  PersonaSkillIdSchema,
+  WorkflowSkillIdSchema,
+  type AgentExecutionMode,
+  type PersonaSkillId,
+  type WorkflowSkillId,
+} from "@/lib/agent-skills";
+import {
+  AgentMutationSummarySchema,
+  AgentPortfolioPatchSchema,
+} from "@/lib/agent-mutations";
 
 function getOpenAI(clientConfig?: { apiKey: string; baseURL?: string }) {
   return new OpenAI({
     apiKey: clientConfig?.apiKey ?? process.env.OPENAI_API_KEY,
     baseURL: clientConfig?.baseURL,
   });
+}
+
+function getMaxTokenOption(model: string, maxTokens?: number) {
+  if (!maxTokens) {
+    return {};
+  }
+
+  const normalizedModel = model.trim().toLowerCase();
+  if (
+    normalizedModel.startsWith("gpt-5") ||
+    normalizedModel.startsWith("o1") ||
+    normalizedModel.startsWith("o3") ||
+    normalizedModel.startsWith("o4")
+  ) {
+    return { max_completion_tokens: maxTokens };
+  }
+
+  return { max_tokens: maxTokens };
+}
+
+function getTemperatureOption(model: string, temperature: number) {
+  const normalizedModel = model.trim().toLowerCase();
+  if (
+    normalizedModel.startsWith("gpt-5") ||
+    normalizedModel.startsWith("o1") ||
+    normalizedModel.startsWith("o3") ||
+    normalizedModel.startsWith("o4")
+  ) {
+    return {};
+  }
+
+  return { temperature };
 }
 
 // ─── Shared types ──────────────────────────────────────────────────────────────
@@ -37,6 +84,18 @@ export type ToolName =
   | "regenerate_profile"
   | "recrawl_url"
   | "chat";
+
+export const EXECUTABLE_AGENT_TOOLS = [
+  "generate_timeline",
+  "generate_video_script",
+  "generate_tree",
+  "set_portfolio_theme",
+  "set_resume_model",
+  "regenerate_profile",
+  "recrawl_url",
+] as const;
+
+export type ExecutableAgentTool = (typeof EXECUTABLE_AGENT_TOOLS)[number];
 
 export interface ToolResult {
   tool: ToolName;
@@ -61,6 +120,127 @@ ${options.focusContext}
 
 Treat this focus area as the main place to work. Keep suggestions and generated output anchored to it while still respecting the overall brand story.
 `;
+}
+
+export interface AgentTurnStrategy {
+  intent: string;
+  mode: AgentExecutionMode;
+  personaSkillId?: PersonaSkillId;
+  workflowSkillId?: WorkflowSkillId;
+  tool?: ExecutableAgentTool;
+  style?: string;
+  reply: string;
+  rationale: string;
+  nextSteps: string[];
+  missingContext: string[];
+}
+
+interface AgentToolSpec {
+  label: string;
+  defaultStyle?: string;
+  whenToUse: string;
+  styleGuide: string;
+}
+
+interface AgentPlannerOptions extends AgentPromptOptions {
+  forcedPersonaSkillId?: PersonaSkillId | null;
+  forcedWorkflowSkillId?: WorkflowSkillId | null;
+}
+
+const AGENT_TOOL_SPECS: Record<ExecutableAgentTool, AgentToolSpec> = {
+  generate_timeline: {
+    label: "Timeline",
+    defaultStyle: "documentary",
+    whenToUse:
+      "Use when the user wants a visual journey, chronology, milestones, or a story arc from their work and life.",
+    styleGuide: "Pick one of: vertical, horizontal, documentary, minimal.",
+  },
+  generate_video_script: {
+    label: "Video script",
+    defaultStyle: "documentary",
+    whenToUse:
+      "Use when the user wants a narrated brand video, pitch video, portfolio reel, or scene-by-scene script.",
+    styleGuide: "Pick one of: documentary, pitch, cinematic, tutorial, story.",
+  },
+  generate_tree: {
+    label: "Tree / map",
+    defaultStyle: "skills",
+    whenToUse:
+      "Use when the user wants a structured map of skills, projects, career growth, or goals.",
+    styleGuide: "Pick one of: skills, projects, career, goals.",
+  },
+  set_portfolio_theme: {
+    label: "Portfolio theme",
+    defaultStyle: "custom",
+    whenToUse:
+      "Use when the user wants the public portfolio UI, layout mood, typography direction, or theme changed.",
+    styleGuide:
+      "Use custom for a generated variant, or choose a preset id from the portfolio model catalog.",
+  },
+  set_resume_model: {
+    label: "Resume model",
+    defaultStyle: "custom",
+    whenToUse:
+      "Use when the user wants the public resume page structure, typography, or screening presentation changed.",
+    styleGuide:
+      "Use custom for a generated variant, or choose a preset id from the resume model catalog.",
+  },
+  regenerate_profile: {
+    label: "Regenerate profile",
+    whenToUse:
+      "Use when the user wants the main AI profile rebuilt from current evidence, refreshed copy, or updated positioning.",
+    styleGuide: "No style needed.",
+  },
+  recrawl_url: {
+    label: "Re-crawl URL",
+    whenToUse:
+      "Use when the user wants a source refreshed, a stale URL revisited, or a focused evidence item re-imported.",
+    styleGuide: "No style needed. Only choose this when a concrete URL is available.",
+  },
+};
+
+function getAgentToolCatalogPrompt() {
+  return EXECUTABLE_AGENT_TOOLS.map((tool) => {
+    const spec = AGENT_TOOL_SPECS[tool];
+    return `- ${tool}: ${spec.label}
+  When to use: ${spec.whenToUse}
+  Style guide: ${spec.styleGuide}`;
+  }).join("\n");
+}
+
+export function normalizeAgentToolStyle(
+  tool: ExecutableAgentTool,
+  style?: string | null
+) {
+  const trimmedStyle = style?.trim();
+
+  switch (tool) {
+    case "generate_timeline":
+      return TIMELINE_STYLES.includes(trimmedStyle as TimelineStyle)
+        ? trimmedStyle!
+        : (AGENT_TOOL_SPECS[tool].defaultStyle ?? "documentary");
+    case "generate_video_script":
+      return VIDEO_STYLES.includes(trimmedStyle as VideoStyle)
+        ? trimmedStyle!
+        : (AGENT_TOOL_SPECS[tool].defaultStyle ?? "documentary");
+    case "generate_tree":
+      return TREE_STYLES.includes(trimmedStyle as TreeStyle)
+        ? trimmedStyle!
+        : (AGENT_TOOL_SPECS[tool].defaultStyle ?? "skills");
+    case "set_portfolio_theme":
+      if (!trimmedStyle || trimmedStyle === "custom") {
+        return "custom";
+      }
+      return normalizePortfolioThemeId(trimmedStyle);
+    case "set_resume_model":
+      if (!trimmedStyle || trimmedStyle === "custom") {
+        return "custom";
+      }
+      return normalizeResumeModelId(trimmedStyle);
+    case "regenerate_profile":
+    case "recrawl_url":
+      return "";
+  }
 }
 
 // ─── Timeline tool ─────────────────────────────────────────────────────────────
@@ -141,8 +321,8 @@ Rules:
     model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
-    temperature: 0.5,
-    ...(maxTokens ? { max_tokens: maxTokens } : {}),
+    ...getTemperatureOption(model, 0.5),
+    ...getMaxTokenOption(model, maxTokens),
   });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
@@ -237,8 +417,8 @@ Rules:
     model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
-    temperature: 0.6,
-    ...(maxTokens ? { max_tokens: maxTokens } : {}),
+    ...getTemperatureOption(model, 0.6),
+    ...getMaxTokenOption(model, maxTokens),
   });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
@@ -344,8 +524,8 @@ Rules:
     model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
-    temperature: 0.4,
-    ...(maxTokens ? { max_tokens: maxTokens } : {}),
+    ...getTemperatureOption(model, 0.4),
+    ...getMaxTokenOption(model, maxTokens),
   });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
@@ -443,8 +623,8 @@ Rules:
     model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
-    temperature: 0.6,
-    ...(maxTokens ? { max_tokens: maxTokens } : {}),
+    ...getTemperatureOption(model, 0.6),
+    ...getMaxTokenOption(model, maxTokens),
   });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
@@ -542,8 +722,8 @@ Rules:
     model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
-    temperature: 0.6,
-    ...(maxTokens ? { max_tokens: maxTokens } : {}),
+    ...getTemperatureOption(model, 0.6),
+    ...getMaxTokenOption(model, maxTokens),
   });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
@@ -557,70 +737,267 @@ Rules:
   };
 }
 
-// ─── Chat / general agent tool ─────────────────────────────────────────────────
+const AgentTurnStrategySchema = z.object({
+  intent: z.string().min(1).max(160),
+  mode: z.enum(["reply", "artifact", "mutate"]),
+  personaSkillId: PersonaSkillIdSchema.optional(),
+  workflowSkillId: WorkflowSkillIdSchema.optional(),
+  tool: z.string().max(120).optional(),
+  style: z.string().max(120).optional(),
+  reply: z.string().min(1).max(1600),
+  rationale: z.string().min(1).max(280),
+  nextSteps: z.array(z.string().min(1).max(180)).max(4).default([]),
+  missingContext: z.array(z.string().min(1).max(180)).max(4).default([]),
+});
 
-export async function agentChat(
+const AgentMutationPlanSchema = z.object({
+  reply: z.string().min(1).max(1600),
+  mutationSummary: AgentMutationSummarySchema,
+  patch: AgentPortfolioPatchSchema,
+});
+
+// ─── Planner / general agent orchestration ───────────────────────────────────
+
+export async function planAgentTurn(
   message: string,
   context: string,
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }>,
   model: string,
-  options?: AgentPromptOptions,
+  options?: AgentPlannerOptions,
   clientConfig?: { apiKey: string; baseURL?: string },
   maxTokens?: number
-): Promise<string> {
+): Promise<AgentTurnStrategy> {
   const systemPrompt = `You are LifeAgent, an advanced AI personal brand strategist, editor, and portfolio operator.
-You help users sharpen positioning, improve proof-of-work, and decide exactly what to build next.
+You are embedded inside the LifePage product. The user expects you to understand what this app does, what their current portfolio state is, and what is actually possible right now.
+You help users sharpen positioning, improve proof-of-work, improve UI/theme direction, and decide exactly what to build next.
 
-You have access to these tools you can suggest using:
-- generate_timeline: Create timeline trees in styles: ${TIMELINE_STYLES.join(", ")}
-- generate_video_script: Create video scripts in styles: ${VIDEO_STYLES.join(", ")}  
-- generate_tree: Create skill/project/career trees in styles: ${TREE_STYLES.join(", ")}
-- set_portfolio_theme: Apply a public portfolio theme in styles: custom, ${describePortfolioThemesForAgent()}
-- set_resume_model: Apply a public resume model in styles: custom, ${describeResumeModelsForAgent()}
-- regenerate_profile: Refresh the AI-generated portfolio profile
-- recrawl_url: Re-crawl a specific URL to get fresh content
+Persona skills:
+${describePersonaSkillsForPrompt()}
+
+Workflow skills:
+${describeWorkflowSkillsForPrompt()}
+
+You have access to these executable tools:
+${getAgentToolCatalogPrompt()}
+
+Portfolio model catalog:
+${describePortfolioThemesForAgent()}
+
+Resume model catalog:
+${describeResumeModelsForAgent()}
 
 Context about this user's portfolio:
 ${context}
 
 ${buildFocusPrompt(options)}
 
+${options?.forcedPersonaSkillId ? `Pinned persona skill for this turn: ${options.forcedPersonaSkillId}\nAlways use it.\n` : ""}
+${options?.forcedWorkflowSkillId ? `Pinned workflow skill for this turn: ${options.forcedWorkflowSkillId}\nAlways use it unless the user is clearly asking for a pure artifact tool instead.\n` : ""}
+
 How to behave:
+- Do not act like a generic blank chatbot. Use the product brief and runtime state above.
 - Be specific, grounded, and practical. Do not give generic fluff.
 - Use the selected focus area first when one is provided.
 - For critique or strategy requests, prioritize: what is strong, what is unclear, what to change next.
 - For rewriting requests, provide improved copy that is concise and usable.
 - Stay anchored to the evidence and profile context. If context is thin, say what is missing.
+- Respect product reality. Do not invent unsupported features, integrations, or workflows.
+- If the runtime context says only certain providers are configured, do not recommend unavailable ones as if they are active.
+- Choose mode=artifact when the user explicitly wants a generated artifact or one of the executable tools.
+- Choose mode=mutate when the best outcome is a direct live change to allowed portfolio fields.
+- Choose mode=reply when the user mainly needs advice, prioritization, critique, or lightweight copy without saving changes.
+- Never choose more than one tool.
+- Only choose recrawl_url if a specific URL is available from the user's message or focused evidence.
+- If you choose regenerate_profile, assume the system will rebuild the active profile from visible evidence.
+- If you choose a tool with no style, leave style empty.
+- If mode=mutate, you must pick a workflowSkillId.
+- If the user pinned a persona or workflow skill, preserve it in the response.
 
-When a user asks you to create something (timeline, video script, tree, etc.),
-respond with what you'll do and then output a special tool call marker like:
-[TOOL: generate_timeline style=documentary]
-or
-[TOOL: generate_video_script style=pitch]
-or
-[TOOL: generate_tree style=skills]
-or
-[TOOL: set_portfolio_theme style=custom]
-or
-[TOOL: set_resume_model style=executive]
-
-Otherwise, give helpful advice about personal branding, portfolio building, and career development.
-Be concise, practical, and direct.`;
+Return JSON only with this structure:
+{
+  "intent": "short summary of what the user is trying to do",
+  "mode": "reply | artifact | mutate",
+  "personaSkillId": "one persona skill id or omit",
+  "workflowSkillId": "one workflow skill id or omit",
+  "tool": "one tool name when mode=artifact and a tool is needed",
+  "style": "tool style or empty string",
+  "reply": "what you tell the user right now inside the chat UI",
+  "rationale": "one short sentence explaining why this mode/tool is the right move",
+  "nextSteps": ["up to 4 short next steps"],
+  "missingContext": ["up to 4 short missing pieces if context is thin"]
+}`;
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
-    ...conversationHistory,
+    ...conversationHistory.slice(-8),
     { role: "user", content: message },
   ];
 
   const completion = await getOpenAI(clientConfig).chat.completions.create({
     model,
     messages,
-    temperature: 0.7,
-    max_tokens: maxTokens ?? 600,
+    response_format: { type: "json_object" },
+    ...getTemperatureOption(model, 0.2),
+    ...getMaxTokenOption(model, Math.min(maxTokens ?? 700, 700)),
   });
 
-  return completion.choices[0]?.message?.content ?? "I couldn't generate a response.";
+  const raw = completion.choices[0]?.message?.content ?? "{}";
+  const parsed = AgentTurnStrategySchema.parse(JSON.parse(raw) as unknown);
+  const resolvedPersonaSkillId =
+    options?.forcedPersonaSkillId ?? parsed.personaSkillId;
+  const resolvedWorkflowSkillId =
+    options?.forcedWorkflowSkillId ?? parsed.workflowSkillId;
+  const normalizedTool = parsed.tool && EXECUTABLE_AGENT_TOOLS.includes(parsed.tool as ExecutableAgentTool)
+    ? (parsed.tool as ExecutableAgentTool)
+    : undefined;
+
+  if (parsed.mode === "artifact" && !normalizedTool) {
+    return {
+      ...parsed,
+      mode: "reply",
+      personaSkillId: resolvedPersonaSkillId,
+      workflowSkillId: resolvedWorkflowSkillId,
+      tool: undefined,
+      style: undefined,
+      reply:
+        parsed.reply ||
+        "I can help with that, but I need a clearer action before I run a tool.",
+      nextSteps: parsed.nextSteps,
+      missingContext: [
+        ...parsed.missingContext,
+        "Which artifact or portfolio surface should I change?",
+      ].slice(0, 4),
+    };
+  }
+
+  if (parsed.mode === "mutate" && !resolvedWorkflowSkillId) {
+    return {
+      ...parsed,
+      mode: "reply",
+      personaSkillId: resolvedPersonaSkillId,
+      workflowSkillId: undefined,
+      tool: undefined,
+      style: undefined,
+      reply:
+        parsed.reply ||
+        "I can make that change, but I need a clearer workflow target first.",
+      nextSteps: parsed.nextSteps,
+      missingContext: [
+        ...parsed.missingContext,
+        "Which part of the portfolio should I update live?",
+      ].slice(0, 4),
+    };
+  }
+
+  if (parsed.mode === "artifact" && normalizedTool) {
+    return {
+      ...parsed,
+      personaSkillId: resolvedPersonaSkillId,
+      workflowSkillId: resolvedWorkflowSkillId,
+      tool: normalizedTool,
+      style: normalizeAgentToolStyle(normalizedTool, parsed.style),
+    };
+  }
+
+  return {
+    ...parsed,
+    personaSkillId: resolvedPersonaSkillId,
+    workflowSkillId: resolvedWorkflowSkillId,
+    tool: undefined,
+    style: undefined,
+  };
+}
+
+export async function generateAgentMutationPlan(args: {
+  message: string;
+  context: string;
+  model: string;
+  personaSkillId?: PersonaSkillId | null;
+  workflowSkillId: WorkflowSkillId;
+  focusLabel?: string | null;
+  focusContext?: string | null;
+  clientConfig?: { apiKey: string; baseURL?: string };
+  maxTokens?: number;
+}) {
+  const skillInstructionBlock = describeSkillInstructionsForPrompt(
+    args.personaSkillId,
+    args.workflowSkillId
+  );
+  const workflowSkill = getWorkflowSkill(args.workflowSkillId);
+
+  const prompt = `You are LifeAgent, a portfolio operator that can make direct live edits inside LifePage.
+
+Context about the user's portfolio:
+${args.context}
+
+${buildFocusPrompt({
+    focusLabel: args.focusLabel,
+    focusContext: args.focusContext,
+    userRequest: args.message,
+  })}
+
+Active skill instructions:
+${skillInstructionBlock}
+
+Allowed live mutation targets for this workflow:
+${workflowSkill?.allowedMutationTargets.join("\n") ?? "none"}
+
+You are generating a direct live-edit patch. Stay inside the allowed scope for the selected workflow skill.
+
+Rules:
+- Return JSON only.
+- Only change fields that genuinely need to change.
+- Keep untouched sections out of the patch.
+- Never mutate billing, auth, evidence deletion, or custom-domain fields.
+- If changing themeConfig or resumeModelConfig, use the existing safe config shape only.
+- Prefer concise, production-ready copy.
+- If the workflow is align_for_hiring, set publicPageSettings.mode to "hiring" only when that helps.
+- If the workflow is align_for_admissions, set publicPageSettings.mode to "admissions" only when that helps.
+- Do not invent unsupported structure outside the existing profile schema.
+
+Return:
+{
+  "reply": "what you tell the user in chat after applying the live change",
+  "mutationSummary": {
+    "title": "short title",
+    "summary": "one concise summary of what changed",
+    "changes": ["3-6 concrete changes"],
+    "changedFields": ["profile.headline", "profile.about"]
+  },
+  "patch": {
+    "profile": {
+      "headline": "optional",
+      "about": "optional",
+      "skills": [{ "tag": "React", "level": "advanced", "evidenceRefs": [] }],
+      "projects": [{ "title": "optional", "problem": "optional", "approach": "optional", "impact": "optional", "tech": [], "links": [], "media": [], "evidenceRefs": [] }],
+      "experiences": [{ "role": "optional", "org": "optional", "startDate": null, "endDate": null, "bullets": [], "evidenceRefs": [] }],
+      "achievements": [{ "title": "optional", "context": null, "date": null, "proof": null }],
+      "resume": {
+        "summary": "optional",
+        "bullets": ["optional"]
+      }
+    },
+    "publicPageSettings": {
+      "mode": "hiring|admissions",
+      "visibility": "public|unlisted|private",
+      "theme": "preset id or custom",
+      "themeConfig": null,
+      "resumeModel": "preset id or custom",
+      "resumeModelConfig": null
+    }
+  }
+}`;
+
+  const completion = await getOpenAI(args.clientConfig).chat.completions.create({
+    model: args.model,
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+    ...getTemperatureOption(args.model, 0.35),
+    ...getMaxTokenOption(args.model, Math.min(args.maxTokens ?? 2200, 2200)),
+  });
+
+  const raw = completion.choices[0]?.message?.content ?? "{}";
+  return AgentMutationPlanSchema.parse(JSON.parse(raw) as unknown);
 }
 
 // ─── Automation executor ───────────────────────────────────────────────────────

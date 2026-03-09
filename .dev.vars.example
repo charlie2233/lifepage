@@ -1,0 +1,5 @@
+DATABASE_URL="postgresql://user:password@localhost:5432/lifepage"
+AUTH_SECRET="generate-with-openssl-rand-base64-32"
+AUTH_URL="http://127.0.0.1:8787"
+OPENAI_API_KEY="sk-your-openai-key-here"
+CRON_SECRET="generate-a-random-secret-here"

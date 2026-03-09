@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import type { Prisma } from "@/generated/prisma";
+import type { Prisma } from "@prisma/client";
 
 export const PLAN_TIERS = ["free", "plus", "pro"] as const;
 export type PlanTier = (typeof PLAN_TIERS)[number];
@@ -136,11 +136,12 @@ export const AI_PROVIDER_DEFINITIONS: Record<AiProvider, AiProviderDefinition> =
   openai: {
     id: "openai",
     label: "OpenAI",
-    summary: "Use OpenAI models directly for advanced and mini fallbacks.",
+    summary:
+      "Use OpenAI models directly, including GPT-5, GPT-5 mini, and GPT-5.1 family choices.",
     defaultAdvancedModel:
-      process.env.OPENAI_ADVANCED_MODEL ?? "gpt-4o",
+      process.env.OPENAI_ADVANCED_MODEL ?? "gpt-5",
     defaultStandardModel:
-      process.env.OPENAI_STANDARD_MODEL ?? "gpt-4o-mini",
+      process.env.OPENAI_STANDARD_MODEL ?? "gpt-5-mini",
     available: Boolean(process.env.OPENAI_API_KEY),
   },
 };

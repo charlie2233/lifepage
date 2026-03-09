@@ -9,6 +9,38 @@ function getOpenAI(clientConfig?: { apiKey: string; baseURL?: string }) {
   });
 }
 
+function getMaxTokenOption(model: string, maxTokens?: number) {
+  if (!maxTokens) {
+    return {};
+  }
+
+  const normalizedModel = model.trim().toLowerCase();
+  if (
+    normalizedModel.startsWith("gpt-5") ||
+    normalizedModel.startsWith("o1") ||
+    normalizedModel.startsWith("o3") ||
+    normalizedModel.startsWith("o4")
+  ) {
+    return { max_completion_tokens: maxTokens };
+  }
+
+  return { max_tokens: maxTokens };
+}
+
+function getTemperatureOption(model: string, temperature: number) {
+  const normalizedModel = model.trim().toLowerCase();
+  if (
+    normalizedModel.startsWith("gpt-5") ||
+    normalizedModel.startsWith("o1") ||
+    normalizedModel.startsWith("o3") ||
+    normalizedModel.startsWith("o4")
+  ) {
+    return {};
+  }
+
+  return { temperature };
+}
+
 const PROFILE_JSON_TEMPLATE = `{
   "headline": "string",
   "about": "string",
@@ -65,8 +97,8 @@ ${PROFILE_JSON_TEMPLATE}`;
     model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
-    temperature: 0.3,
-    ...(maxTokens ? { max_tokens: maxTokens } : {}),
+    ...getTemperatureOption(model, 0.3),
+    ...getMaxTokenOption(model, maxTokens),
   });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
@@ -93,8 +125,8 @@ ${PROFILE_JSON_TEMPLATE}`;
     model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
-    temperature: 0.3,
-    ...(maxTokens ? { max_tokens: maxTokens } : {}),
+    ...getTemperatureOption(model, 0.3),
+    ...getMaxTokenOption(model, maxTokens),
   });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
