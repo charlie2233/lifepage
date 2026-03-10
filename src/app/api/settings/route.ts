@@ -3,6 +3,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { normalizeCustomDomain } from "@/lib/custom-domain";
+import {
+  buildCustomDomainVerificationRecord,
+  normalizeCustomDomainStatus,
+} from "@/lib/custom-domain-lifecycle";
 import type { PublicPageVisibility } from "@/lib/page-visibility";
 import {
   PortfolioThemeConfigSchema,
@@ -43,6 +47,9 @@ export async function PATCH(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const existingSettings = await prisma.publicPageSettings.findUnique({
+    where: { userId: session.user.id },
+  });
   const body = await req.json() as unknown;
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
@@ -59,6 +66,11 @@ export async function PATCH(req: Request) {
     resumeModelConfig?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
     customDomain?: string | null;
     customDomainNormalized?: string | null;
+    customDomainStatus?: string;
+    customDomainVerificationName?: string | null;
+    customDomainVerificationValue?: string | null;
+    customDomainLastCheckedAt?: Date | null;
+    customDomainError?: string | null;
   } = {};
 
   const resolvedVisibility =
@@ -98,11 +110,38 @@ export async function PATCH(req: Request) {
     if (!rawDomain) {
       updateData.customDomain = null;
       updateData.customDomainNormalized = null;
+      updateData.customDomainStatus = "none";
+      updateData.customDomainVerificationName = null;
+      updateData.customDomainVerificationValue = null;
+      updateData.customDomainLastCheckedAt = null;
+      updateData.customDomainError = null;
     } else {
       try {
         const normalizedDomain = normalizeCustomDomain(rawDomain);
+        const verification = buildCustomDomainVerificationRecord(normalizedDomain);
+        const isSameDomain =
+          existingSettings?.customDomainNormalized === normalizedDomain;
+        const existingStatus = normalizeCustomDomainStatus(
+          existingSettings?.customDomainStatus
+        );
+        const shouldPreserveActiveDomain =
+          isSameDomain &&
+          existingStatus === "active" &&
+          existingSettings?.customDomainVerificationValue === verification.value;
+
         updateData.customDomain = normalizedDomain;
         updateData.customDomainNormalized = normalizedDomain;
+        updateData.customDomainStatus = shouldPreserveActiveDomain
+          ? "active"
+          : isSameDomain && existingStatus === "verified"
+            ? "verified"
+            : "pending_verification";
+        updateData.customDomainVerificationName = verification.name;
+        updateData.customDomainVerificationValue = verification.value;
+        updateData.customDomainLastCheckedAt = shouldPreserveActiveDomain
+          ? existingSettings?.customDomainLastCheckedAt ?? null
+          : null;
+        updateData.customDomainError = null;
       } catch (error) {
         return NextResponse.json(
           { error: error instanceof Error ? error.message : "Invalid custom domain." },

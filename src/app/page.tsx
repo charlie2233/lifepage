@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ProfileJSON } from "@/lib/schema";
 import { PublicProfilePage } from "@/components/public-profile-page";
 import { ContactSection } from "@/components/contact-section";
+import { LandingPricing } from "@/components/landing-pricing";
 import {
   getPublicPageUserByCustomDomain,
 } from "@/lib/public-page";
@@ -147,22 +148,28 @@ const WHO_ITS_FOR: Array<{
 
 const PRICING = [
   {
+    id: "free",
     name: "Free",
-    price: "$0",
+    monthlyPriceUsd: 0,
+    yearlyPriceUsd: 0,
     detail: "20 advanced AI credits each month",
     body: "Start building the site, the story, and the resume, then keep going on a lighter model after advanced credits run out.",
     badge: "Start here",
   },
   {
+    id: "plus",
     name: "Plus",
-    price: "$5",
+    monthlyPriceUsd: 5,
+    yearlyPriceUsd: 50,
     detail: "150 advanced AI credits each month",
     body: "For active students, applicants, and builders who want room to iterate without paying for unlimited usage.",
     badge: "Most practical",
   },
   {
+    id: "pro",
     name: "Pro",
-    price: "$10",
+    monthlyPriceUsd: 10,
+    yearlyPriceUsd: 100,
     detail: "Unlimited advanced AI usage",
     body: "For constant editing, heavier agent workflows, and teams or creators who want the advanced route on every request.",
     badge: "Unlimited",
@@ -732,45 +739,7 @@ function LandingPage() {
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {PRICING.map((tier) => (
-              <div
-                key={tier.name}
-                className={`lp-panel card-hover rounded-[1.75rem] p-6 ${
-                  tier.name === "Plus"
-                    ? "animate-pulse-glow border-[#79e5d2]/35 bg-[linear-gradient(180deg,rgba(121,229,210,0.14),rgba(255,255,255,0.03))]"
-                    : ""
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-lg font-semibold text-[#f7f1e8]">
-                      {tier.name}
-                    </p>
-                    <p className="mt-2 brand-display text-5xl tracking-tight text-[#f8f3ea]">
-                      {tier.price}
-                      <span className="ml-1 text-base font-medium text-[#95a2ac]">
-                        /mo
-                      </span>
-                    </p>
-                  </div>
-                  <span className={`rounded-full border px-3 py-1 text-xs ${
-                    tier.name === "Plus"
-                      ? "border-[#79e5d2]/35 bg-[#79e5d2]/12 text-[#79e5d2]"
-                      : "border-white/10 bg-white/5 text-[#cbd3d9]"
-                  }`}>
-                    {tier.badge}
-                  </span>
-                </div>
-                <p className="mt-8 text-sm font-medium text-[#f8f1e8]">
-                  {tier.detail}
-                </p>
-                <p className="mt-3 text-sm leading-7 text-[#97a4ae]">
-                  {tier.body}
-                </p>
-              </div>
-            ))}
-          </div>
+          <LandingPricing plans={PRICING} />
         </div>
       </section>
 

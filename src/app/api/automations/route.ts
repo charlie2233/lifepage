@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { computeNextRun } from "@/lib/agent-tools";
+import {
+  computeNextRun,
+  normalizeAutomationScheduleTime,
+  normalizeAutomationTimezone,
+} from "@/lib/automations";
 import { z } from "zod";
 
 const CreateSchema = z.object({
@@ -10,6 +14,8 @@ const CreateSchema = z.object({
   action: z.enum(["recrawl_url", "regenerate_profile", "refresh_timeline", "refresh_video_script"]),
   config: z.record(z.string(), z.unknown()).default({}),
   schedule: z.enum(["daily", "weekly", "monthly"]).default("weekly"),
+  scheduleTime: z.string().optional(),
+  scheduleTimezone: z.string().optional(),
 });
 
 export async function GET() {
@@ -34,13 +40,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   }
 
-  const nextRun = await computeNextRun(parsed.data.schedule);
+  const scheduleTime = normalizeAutomationScheduleTime(parsed.data.scheduleTime);
+  const scheduleTimezone = normalizeAutomationTimezone(
+    parsed.data.scheduleTimezone
+  );
+  const nextRun = computeNextRun(parsed.data.schedule, {
+    timeOfDay: scheduleTime,
+    timeZone: scheduleTimezone,
+  });
 
   const automation = await prisma.automation.create({
     data: {
       userId: session.user.id,
       ...parsed.data,
       config: parsed.data.config as object,
+      scheduleTime,
+      scheduleTimezone,
       nextRun,
     },
   });

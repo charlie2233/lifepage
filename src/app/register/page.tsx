@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function RegisterPage() {
+function RegisterPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -14,6 +15,10 @@ export default function RegisterPage() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const callbackUrl = searchParams.get("callbackUrl");
+  const loginHref = callbackUrl
+    ? `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`
+    : "/login";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +34,7 @@ export default function RegisterPage() {
     if (!res.ok) {
       setError(data.error || "Registration failed");
     } else {
-      router.push("/login");
+      router.push(loginHref);
     }
   };
 
@@ -159,7 +164,7 @@ export default function RegisterPage() {
             <p className="text-center text-sm text-[#6e7e89]">
               Already have an account?{" "}
               <Link
-                href="/login"
+                href={loginHref}
                 className="font-medium text-[#79e5d2] transition-colors hover:text-[#cffff6]"
               >
                 Sign in
@@ -181,5 +186,21 @@ export default function RegisterPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+function RegisterPageFallback() {
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-[#080e12] flex items-center justify-center px-4 py-12">
+      <div className="text-sm text-[#7a8d98]">Loading registration…</div>
+    </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<RegisterPageFallback />}>
+      <RegisterPageContent />
+    </Suspense>
   );
 }

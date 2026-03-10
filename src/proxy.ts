@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   // Support both legacy next-auth cookies and Auth.js v5 cookies.
   const hasSession =
     req.cookies.has("authjs.session-token") ||

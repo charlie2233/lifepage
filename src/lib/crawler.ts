@@ -1,5 +1,15 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
+import {
+  deriveCrawlStatus,
+  deriveScreenshotStatus,
+  type CrawlStatus,
+  type ScreenshotStatus,
+} from "@/lib/crawl-state";
+import {
+  captureCloudflareBrowserScreenshot,
+  isCloudflareBrowserRenderingConfigured,
+} from "@/lib/cloudflare-browser";
 
 const GOOGLE_SITES_HOSTNAME = "sites.google.com";
 const GOOGLE_SITES_IMPORT_LIMIT = 6;
@@ -13,6 +23,9 @@ export interface CrawlResult {
   links: string[];
   bodyText: string;
   screenshot: string | null;
+  crawlStatus: CrawlStatus;
+  screenshotStatus: ScreenshotStatus;
+  screenshotError: string | null;
   metadata: Record<string, string>;
 }
 
@@ -74,6 +87,7 @@ export async function crawlUrl(url: string): Promise<CrawlResult> {
 
   let html = "";
   let screenshot: string | null = null;
+  let screenshotError: string | null = null;
 
   try {
     const response = await axios.get(url, {
@@ -90,8 +104,10 @@ export async function crawlUrl(url: string): Promise<CrawlResult> {
 
   try {
     screenshot = await takeScreenshot(url);
-  } catch {
+  } catch (error) {
     screenshot = null;
+    screenshotError =
+      error instanceof Error ? error.message : "Screenshot capture failed.";
   }
 
   const $ = cheerio.load(html);
@@ -146,6 +162,9 @@ export async function crawlUrl(url: string): Promise<CrawlResult> {
     links: links.slice(0, 30),
     bodyText,
     screenshot,
+    crawlStatus: deriveCrawlStatus({ screenshot, screenshotError }),
+    screenshotStatus: deriveScreenshotStatus(screenshot, screenshotError),
+    screenshotError,
     metadata,
   };
 }
@@ -161,6 +180,10 @@ function canUseEmbeddedBrowserScreenshots() {
 
 async function takeScreenshot(url: string): Promise<string | null> {
   if (!canUseEmbeddedBrowserScreenshots()) {
+    if (isCloudflareBrowserRenderingConfigured()) {
+      return captureCloudflareBrowserScreenshot(url);
+    }
+
     return null;
   }
 

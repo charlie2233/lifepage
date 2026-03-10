@@ -47,6 +47,9 @@ export async function POST(req: Request) {
         links: [],
         bodyText: item.rawContent ?? item.description ?? "",
         screenshot: item.screenshot ?? null,
+        crawlStatus: item.screenshot ? "ready" : "partial",
+        screenshotStatus: item.screenshot ? "ready" : "unavailable",
+        screenshotError: null,
         metadata: (item.metadata as Record<string, string>) ?? {},
       }));
 

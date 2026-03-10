@@ -11,12 +11,43 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { reserveAiModel } from "@/lib/billing";
 import { prisma } from "@/lib/db";
+import {
+  AUTOMATION_LOCK_TIMEOUT_MS,
+  AUTOMATION_MAX_RETRIES,
+  computeNextRun,
+  getAutomationRetryDelayMs,
+  isTransientAutomationError,
+} from "@/lib/automations";
+import { canonicalizeCrawlUrl } from "@/lib/crawl-state";
 import { crawlUrl } from "@/lib/crawler";
 import { generateProfileFromCrawl } from "@/lib/ai";
-import { generateTimeline, generateVideoScript, computeNextRun } from "@/lib/agent-tools";
+import { generateTimeline, generateVideoScript } from "@/lib/agent-tools";
+import type { CrawlResult } from "@/lib/crawler";
 
 const MAX_CONTEXT_LENGTH = 2000;
-import type { CrawlResult } from "@/lib/crawler";
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error ?? "Unknown error");
+}
+
+async function acquireAutomationLock(automationId: string) {
+  const lockedAt = new Date();
+  const staleBefore = new Date(lockedAt.getTime() - AUTOMATION_LOCK_TIMEOUT_MS);
+  const result = await prisma.automation.updateMany({
+    where: {
+      id: automationId,
+      enabled: true,
+      OR: [{ lockedAt: null }, { lockedAt: { lte: staleBefore } }],
+    },
+    data: {
+      lockedAt,
+      lastStatus: "running",
+      lastAttemptAt: lockedAt,
+    },
+  });
+
+  return result.count === 1 ? lockedAt : null;
+}
 
 async function runAutomation(automationId: string): Promise<{ ok: boolean; message: string }> {
   const automation = await prisma.automation.findUnique({ where: { id: automationId } });
@@ -24,39 +55,62 @@ async function runAutomation(automationId: string): Promise<{ ok: boolean; messa
     return { ok: false, message: "Automation not found or disabled" };
   }
 
-  // Mark as running
-  await prisma.automation.update({
+  const lockedAt = await acquireAutomationLock(automationId);
+  if (!lockedAt) {
+    return { ok: false, message: "Automation is already running." };
+  }
+
+  const lockedAutomation = await prisma.automation.findUnique({
     where: { id: automationId },
-    data: { lastStatus: "running" },
   });
+  if (!lockedAutomation || !lockedAutomation.enabled) {
+    await prisma.automation.updateMany({
+      where: { id: automationId },
+      data: { lockedAt: null, lastStatus: "error" },
+    });
+    return { ok: false, message: "Automation not found or disabled" };
+  }
 
   try {
-    const config = automation.config as Record<string, unknown>;
+    const config = lockedAutomation.config as Record<string, unknown>;
     let resultMessage = "";
 
-    switch (automation.action) {
+    switch (lockedAutomation.action) {
       case "recrawl_url": {
         const url = config.url as string;
         if (!url) throw new Error("No URL configured");
         const crawlResult = await crawlUrl(url);
-        // Update or create evidence item
+        const canonicalUrl = canonicalizeCrawlUrl(crawlResult.url);
         await prisma.evidenceItem.upsert({
-          where: { id: (config.evidenceItemId as string) ?? "none" },
+          where: {
+            userId_canonicalUrl: {
+              userId: lockedAutomation.userId,
+              canonicalUrl,
+            },
+          },
           create: {
-            userId: automation.userId,
+            userId: lockedAutomation.userId,
             type: "url",
             url: crawlResult.url,
+            canonicalUrl,
             title: crawlResult.title,
             description: crawlResult.description,
             screenshot: crawlResult.screenshot,
+            crawlStatus: crawlResult.crawlStatus,
+            screenshotStatus: crawlResult.screenshotStatus,
+            screenshotError: crawlResult.screenshotError,
             rawContent: crawlResult.bodyText,
             metadata: crawlResult.metadata as object,
             visible: true,
           },
           update: {
+            url: crawlResult.url,
             title: crawlResult.title,
             description: crawlResult.description,
             screenshot: crawlResult.screenshot,
+            crawlStatus: crawlResult.crawlStatus,
+            screenshotStatus: crawlResult.screenshotStatus,
+            screenshotError: crawlResult.screenshotError,
             rawContent: crawlResult.bodyText,
             metadata: crawlResult.metadata as object,
           },
@@ -67,7 +121,7 @@ async function runAutomation(automationId: string): Promise<{ ok: boolean; messa
 
       case "regenerate_profile": {
         const evidenceItems = await prisma.evidenceItem.findMany({
-          where: { userId: automation.userId, visible: true },
+          where: { userId: lockedAutomation.userId, visible: true },
         });
         if (evidenceItems.length === 0) throw new Error("No evidence items to generate from");
 
@@ -80,10 +134,13 @@ async function runAutomation(automationId: string): Promise<{ ok: boolean; messa
           links: [],
           bodyText: item.rawContent ?? "",
           screenshot: item.screenshot ?? null,
+          crawlStatus: item.crawlStatus as CrawlResult["crawlStatus"],
+          screenshotStatus: item.screenshotStatus as CrawlResult["screenshotStatus"],
+          screenshotError: item.screenshotError,
           metadata: (item.metadata as Record<string, string>) ?? {},
         }));
 
-        const aiReservation = await reserveAiModel(automation.userId, {
+        const aiReservation = await reserveAiModel(lockedAutomation.userId, {
           task: "profile",
         });
         const profileData = await generateProfileFromCrawl(
@@ -94,11 +151,15 @@ async function runAutomation(automationId: string): Promise<{ ok: boolean; messa
           aiReservation.maxTokens
         );
         await prisma.generatedProfile.updateMany({
-          where: { userId: automation.userId, isActive: true },
+          where: { userId: lockedAutomation.userId, isActive: true },
           data: { isActive: false },
         });
         await prisma.generatedProfile.create({
-          data: { userId: automation.userId, data: profileData as object, isActive: true },
+          data: {
+            userId: lockedAutomation.userId,
+            data: profileData as object,
+            isActive: true,
+          },
         });
         resultMessage = "Profile regenerated";
         break;
@@ -106,11 +167,11 @@ async function runAutomation(automationId: string): Promise<{ ok: boolean; messa
 
       case "refresh_timeline": {
         const profile = await prisma.generatedProfile.findFirst({
-          where: { userId: automation.userId, isActive: true },
+          where: { userId: lockedAutomation.userId, isActive: true },
         });
         const context = profile ? JSON.stringify(profile.data).slice(0, MAX_CONTEXT_LENGTH) : "No profile";
         const style = (config.style as string) ?? "vertical";
-        const aiReservation = await reserveAiModel(automation.userId, {
+        const aiReservation = await reserveAiModel(lockedAutomation.userId, {
           task: "timeline",
         });
         const timeline = await generateTimeline(
@@ -123,7 +184,7 @@ async function runAutomation(automationId: string): Promise<{ ok: boolean; messa
         );
         await prisma.agentArtifact.create({
           data: {
-            userId: automation.userId,
+            userId: lockedAutomation.userId,
             tool: "generate_timeline",
             style,
             input: "automation",
@@ -136,11 +197,11 @@ async function runAutomation(automationId: string): Promise<{ ok: boolean; messa
 
       case "refresh_video_script": {
         const profile = await prisma.generatedProfile.findFirst({
-          where: { userId: automation.userId, isActive: true },
+          where: { userId: lockedAutomation.userId, isActive: true },
         });
         const context = profile ? JSON.stringify(profile.data).slice(0, MAX_CONTEXT_LENGTH) : "No profile";
         const style = (config.style as string) ?? "documentary";
-        const aiReservation = await reserveAiModel(automation.userId, {
+        const aiReservation = await reserveAiModel(lockedAutomation.userId, {
           task: "video_script",
         });
         const script = await generateVideoScript(
@@ -153,7 +214,7 @@ async function runAutomation(automationId: string): Promise<{ ok: boolean; messa
         );
         await prisma.agentArtifact.create({
           data: {
-            userId: automation.userId,
+            userId: lockedAutomation.userId,
             tool: "generate_video_script",
             style,
             input: "automation",
@@ -165,28 +226,59 @@ async function runAutomation(automationId: string): Promise<{ ok: boolean; messa
       }
 
       default:
-        throw new Error(`Unknown action: ${automation.action}`);
+        throw new Error(`Unknown action: ${lockedAutomation.action}`);
     }
 
-    const nextRun = await computeNextRun(automation.schedule);
+    const completedAt = new Date();
+    const nextRun = computeNextRun(lockedAutomation.schedule, {
+      from: completedAt,
+      timeOfDay: lockedAutomation.scheduleTime,
+      timeZone: lockedAutomation.scheduleTimezone,
+    });
     await prisma.automation.update({
       where: { id: automationId },
       data: {
         lastStatus: "success",
-        lastRun: new Date(),
+        lockedAt: null,
+        lastAttemptAt: completedAt,
+        lastRun: completedAt,
         nextRun,
         lastError: null,
+        retryCount: 0,
         runCount: { increment: 1 },
       },
     });
 
     return { ok: true, message: resultMessage };
   } catch (err) {
+    const failedAt = new Date();
+    const errorMessage = getErrorMessage(err);
+    const transient = isTransientAutomationError(err);
+    const nextRetryCount = lockedAutomation.retryCount + 1;
+    const shouldRetry = transient && nextRetryCount <= AUTOMATION_MAX_RETRIES;
     await prisma.automation.update({
       where: { id: automationId },
-      data: { lastStatus: "error", lastError: String(err) },
+      data: {
+        lockedAt: null,
+        lastStatus: "error",
+        lastAttemptAt: failedAt,
+        lastError: errorMessage,
+        retryCount: shouldRetry ? nextRetryCount : 0,
+        nextRun: shouldRetry
+          ? new Date(failedAt.getTime() + getAutomationRetryDelayMs(lockedAutomation.retryCount))
+          : computeNextRun(lockedAutomation.schedule, {
+              from: failedAt,
+              timeOfDay: lockedAutomation.scheduleTime,
+              timeZone: lockedAutomation.scheduleTimezone,
+            }),
+      },
     });
-    return { ok: false, message: String(err) };
+    return {
+      ok: false,
+      message: shouldRetry
+        ? `${errorMessage} Retrying automatically.`
+        : errorMessage,
+    };
   }
 }
 
@@ -216,14 +308,22 @@ export async function POST(req: Request) {
   }
 
   // Find all due automations
+  const now = new Date();
+  const staleLockBefore = new Date(now.getTime() - AUTOMATION_LOCK_TIMEOUT_MS);
   const due = await prisma.automation.findMany({
     where: {
       enabled: true,
-      OR: [
-        { nextRun: null },
-        { nextRun: { lte: new Date() } },
+      OR: [{ lockedAt: null }, { lockedAt: { lte: staleLockBefore } }],
+      AND: [
+        {
+          OR: [
+            { nextRun: null },
+            { nextRun: { lte: now } },
+          ],
+        },
       ],
     },
+    orderBy: { nextRun: "asc" },
     take: 20,
   });
 

@@ -4,6 +4,9 @@ import type { Prisma } from "@prisma/client";
 export const PLAN_TIERS = ["free", "plus", "pro"] as const;
 export type PlanTier = (typeof PLAN_TIERS)[number];
 
+export const PLAN_INTERVALS = ["month", "year"] as const;
+export type BillingInterval = (typeof PLAN_INTERVALS)[number];
+
 export const AI_PROVIDERS = ["auto", "kimi", "qwen", "openai"] as const;
 export type AiProvider = (typeof AI_PROVIDERS)[number];
 type PhysicalAiProvider = Exclude<AiProvider, "auto">;
@@ -31,11 +34,13 @@ export const AI_TASKS = [
 export type AiTask = (typeof AI_TASKS)[number];
 
 const BILLING_CYCLE_DAYS = 30;
+const STRIPE_ENTITLED_STATUSES = ["active", "trialing", "past_due"] as const;
 
 export interface PlanDefinition {
   id: PlanTier;
   label: string;
   monthlyPriceUsd: number;
+  yearlyPriceUsd: number;
   monthlyAdvancedCredits: number | null;
   summary: string;
   highlights: string[];
@@ -62,6 +67,7 @@ export const PLAN_DEFINITIONS: Record<PlanTier, PlanDefinition> = {
     id: "free",
     label: "Free",
     monthlyPriceUsd: 0,
+    yearlyPriceUsd: 0,
     monthlyAdvancedCredits: 20,
     summary: "Start building your brand with a small monthly advanced AI budget.",
     highlights: [
@@ -74,6 +80,7 @@ export const PLAN_DEFINITIONS: Record<PlanTier, PlanDefinition> = {
     id: "plus",
     label: "Plus",
     monthlyPriceUsd: 5,
+    yearlyPriceUsd: 50,
     monthlyAdvancedCredits: 150,
     summary: "More monthly credits for regular creation, editing, and agent work.",
     highlights: [
@@ -86,6 +93,7 @@ export const PLAN_DEFINITIONS: Record<PlanTier, PlanDefinition> = {
     id: "pro",
     label: "Pro",
     monthlyPriceUsd: 10,
+    yearlyPriceUsd: 100,
     monthlyAdvancedCredits: null,
     summary: "Unlimited advanced AI usage for heavy portfolio and brand workflows.",
     highlights: [
@@ -102,7 +110,8 @@ export const AI_PROVIDER_DEFINITIONS: Record<AiProvider, AiProviderDefinition> =
     label: "Auto",
     summary:
       "Best-value router. Uses Qwen for fast cheap chat, and routes heavier generation to Kimi or Qwen depending on the task.",
-    defaultAdvancedModel: "Auto (Kimi for deep generation, Qwen for structured tools)",
+    defaultAdvancedModel:
+      "Auto (Kimi for deep generation, Qwen for structured tools)",
     defaultStandardModel: "Auto (Qwen fast route, Kimi/OpenAI fallback)",
     available: Boolean(
       process.env.KIMI_API_KEY ||
@@ -115,33 +124,25 @@ export const AI_PROVIDER_DEFINITIONS: Record<AiProvider, AiProviderDefinition> =
     id: "kimi",
     label: "Kimi",
     summary: "Moonshot's OpenAI-compatible API. This is the default provider.",
-    defaultAdvancedModel:
-      process.env.KIMI_ADVANCED_MODEL ?? "moonshot-v1-32k",
-    defaultStandardModel:
-      process.env.KIMI_STANDARD_MODEL ?? "moonshot-v1-8k",
+    defaultAdvancedModel: process.env.KIMI_ADVANCED_MODEL ?? "moonshot-v1-32k",
+    defaultStandardModel: process.env.KIMI_STANDARD_MODEL ?? "moonshot-v1-8k",
     available: Boolean(process.env.KIMI_API_KEY),
   },
   qwen: {
     id: "qwen",
     label: "Qwen",
     summary: "Alibaba Cloud DashScope's OpenAI-compatible Qwen API.",
-    defaultAdvancedModel:
-      process.env.QWEN_ADVANCED_MODEL ?? "qwen-plus",
-    defaultStandardModel:
-      process.env.QWEN_STANDARD_MODEL ?? "qwen-turbo",
-    available: Boolean(
-      process.env.QWEN_API_KEY ?? process.env.DASHSCOPE_API_KEY
-    ),
+    defaultAdvancedModel: process.env.QWEN_ADVANCED_MODEL ?? "qwen-plus",
+    defaultStandardModel: process.env.QWEN_STANDARD_MODEL ?? "qwen-turbo",
+    available: Boolean(process.env.QWEN_API_KEY ?? process.env.DASHSCOPE_API_KEY),
   },
   openai: {
     id: "openai",
     label: "OpenAI",
     summary:
       "Use OpenAI models directly, including GPT-5, GPT-5 mini, and GPT-5.1 family choices.",
-    defaultAdvancedModel:
-      process.env.OPENAI_ADVANCED_MODEL ?? "gpt-5",
-    defaultStandardModel:
-      process.env.OPENAI_STANDARD_MODEL ?? "gpt-5-mini",
+    defaultAdvancedModel: process.env.OPENAI_ADVANCED_MODEL ?? "gpt-5",
+    defaultStandardModel: process.env.OPENAI_STANDARD_MODEL ?? "gpt-5-mini",
     available: Boolean(process.env.OPENAI_API_KEY),
   },
 };
@@ -201,20 +202,42 @@ export const AI_USAGE_RATE_DEFINITIONS: Record<
 };
 
 type BillingDbClient = Pick<typeof prisma, "user">;
+
 const BILLING_USER_SELECT = {
   planTier: true,
+  stripeCustomerId: true,
+  stripeSubscriptionId: true,
+  stripePriceId: true,
+  stripeProductId: true,
+  stripeSubscriptionStatus: true,
+  billingInterval: true,
+  subscriptionCurrentPeriodStart: true,
+  subscriptionCurrentPeriodEnd: true,
+  cancelAtPeriodEnd: true,
+  billingSyncedAt: true,
   aiProvider: true,
   preferredAiModel: true,
   aiUsageRate: true,
   aiUsageCycleStartedAt: true,
   advancedAiCreditsUsed: true,
 } satisfies Prisma.UserSelect;
+
 type BillingUserRecord = Prisma.UserGetPayload<{
   select: typeof BILLING_USER_SELECT;
 }>;
 
 interface BillingState {
   planTier: PlanTier;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripePriceId: string | null;
+  stripeProductId: string | null;
+  stripeSubscriptionStatus: string | null;
+  billingInterval: BillingInterval | null;
+  subscriptionCurrentPeriodStart: Date | null;
+  subscriptionCurrentPeriodEnd: Date | null;
+  cancelAtPeriodEnd: boolean;
+  billingSyncedAt: Date | null;
   aiProvider: AiProvider;
   preferredAiModel: string | null;
   aiUsageRate: AiUsageRate;
@@ -225,6 +248,13 @@ interface BillingState {
 export interface BillingSnapshot {
   planTier: PlanTier;
   plan: PlanDefinition;
+  billingInterval: BillingInterval | null;
+  subscriptionStatus: string | null;
+  subscriptionCurrentPeriodStart: Date | null;
+  subscriptionCurrentPeriodEnd: Date | null;
+  cancelAtPeriodEnd: boolean;
+  billingSyncedAt: Date | null;
+  canManageSubscription: boolean;
   aiProvider: AiProvider;
   provider: AiProviderDefinition;
   preferredAiModel: string | null;
@@ -264,8 +294,25 @@ export interface VideoGenerationReservation {
   snapshot: BillingSnapshot;
 }
 
+export interface StripeBillingSyncInput {
+  planTier: PlanTier;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripePriceId: string | null;
+  stripeProductId: string | null;
+  stripeSubscriptionStatus: string | null;
+  billingInterval: BillingInterval | null;
+  subscriptionCurrentPeriodStart: Date | null;
+  subscriptionCurrentPeriodEnd: Date | null;
+  cancelAtPeriodEnd: boolean;
+}
+
 function normalizePlanTier(value?: string | null): PlanTier {
   return value === "plus" || value === "pro" ? value : "free";
+}
+
+function normalizeBillingInterval(value?: string | null): BillingInterval | null {
+  return value === "month" || value === "year" ? value : null;
 }
 
 function normalizeAiProvider(value?: string | null): AiProvider {
@@ -470,12 +517,122 @@ function getClientConfig(provider: PhysicalAiProvider) {
   return { apiKey };
 }
 
+function toBillingState(user: BillingUserRecord): BillingState {
+  return {
+    planTier: normalizePlanTier(user.planTier),
+    stripeCustomerId: user.stripeCustomerId,
+    stripeSubscriptionId: user.stripeSubscriptionId,
+    stripePriceId: user.stripePriceId,
+    stripeProductId: user.stripeProductId,
+    stripeSubscriptionStatus: user.stripeSubscriptionStatus,
+    billingInterval: normalizeBillingInterval(user.billingInterval),
+    subscriptionCurrentPeriodStart: user.subscriptionCurrentPeriodStart,
+    subscriptionCurrentPeriodEnd: user.subscriptionCurrentPeriodEnd,
+    cancelAtPeriodEnd: user.cancelAtPeriodEnd,
+    billingSyncedAt: user.billingSyncedAt,
+    aiProvider: normalizeAiProvider(user.aiProvider),
+    preferredAiModel: user.preferredAiModel,
+    aiUsageRate: normalizeAiUsageRate(user.aiUsageRate),
+    cycleStartedAt: user.aiUsageCycleStartedAt,
+    advancedCreditsUsed: user.advancedAiCreditsUsed,
+  };
+}
+
+function getCycleEndsAt(state: BillingState) {
+  if (
+    state.planTier !== "free" &&
+    state.billingInterval === "month" &&
+    state.subscriptionCurrentPeriodEnd
+  ) {
+    return state.subscriptionCurrentPeriodEnd;
+  }
+
+  if (
+    state.planTier !== "free" &&
+    state.billingInterval === "year" &&
+    state.subscriptionCurrentPeriodEnd
+  ) {
+    const cycleEnd = addBillingCycle(state.cycleStartedAt);
+    return cycleEnd < state.subscriptionCurrentPeriodEnd
+      ? cycleEnd
+      : state.subscriptionCurrentPeriodEnd;
+  }
+
+  return addBillingCycle(state.cycleStartedAt);
+}
+
+function getBillingCycleReset(state: BillingState, now: Date) {
+  if (
+    state.planTier !== "free" &&
+    state.billingInterval === "month" &&
+    state.subscriptionCurrentPeriodStart
+  ) {
+    if (
+      state.cycleStartedAt.getTime() !==
+      state.subscriptionCurrentPeriodStart.getTime()
+    ) {
+      return {
+        aiUsageCycleStartedAt: state.subscriptionCurrentPeriodStart,
+        advancedAiCreditsUsed: 0,
+      };
+    }
+
+    return null;
+  }
+
+  if (
+    state.planTier !== "free" &&
+    state.billingInterval === "year" &&
+    state.subscriptionCurrentPeriodStart &&
+    state.subscriptionCurrentPeriodEnd
+  ) {
+    if (
+      state.cycleStartedAt < state.subscriptionCurrentPeriodStart ||
+      state.cycleStartedAt >= state.subscriptionCurrentPeriodEnd
+    ) {
+      return {
+        aiUsageCycleStartedAt: state.subscriptionCurrentPeriodStart,
+        advancedAiCreditsUsed: 0,
+      };
+    }
+
+    let nextCycleStart = state.cycleStartedAt;
+    let shouldReset = false;
+
+    while (
+      addBillingCycle(nextCycleStart) <= now &&
+      addBillingCycle(nextCycleStart) < state.subscriptionCurrentPeriodEnd
+    ) {
+      nextCycleStart = addBillingCycle(nextCycleStart);
+      shouldReset = true;
+    }
+
+    if (shouldReset) {
+      return {
+        aiUsageCycleStartedAt: nextCycleStart,
+        advancedAiCreditsUsed: 0,
+      };
+    }
+
+    return null;
+  }
+
+  if (addBillingCycle(state.cycleStartedAt) <= now) {
+    return {
+      aiUsageCycleStartedAt: now,
+      advancedAiCreditsUsed: 0,
+    };
+  }
+
+  return null;
+}
+
 function buildSnapshot(state: BillingState): BillingSnapshot {
   const plan = PLAN_DEFINITIONS[state.planTier];
   const providerId = resolveProvider(state.aiProvider);
   const provider = AI_PROVIDER_DEFINITIONS[providerId];
   const effectiveAiUsageRate = getEffectiveAiUsageRate(state.aiUsageRate);
-  const cycleEndsAt = addBillingCycle(state.cycleStartedAt);
+  const cycleEndsAt = getCycleEndsAt(state);
   const advancedCreditsRemaining =
     plan.monthlyAdvancedCredits === null
       ? null
@@ -484,6 +641,13 @@ function buildSnapshot(state: BillingState): BillingSnapshot {
   return {
     planTier: state.planTier,
     plan,
+    billingInterval: state.billingInterval,
+    subscriptionStatus: state.stripeSubscriptionStatus,
+    subscriptionCurrentPeriodStart: state.subscriptionCurrentPeriodStart,
+    subscriptionCurrentPeriodEnd: state.subscriptionCurrentPeriodEnd,
+    cancelAtPeriodEnd: state.cancelAtPeriodEnd,
+    billingSyncedAt: state.billingSyncedAt,
+    canManageSubscription: Boolean(state.stripeCustomerId),
     aiProvider: providerId,
     provider,
     preferredAiModel: state.preferredAiModel,
@@ -506,17 +670,6 @@ function buildSnapshot(state: BillingState): BillingSnapshot {
   };
 }
 
-function toBillingState(user: BillingUserRecord): BillingState {
-  return {
-    planTier: normalizePlanTier(user.planTier),
-    aiProvider: normalizeAiProvider(user.aiProvider),
-    preferredAiModel: user.preferredAiModel,
-    aiUsageRate: normalizeAiUsageRate(user.aiUsageRate),
-    cycleStartedAt: user.aiUsageCycleStartedAt,
-    advancedCreditsUsed: user.advancedAiCreditsUsed,
-  };
-}
-
 async function getFreshBillingState(
   db: BillingDbClient,
   userId: string
@@ -530,24 +683,20 @@ async function getFreshBillingState(
     throw new Error("User not found.");
   }
 
-  const now = new Date();
-  const cycleStartedAt = user.aiUsageCycleStartedAt;
-  const cycleEndsAt = addBillingCycle(cycleStartedAt);
+  const state = toBillingState(user);
+  const reset = getBillingCycleReset(state, new Date());
 
-  if (cycleEndsAt <= now) {
-    const resetUser = await db.user.update({
+  if (reset) {
+    const updatedUser = await db.user.update({
       where: { id: userId },
-      data: {
-        aiUsageCycleStartedAt: now,
-        advancedAiCreditsUsed: 0,
-      },
+      data: reset,
       select: BILLING_USER_SELECT,
     });
 
-    return toBillingState(resetUser);
+    return toBillingState(updatedUser);
   }
 
-  return toBillingState(user);
+  return state;
 }
 
 export async function getBillingSnapshot(userId: string): Promise<BillingSnapshot> {
@@ -555,10 +704,9 @@ export async function getBillingSnapshot(userId: string): Promise<BillingSnapsho
   return buildSnapshot(state);
 }
 
-export async function updateUserBilling(
+export async function updateUserBillingPreferences(
   userId: string,
   patch: {
-    planTier?: PlanTier;
     aiProvider?: AiProvider;
     preferredAiModel?: string | null;
     aiUsageRate?: AiUsageRate;
@@ -580,6 +728,7 @@ export async function updateUserBilling(
 
   const hasPreferredAiModel =
     Object.prototype.hasOwnProperty.call(patch, "preferredAiModel");
+
   if (
     nextProvider === "auto" &&
     hasPreferredAiModel &&
@@ -589,26 +738,12 @@ export async function updateUserBilling(
     throw new Error('The "auto" provider only supports the "auto" model.');
   }
 
-  const updateData: {
-    planTier?: PlanTier;
-    aiProvider?: AiProvider;
-    preferredAiModel?: string | null;
-    aiUsageRate?: AiUsageRate;
-    aiUsageCycleStartedAt?: Date;
-    advancedAiCreditsUsed?: number;
-  } = {};
-
-  if (patch.planTier) {
-    updateData.planTier = patch.planTier;
-    updateData.aiUsageCycleStartedAt = new Date();
-    updateData.advancedAiCreditsUsed = 0;
-  }
+  const updateData: Prisma.UserUpdateInput = {};
 
   if (patch.aiProvider) {
     updateData.aiProvider = patch.aiProvider;
     if (!hasPreferredAiModel) {
-      updateData.preferredAiModel =
-        patch.aiProvider === "auto" ? "auto" : null;
+      updateData.preferredAiModel = patch.aiProvider === "auto" ? "auto" : null;
     }
   }
 
@@ -630,6 +765,72 @@ export async function updateUserBilling(
   });
 
   return buildSnapshot(toBillingState(updatedUser));
+}
+
+export async function syncStripeBillingState(
+  userId: string,
+  input: StripeBillingSyncInput
+): Promise<BillingSnapshot> {
+  return prisma.$transaction(async (tx) => {
+    const existingUser = await tx.user.findUnique({
+      where: { id: userId },
+      select: BILLING_USER_SELECT,
+    });
+
+    if (!existingUser) {
+      throw new Error("User not found.");
+    }
+
+    const currentState = toBillingState(existingUser);
+    const nextCycleAnchor =
+      input.planTier === "free"
+        ? new Date()
+        : input.subscriptionCurrentPeriodStart ?? new Date();
+    const shouldResetCredits =
+      input.planTier === "free"
+        ? currentState.planTier !== "free"
+        : currentState.planTier !== input.planTier ||
+          currentState.billingInterval !== input.billingInterval ||
+          currentState.stripeSubscriptionId !== input.stripeSubscriptionId ||
+          currentState.subscriptionCurrentPeriodStart?.getTime() !==
+            input.subscriptionCurrentPeriodStart?.getTime() ||
+          currentState.subscriptionCurrentPeriodEnd?.getTime() !==
+            input.subscriptionCurrentPeriodEnd?.getTime();
+
+    const updateData: Prisma.UserUpdateInput = {
+      planTier: input.planTier,
+      stripeCustomerId: input.stripeCustomerId,
+      stripeSubscriptionId: input.stripeSubscriptionId,
+      stripePriceId: input.stripePriceId,
+      stripeProductId: input.stripeProductId,
+      stripeSubscriptionStatus: input.stripeSubscriptionStatus,
+      billingInterval: input.billingInterval,
+      subscriptionCurrentPeriodStart: input.subscriptionCurrentPeriodStart,
+      subscriptionCurrentPeriodEnd: input.subscriptionCurrentPeriodEnd,
+      cancelAtPeriodEnd: input.cancelAtPeriodEnd,
+      billingSyncedAt: new Date(),
+    };
+
+    if (shouldResetCredits) {
+      updateData.aiUsageCycleStartedAt = nextCycleAnchor;
+      updateData.advancedAiCreditsUsed = 0;
+    } else if (
+      input.planTier !== "free" &&
+      input.subscriptionCurrentPeriodStart &&
+      currentState.cycleStartedAt < input.subscriptionCurrentPeriodStart
+    ) {
+      updateData.aiUsageCycleStartedAt = input.subscriptionCurrentPeriodStart;
+      updateData.advancedAiCreditsUsed = 0;
+    }
+
+    const updatedUser = await tx.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: BILLING_USER_SELECT,
+    });
+
+    return buildSnapshot(toBillingState(updatedUser));
+  });
 }
 
 export async function reserveAiModel(
@@ -710,11 +911,7 @@ export async function reserveAiModel(
 
       const updatedState = toBillingState(updatedUser);
       const snapshot = buildSnapshot(updatedState);
-      const target = resolveReservationTarget(
-        updatedState,
-        "advanced",
-        task
-      );
+      const target = resolveReservationTarget(updatedState, "advanced", task);
 
       return {
         provider: target.provider,
@@ -784,4 +981,10 @@ export async function reserveVideoGeneration(
       "You have used all advanced AI credits for this cycle. Upgrade to Plus or Pro to generate more demo videos."
     );
   });
+}
+
+export function isEntitledStripeStatus(status?: string | null) {
+  return STRIPE_ENTITLED_STATUSES.includes(
+    status as (typeof STRIPE_ENTITLED_STATUSES)[number]
+  );
 }

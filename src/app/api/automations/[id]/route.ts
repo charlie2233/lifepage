@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import {
+  computeNextRun,
+  normalizeAutomationSchedule,
+  normalizeAutomationScheduleTime,
+  normalizeAutomationTimezone,
+} from "@/lib/automations";
 import { z } from "zod";
 
 const PatchSchema = z.object({
   enabled: z.boolean().optional(),
   schedule: z.enum(["daily", "weekly", "monthly"]).optional(),
+  scheduleTime: z.string().optional(),
+  scheduleTimezone: z.string().optional(),
   name: z.string().min(1).max(100).optional(),
 });
 
@@ -17,9 +25,43 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const parsed = PatchSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const automation = await prisma.automation.updateMany({
+  const existing = await prisma.automation.findFirst({
     where: { id, userId: session.user.id },
-    data: parsed.data,
+  });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const schedule = normalizeAutomationSchedule(
+    parsed.data.schedule ?? existing.schedule
+  );
+  const scheduleTime = normalizeAutomationScheduleTime(
+    parsed.data.scheduleTime ?? existing.scheduleTime
+  );
+  const scheduleTimezone = normalizeAutomationTimezone(
+    parsed.data.scheduleTimezone ?? existing.scheduleTimezone
+  );
+  const shouldRecomputeNextRun =
+    parsed.data.schedule !== undefined ||
+    parsed.data.scheduleTime !== undefined ||
+    parsed.data.scheduleTimezone !== undefined;
+
+  const automation = await prisma.automation.update({
+    where: { id: existing.id },
+    data: {
+      enabled: parsed.data.enabled,
+      name: parsed.data.name,
+      schedule,
+      scheduleTime,
+      scheduleTimezone,
+      ...(shouldRecomputeNextRun
+        ? {
+            nextRun: computeNextRun(schedule, {
+              from: new Date(),
+              timeOfDay: scheduleTime,
+              timeZone: scheduleTimezone,
+            }),
+          }
+        : {}),
+    },
   });
 
   return NextResponse.json({ automation });

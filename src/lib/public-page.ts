@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { normalizeCustomDomain } from "@/lib/custom-domain";
+import { isCustomDomainActive } from "@/lib/custom-domain-lifecycle";
 import { isVisibilityAccessible, normalizeVisibility } from "@/lib/page-visibility";
 
 export const publicPageInclude = {
@@ -50,13 +51,16 @@ export const getPublicPageUserByCustomDomain = cache(async (hostname: string) =>
         publicPageSettings: {
           is: {
             customDomainNormalized: normalizedHostname,
+            customDomainStatus: "active",
           },
         },
       },
       include: publicPageInclude,
     });
 
-    return user && canAccessPortfolio(user.publicPageSettings) ? user : null;
+    return user && canAccessCustomDomainPortfolio(user.publicPageSettings)
+      ? user
+      : null;
   } catch (error) {
     console.warn("Falling back from public page custom-domain lookup:", error);
     return null;
@@ -87,4 +91,15 @@ export function canAccessPortfolio(settings?: {
   visibility?: string | null;
 } | null) {
   return isVisibilityAccessible(normalizeVisibility(settings));
+}
+
+export function canAccessCustomDomainPortfolio(
+  settings?: {
+    isPublic?: boolean | null;
+    visibility?: string | null;
+    customDomainNormalized?: string | null;
+    customDomainStatus?: string | null;
+  } | null
+) {
+  return canAccessPortfolio(settings) && isCustomDomainActive(settings);
 }

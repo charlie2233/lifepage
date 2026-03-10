@@ -15,6 +15,16 @@ model User {
   passwordHash  String?
   avatar        String?
   planTier      String    @default("free")
+  stripeCustomerId String? @unique
+  stripeSubscriptionId String? @unique
+  stripePriceId  String?
+  stripeProductId String?
+  stripeSubscriptionStatus String?
+  billingInterval String?
+  subscriptionCurrentPeriodStart DateTime?
+  subscriptionCurrentPeriodEnd DateTime?
+  cancelAtPeriodEnd Boolean @default(false)
+  billingSyncedAt DateTime?
   aiProvider    String    @default("kimi")
   preferredAiModel String?
   aiUsageRate   String    @default("auto")
@@ -56,16 +66,22 @@ model EvidenceItem {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   type        String
   url         String?
+  canonicalUrl String?
   filename    String?
   fileUrl     String?
   title       String?
   description String?
   screenshot  String?
+  crawlStatus String   @default("ready")
+  screenshotStatus String @default("unavailable")
+  screenshotError String?
   rawContent  String?
   metadata    Json?
   visible     Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@unique([userId, canonicalUrl])
 }
 
 model GeneratedProfile {
@@ -92,6 +108,11 @@ model PublicPageSettings {
   resumeModelConfig      Json?
   customDomain           String?
   customDomainNormalized String?  @unique
+  customDomainStatus     String   @default("none")
+  customDomainVerificationName String?
+  customDomainVerificationValue String?
+  customDomainLastCheckedAt DateTime?
+  customDomainError      String?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 }
@@ -105,11 +126,16 @@ model Automation {
   action      String   // "recrawl_url" | "regenerate_profile" | "refresh_timeline" | "refresh_video_script"
   config      Json     // action-specific config e.g. { url: "https://..." }
   schedule    String   @default("weekly") // "daily" | "weekly" | "monthly"
+  scheduleTime String  @default("09:00")
+  scheduleTimezone String @default("UTC")
   enabled     Boolean  @default(true)
+  lockedAt    DateTime?
+  lastAttemptAt DateTime?
   lastRun     DateTime?
   nextRun     DateTime?
   lastStatus  String?  // "success" | "error" | "running"
   lastError   String?
+  retryCount  Int      @default(0)
   runCount    Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

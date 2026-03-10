@@ -1,16 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const registerHref = callbackUrl
+    ? `/register?callbackUrl=${encodeURIComponent(callbackUrl)}`
+    : "/register";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,12 +25,18 @@ export default function LoginPage() {
       email,
       password,
       redirect: false,
+      callbackUrl,
     });
     setLoading(false);
     if (res?.error) {
       setError("Invalid email or password.");
     } else {
-      router.push("/dashboard");
+      const nextUrl = res?.url ?? callbackUrl;
+      if (nextUrl.startsWith("http")) {
+        window.location.href = nextUrl;
+      } else {
+        router.push(nextUrl);
+      }
     }
   };
 
@@ -140,7 +151,7 @@ export default function LoginPage() {
             <p className="text-center text-sm text-[#6e7e89]">
               Don&apos;t have an account?{" "}
               <Link
-                href="/register"
+                href={registerHref}
                 className="font-medium text-[#79e5d2] transition-colors hover:text-[#cffff6]"
               >
                 Create one
@@ -162,5 +173,21 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+function LoginPageFallback() {
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-[#080e12] flex items-center justify-center px-4">
+      <div className="text-sm text-[#7a8d98]">Loading sign in…</div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageFallback />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

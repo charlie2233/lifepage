@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { canonicalizeCrawlUrl } from "@/lib/crawl-state";
 import { prisma } from "@/lib/db";
 import { crawlUrl, expandGoogleSitesUrls, isGoogleSitesUrl } from "@/lib/crawler";
 import { z } from "zod";
@@ -59,25 +60,46 @@ function normalizeUrl(url: string) {
   return parsed.toString();
 }
 
-function canonicalizeCrawlUrl(url: string) {
-  const parsed = new URL(url);
-  parsed.hash = "";
-  parsed.search = "";
-  return parsed.toString();
-}
+async function createEvidenceItem(
+  userId: string,
+  fallbackUrl: string,
+  crawlResult: Awaited<ReturnType<typeof crawlUrl>>
+) {
+  const canonicalUrl = canonicalizeCrawlUrl(crawlResult.url || fallbackUrl);
 
-async function createEvidenceItem(userId: string, fallbackUrl: string, crawlResult: Awaited<ReturnType<typeof crawlUrl>>) {
-  return prisma.evidenceItem.create({
-    data: {
+  return prisma.evidenceItem.upsert({
+    where: {
+      userId_canonicalUrl: {
+        userId,
+        canonicalUrl,
+      },
+    },
+    create: {
       userId,
       type: "url",
       url: crawlResult.url,
+      canonicalUrl,
       title: crawlResult.title || fallbackUrl,
       description: crawlResult.description || "",
       screenshot: crawlResult.screenshot,
+      crawlStatus: crawlResult.crawlStatus,
+      screenshotStatus: crawlResult.screenshotStatus,
+      screenshotError: crawlResult.screenshotError,
       rawContent: crawlResult.bodyText,
       metadata: crawlResult.metadata as object,
       visible: true,
+    },
+    update: {
+      url: crawlResult.url,
+      canonicalUrl,
+      title: crawlResult.title || fallbackUrl,
+      description: crawlResult.description || "",
+      screenshot: crawlResult.screenshot,
+      crawlStatus: crawlResult.crawlStatus,
+      screenshotStatus: crawlResult.screenshotStatus,
+      screenshotError: crawlResult.screenshotError,
+      rawContent: crawlResult.bodyText,
+      metadata: crawlResult.metadata as object,
     },
   });
 }

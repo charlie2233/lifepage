@@ -10,7 +10,7 @@ export async function GET() {
 
   const items = await prisma.evidenceItem.findMany({
     where: { userId: session.user.id },
-    orderBy: { createdAt: "desc" },
+    orderBy: { updatedAt: "desc" },
   });
 
   return NextResponse.json({ items });

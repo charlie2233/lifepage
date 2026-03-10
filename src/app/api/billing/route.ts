@@ -6,14 +6,14 @@ import {
   AI_USAGE_RATE_DEFINITIONS,
   AI_USAGE_RATES,
   getBillingSnapshot,
+  PLAN_INTERVALS,
   PLAN_DEFINITIONS,
-  PLAN_TIERS,
-  updateUserBilling,
+  updateUserBillingPreferences,
 } from "@/lib/billing";
+import { isStripeBillingConfigured } from "@/lib/stripe-billing";
 import { z } from "zod";
 
 const PatchSchema = z.object({
-  planTier: z.enum(PLAN_TIERS).optional(),
   aiProvider: z.enum(AI_PROVIDERS).optional(),
   preferredAiModel: z.union([z.string().max(120), z.null()]).optional(),
   aiUsageRate: z.enum(AI_USAGE_RATES).optional(),
@@ -29,8 +29,10 @@ export async function GET() {
   return NextResponse.json({
     billing,
     plans: Object.values(PLAN_DEFINITIONS),
+    intervals: PLAN_INTERVALS,
     providers: Object.values(AI_PROVIDER_DEFINITIONS),
     usageRates: Object.values(AI_USAGE_RATE_DEFINITIONS),
+    stripeConfigured: isStripeBillingConfigured(),
   });
 }
 
@@ -47,7 +49,6 @@ export async function PATCH(req: Request) {
   }
 
   if (
-    parsed.data.planTier === undefined &&
     parsed.data.aiProvider === undefined &&
     parsed.data.aiUsageRate === undefined &&
     !Object.prototype.hasOwnProperty.call(parsed.data, "preferredAiModel")
@@ -56,8 +57,7 @@ export async function PATCH(req: Request) {
   }
 
   try {
-    const billing = await updateUserBilling(session.user.id, {
-      planTier: parsed.data.planTier,
+    const billing = await updateUserBillingPreferences(session.user.id, {
       aiProvider: parsed.data.aiProvider,
       preferredAiModel: parsed.data.preferredAiModel,
       aiUsageRate: parsed.data.aiUsageRate,
@@ -65,8 +65,10 @@ export async function PATCH(req: Request) {
     return NextResponse.json({
       billing,
       plans: Object.values(PLAN_DEFINITIONS),
+      intervals: PLAN_INTERVALS,
       providers: Object.values(AI_PROVIDER_DEFINITIONS),
       usageRates: Object.values(AI_USAGE_RATE_DEFINITIONS),
+      stripeConfigured: isStripeBillingConfigured(),
     });
   } catch (error) {
     return NextResponse.json(

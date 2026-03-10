@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -61,9 +61,13 @@ interface EvidenceItem {
   id: string;
   type: string;
   url?: string | null;
+  canonicalUrl?: string | null;
   title?: string | null;
   description?: string | null;
   screenshot?: string | null;
+  crawlStatus?: "ready" | "partial" | "failed" | null;
+  screenshotStatus?: "ready" | "pending" | "failed" | "unavailable" | null;
+  screenshotError?: string | null;
   visible: boolean;
   createdAt: string;
 }
@@ -125,11 +129,16 @@ interface Automation {
   action: string;
   config: Record<string, unknown>;
   schedule: string;
+  scheduleTime: string;
+  scheduleTimezone: string;
   enabled: boolean;
+  lockedAt?: string | null;
+  lastAttemptAt?: string | null;
   lastRun?: string | null;
   nextRun?: string | null;
   lastStatus?: string | null;
   lastError?: string | null;
+  retryCount: number;
   runCount: number;
 }
 
@@ -228,10 +237,12 @@ interface BillingPlan {
   id: "free" | "plus" | "pro";
   label: string;
   monthlyPriceUsd: number;
+  yearlyPriceUsd: number;
   monthlyAdvancedCredits: number | null;
   summary: string;
   highlights: string[];
 }
+type BillingInterval = "month" | "year";
 interface BillingProvider {
   id: "auto" | "kimi" | "qwen" | "openai";
   label: string;
@@ -249,6 +260,13 @@ interface BillingUsageRate {
 interface BillingSnapshot {
   planTier: "free" | "plus" | "pro";
   plan: BillingPlan;
+  billingInterval: BillingInterval | null;
+  subscriptionStatus: string | null;
+  subscriptionCurrentPeriodStart: string | null;
+  subscriptionCurrentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  billingSyncedAt?: string | null;
+  canManageSubscription: boolean;
   aiProvider: BillingProvider["id"];
   provider: BillingProvider;
   preferredAiModel: string | null;
@@ -361,9 +379,38 @@ interface ProjectVideoArtifactOutput {
 interface ApiBillingResponse {
   billing?: BillingSnapshot;
   plans?: BillingPlan[];
+  intervals?: BillingInterval[];
   providers?: BillingProvider[];
   usageRates?: BillingUsageRate[];
+  stripeConfigured?: boolean;
   error?: string;
+}
+type CustomDomainStatus =
+  | "none"
+  | "pending_verification"
+  | "verified"
+  | "active"
+  | "error";
+interface DashboardSettingsSnapshot {
+  isPublic: boolean;
+  visibility?: PublicPageVisibility | null;
+  theme: PortfolioThemeId;
+  themeConfig?: PortfolioThemeConfig | null;
+  resumeModel?: ResumeModelId;
+  resumeModelConfig?: ResumeModelConfig | null;
+  mode: string;
+  customDomain?: string | null;
+  customDomainStatus?: CustomDomainStatus | null;
+  customDomainVerificationName?: string | null;
+  customDomainVerificationValue?: string | null;
+  customDomainLastCheckedAt?: string | null;
+  customDomainError?: string | null;
+}
+interface ApiSettingsResponse {
+  settings?: DashboardSettingsSnapshot | null;
+  verified?: boolean;
+  attached?: boolean;
+  error?: string | null;
 }
 interface ApiProjectVideoResponse {
   artifactId?: string;
@@ -474,6 +521,81 @@ function normalizeOptionalFormValue(value: string) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function formatBillingIntervalLabel(interval?: BillingInterval | null) {
+  if (interval === "year") return "Yearly";
+  if (interval === "month") return "Monthly";
+  return "Not subscribed";
+}
+
+function formatSubscriptionStatus(status?: string | null) {
+  if (!status) return "No active subscription";
+  return status
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatPlanPrice(plan: BillingPlan, interval: BillingInterval) {
+  const amount =
+    interval === "year" ? plan.yearlyPriceUsd : plan.monthlyPriceUsd;
+  return amount === 0 ? "$0" : `$${amount}`;
+}
+
+function formatPlanIntervalSuffix(interval: BillingInterval) {
+  return interval === "year" ? "/yr" : "/mo";
+}
+
+function getPlanSavingsCopy(plan: BillingPlan, interval: BillingInterval) {
+  if (
+    interval !== "year" ||
+    plan.monthlyPriceUsd === 0 ||
+    plan.yearlyPriceUsd === 0
+  ) {
+    return null;
+  }
+
+  const savedAmount = plan.monthlyPriceUsd * 12 - plan.yearlyPriceUsd;
+  if (savedAmount <= 0) {
+    return null;
+  }
+
+  return `Save $${savedAmount} a year`;
+}
+
+function formatCustomDomainStatus(status: CustomDomainStatus) {
+  switch (status) {
+    case "pending_verification":
+      return "Pending verification";
+    case "verified":
+      return "Verified";
+    case "active":
+      return "Active";
+    case "error":
+      return "Needs attention";
+    default:
+      return "Not configured";
+  }
+}
+
+function getCustomDomainStatusCopy(status: CustomDomainStatus) {
+  switch (status) {
+    case "pending_verification":
+      return "Save the hostname, point DNS to the target below, then verify it here.";
+    case "verified":
+      return "DNS matches. You can attach the domain and start serving traffic.";
+    case "active":
+      return "This hostname is live and public requests can resolve through it.";
+    case "error":
+      return "The latest verification or attachment attempt failed. Review the DNS target and try again.";
+    default:
+      return "Add a hostname to start the managed domain flow.";
+  }
+}
+
+function formatEvidenceStatusLabel(status?: EvidenceItem["crawlStatus"] | EvidenceItem["screenshotStatus"]) {
+  if (!status) return "Unknown";
+  return status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 const EMPTY_PUBLIC_CONTACT_INPUT = {
   location: "",
   website: "",
@@ -534,6 +656,14 @@ function isRevertableArtifact(artifact?: AgentArtifact | null) {
     artifact?.meta?.executionMode === "mutate" &&
       artifact.meta?.revertable &&
       !artifact.meta?.revertedAt
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<DashboardPageFallback />}>
+      <DashboardPageContent />
+    </Suspense>
   );
 }
 
@@ -1405,9 +1535,21 @@ const DEFAULT_WORKFLOW_SKILL_OPTIONS: AgentSkillOption[] = [
 
 // ── Main dashboard ────────────────────────────────────────────────────────────
 
-export default function DashboardPage() {
+function DashboardPageFallback() {
+  return (
+    <div className="min-h-screen bg-[#080d10] flex items-center justify-center">
+      <div className="inline-flex items-center gap-3 text-white/80">
+        <LoaderCircle className="h-5 w-5 animate-spin text-[#00f5ff]" />
+        <span className="animate-pulse">Loading dashboard...</span>
+      </div>
+    </div>
+  );
+}
+
+function DashboardPageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [urlInput, setUrlInput] = useState("");
   const [crawling, setCrawling] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -1428,6 +1570,15 @@ export default function DashboardPage() {
   const [resumeModelConfig, setResumeModelConfig] = useState<ResumeModelConfig | null>(null);
   const [customDomain, setCustomDomain] = useState("");
   const [customDomainInput, setCustomDomainInput] = useState("");
+  const [customDomainStatus, setCustomDomainStatus] =
+    useState<CustomDomainStatus>("none");
+  const [customDomainVerificationName, setCustomDomainVerificationName] =
+    useState("");
+  const [customDomainVerificationValue, setCustomDomainVerificationValue] =
+    useState("");
+  const [customDomainLastCheckedAt, setCustomDomainLastCheckedAt] =
+    useState<string | null>(null);
+  const [customDomainError, setCustomDomainError] = useState<string | null>(null);
   const [currentHost, setCurrentHost] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
   const [account, setAccount] = useState<AccountSettings | null>(null);
@@ -1439,12 +1590,21 @@ export default function DashboardPage() {
   const [savingAccount, setSavingAccount] = useState(false);
   const [billing, setBilling] = useState<BillingSnapshot | null>(null);
   const [availablePlans, setAvailablePlans] = useState<BillingPlan[]>([]);
+  const [availableIntervals, setAvailableIntervals] = useState<BillingInterval[]>([
+    "month",
+    "year",
+  ]);
   const [availableProviders, setAvailableProviders] = useState<BillingProvider[]>([]);
   const [availableUsageRates, setAvailableUsageRates] = useState<BillingUsageRate[]>([]);
+  const [selectedBillingInterval, setSelectedBillingInterval] =
+    useState<BillingInterval>("month");
   const [selectedAiProvider, setSelectedAiProvider] = useState<BillingProvider["id"]>("kimi");
   const [selectedAiUsageRate, setSelectedAiUsageRate] = useState<BillingUsageRate["id"]>("auto");
   const [preferredAiModelInput, setPreferredAiModelInput] = useState("");
+  const [stripeConfigured, setStripeConfigured] = useState(false);
   const [updatingPlan, setUpdatingPlan] = useState(false);
+  const [verifyingDomain, setVerifyingDomain] = useState(false);
+  const [attachingDomain, setAttachingDomain] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>("crawl");
   const [message, setMessage] = useState<{
     type: "success" | "error";
@@ -1478,6 +1638,8 @@ export default function DashboardPage() {
     name: "",
     action: "regenerate_profile",
     schedule: "weekly",
+    scheduleTime: "09:00",
+    scheduleTimezone: "UTC",
     config: {} as Record<string, unknown>,
   });
   const [showNewAutomation, setShowNewAutomation] = useState(false);
@@ -1509,24 +1671,38 @@ export default function DashboardPage() {
     })
     .join("|");
 
+  const applySettingsSnapshot = useCallback(
+    (settings?: DashboardSettingsSnapshot | null) => {
+      if (!settings) {
+        return;
+      }
+
+      setVisibility(normalizeVisibility(settings));
+      setTheme(normalizePortfolioThemeId(settings.theme));
+      setThemeConfig(settings.themeConfig ?? null);
+      setResumeModel(normalizeResumeModelId(settings.resumeModel));
+      setResumeModelConfig(settings.resumeModelConfig ?? null);
+      setMode((settings.mode as "hiring" | "admissions") ?? "hiring");
+      setCustomDomain(settings.customDomain ?? "");
+      setCustomDomainInput(settings.customDomain ?? "");
+      setCustomDomainStatus(settings.customDomainStatus ?? "none");
+      setCustomDomainVerificationName(
+        settings.customDomainVerificationName ?? ""
+      );
+      setCustomDomainVerificationValue(
+        settings.customDomainVerificationValue ?? ""
+      );
+      setCustomDomainLastCheckedAt(settings.customDomainLastCheckedAt ?? null);
+      setCustomDomainError(settings.customDomainError ?? null);
+    },
+    []
+  );
+
   const fetchData = useCallback(async () => {
     const [ev, pr, st, arts, billingRes, accountRes, autos, agentSkillsRes] = await Promise.all([
       fetch("/api/evidence").then((r) => r.json() as Promise<ApiEvidenceResponse>),
       fetch("/api/profile").then((r) => r.json() as Promise<ApiProfileResponse>),
-      fetch("/api/settings").then((r) =>
-        r.json() as Promise<{
-          settings?: {
-            isPublic: boolean;
-            visibility?: PublicPageVisibility | null;
-            theme: PortfolioThemeId;
-            themeConfig?: PortfolioThemeConfig | null;
-            resumeModel?: ResumeModelId;
-            resumeModelConfig?: ResumeModelConfig | null;
-            mode: string;
-            customDomain?: string | null;
-          } | null;
-        }>
-      ),
+      fetch("/api/settings").then((r) => r.json() as Promise<ApiSettingsResponse>),
       fetch("/api/agent").then((r) => r.json() as Promise<ApiAgentResponse>),
       fetch("/api/billing").then((r) => r.json() as Promise<ApiBillingResponse>),
       fetch("/api/account").then((r) => r.json() as Promise<ApiAccountResponse>),
@@ -1535,21 +1711,15 @@ export default function DashboardPage() {
     ]);
     setEvidence(ev.items ?? []);
     if (pr.profile) setProfile(pr.profile);
-    if (st.settings) {
-      setVisibility(normalizeVisibility(st.settings));
-      setTheme(normalizePortfolioThemeId(st.settings.theme));
-      setThemeConfig(st.settings.themeConfig ?? null);
-      setResumeModel(normalizeResumeModelId(st.settings.resumeModel));
-      setResumeModelConfig(st.settings.resumeModelConfig ?? null);
-      setMode((st.settings.mode as "hiring" | "admissions") ?? "hiring");
-      setCustomDomain(st.settings.customDomain ?? "");
-      setCustomDomainInput(st.settings.customDomain ?? "");
-    }
+    applySettingsSnapshot(st.settings);
     setSavedArtifacts(arts.artifacts ?? []);
     setBilling(billingRes.billing ?? null);
     setAvailablePlans(billingRes.plans ?? []);
+    setAvailableIntervals(billingRes.intervals ?? ["month", "year"]);
     setAvailableProviders(billingRes.providers ?? []);
     setAvailableUsageRates(billingRes.usageRates ?? []);
+    setStripeConfigured(Boolean(billingRes.stripeConfigured));
+    setSelectedBillingInterval(billingRes.billing?.billingInterval ?? "month");
     setSelectedAiProvider(billingRes.billing?.aiProvider ?? "kimi");
     setSelectedAiUsageRate(billingRes.billing?.aiUsageRate ?? "auto");
     setPreferredAiModelInput(billingRes.billing?.preferredAiModel ?? "");
@@ -1592,7 +1762,7 @@ export default function DashboardPage() {
     setWorkflowSkillOptions(
       agentSkillsRes.workflowSkills ?? DEFAULT_WORKFLOW_SKILL_OPTIONS
     );
-  }, []);
+  }, [applySettingsSnapshot]);
 
   const saveSettings = async (patch: {
     visibility?: PublicPageVisibility;
@@ -1610,28 +1780,11 @@ export default function DashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
-      const data = (await res.json()) as {
-        settings?: {
-          isPublic: boolean;
-          visibility?: PublicPageVisibility | null;
-          theme: PortfolioThemeId;
-          themeConfig?: PortfolioThemeConfig | null;
-          resumeModel?: ResumeModelId;
-          resumeModelConfig?: ResumeModelConfig | null;
-          mode: string;
-          customDomain?: string | null;
-        } | null;
-        error?: string;
-      };
+      const data = (await res.json()) as ApiSettingsResponse;
       if (!res.ok) {
         throw new Error(data.error ?? "Failed to save settings.");
       }
-      if (data.settings) {
-        setTheme(normalizePortfolioThemeId(data.settings.theme));
-        setThemeConfig(data.settings.themeConfig ?? null);
-        setResumeModel(normalizeResumeModelId(data.settings.resumeModel));
-        setResumeModelConfig(data.settings.resumeModelConfig ?? null);
-      }
+      applySettingsSnapshot(data.settings);
       setMessage({ type: "success", text: "Settings saved." });
       return data.settings ?? null;
     } catch (error) {
@@ -1675,33 +1828,51 @@ export default function DashboardPage() {
     });
   };
 
-  const handleChangePlan = async (planTier: BillingPlan["id"]) => {
+  const handleStartCheckout = async (
+    planTier: Exclude<BillingPlan["id"], "free">,
+    interval: BillingInterval
+  ) => {
     setUpdatingPlan(true);
     try {
-      const res = await fetch("/api/billing", {
-        method: "PATCH",
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planTier }),
+        body: JSON.stringify({ planTier, interval }),
       });
-      const data = (await res.json()) as ApiBillingResponse;
-      if (!res.ok || !data.billing) {
-        throw new Error(data.error ?? "Failed to change plan.");
+      const data = (await res.json()) as { checkoutUrl?: string; error?: string };
+      if (!res.ok || !data.checkoutUrl) {
+        throw new Error(data.error ?? "Failed to start checkout.");
       }
-      setBilling(data.billing);
-      setAvailablePlans(data.plans ?? availablePlans);
-      setAvailableProviders(data.providers ?? availableProviders);
-      setAvailableUsageRates(data.usageRates ?? availableUsageRates);
-      setSelectedAiProvider(data.billing.aiProvider);
-      setSelectedAiUsageRate(data.billing.aiUsageRate);
-      setPreferredAiModelInput(data.billing.preferredAiModel ?? "");
-      setMessage({
-        type: "success",
-        text: `Plan updated to ${data.billing.plan.label}.`,
-      });
+      window.location.href = data.checkoutUrl;
     } catch (error) {
       setMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "Failed to change plan.",
+        text:
+          error instanceof Error ? error.message : "Failed to start checkout.",
+      });
+    } finally {
+      setUpdatingPlan(false);
+    }
+  };
+
+  const handleOpenBillingPortal = async () => {
+    setUpdatingPlan(true);
+    try {
+      const res = await fetch("/api/billing/portal", {
+        method: "POST",
+      });
+      const data = (await res.json()) as { portalUrl?: string; error?: string };
+      if (!res.ok || !data.portalUrl) {
+        throw new Error(data.error ?? "Failed to open billing portal.");
+      }
+      window.location.href = data.portalUrl;
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to open billing portal.",
       });
     } finally {
       setUpdatingPlan(false);
@@ -1731,8 +1902,12 @@ export default function DashboardPage() {
       }
       setBilling(data.billing);
       setAvailablePlans(data.plans ?? availablePlans);
+      setAvailableIntervals(data.intervals ?? availableIntervals);
       setAvailableProviders(data.providers ?? availableProviders);
       setAvailableUsageRates(data.usageRates ?? availableUsageRates);
+      setStripeConfigured(
+        data.stripeConfigured !== undefined ? data.stripeConfigured : stripeConfigured
+      );
       setSelectedAiProvider(data.billing.aiProvider);
       setSelectedAiUsageRate(data.billing.aiUsageRate);
       setPreferredAiModelInput(data.billing.preferredAiModel ?? "");
@@ -1754,22 +1929,72 @@ export default function DashboardPage() {
   };
 
   const handleSaveCustomDomain = async () => {
-    const settings = await saveSettings({
+    await saveSettings({
       customDomain: customDomainInput.trim() || null,
     });
-
-    if (settings) {
-      const savedDomain = settings.customDomain ?? "";
-      setCustomDomain(savedDomain);
-      setCustomDomainInput(savedDomain);
-    }
   };
 
   const handleClearCustomDomain = async () => {
-    const settings = await saveSettings({ customDomain: null });
-    if (settings) {
-      setCustomDomain("");
-      setCustomDomainInput("");
+    await saveSettings({ customDomain: null });
+  };
+
+  const handleVerifyCustomDomain = async () => {
+    setVerifyingDomain(true);
+    try {
+      const res = await fetch("/api/settings/domain/verify", {
+        method: "POST",
+      });
+      const data = (await res.json()) as ApiSettingsResponse;
+      if (!res.ok || !data.settings) {
+        throw new Error(data.error ?? "Failed to verify the custom domain.");
+      }
+      applySettingsSnapshot(data.settings);
+      setMessage({
+        type: data.verified ? "success" : "error",
+        text: data.verified
+          ? "DNS looks correct. You can attach the domain now."
+          : data.error ?? "DNS does not match the required target yet.",
+      });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to verify the custom domain.",
+      });
+    } finally {
+      setVerifyingDomain(false);
+    }
+  };
+
+  const handleAttachCustomDomain = async () => {
+    setAttachingDomain(true);
+    try {
+      const res = await fetch("/api/settings/domain/attach", {
+        method: "POST",
+      });
+      const data = (await res.json()) as ApiSettingsResponse;
+      if (!res.ok || !data.settings) {
+        throw new Error(data.error ?? "Failed to attach the custom domain.");
+      }
+      applySettingsSnapshot(data.settings);
+      setMessage({
+        type: data.attached ? "success" : "error",
+        text: data.attached
+          ? "Custom domain attached. Public traffic can now resolve through it."
+          : data.error ?? "Failed to attach the custom domain.",
+      });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to attach the custom domain.",
+      });
+    } finally {
+      setAttachingDomain(false);
     }
   };
 
@@ -2011,7 +2236,41 @@ export default function DashboardPage() {
   }, [status, router, fetchData]);
 
   useEffect(() => {
+    const billingState = searchParams.get("billing");
+    if (!billingState) {
+      return;
+    }
+
+    setActiveTab("settings");
+    if (billingState === "success") {
+      setMessage({
+        type: "success",
+        text: "Payment completed. Stripe will update your plan as soon as the webhook sync finishes.",
+      });
+    } else if (billingState === "canceled") {
+      setMessage({
+        type: "error",
+        text: "Checkout was canceled. Your plan has not changed.",
+      });
+    }
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete("billing");
+    window.history.replaceState({}, "", nextUrl.toString());
+  }, [searchParams]);
+
+  useEffect(() => {
     setCurrentHost(window.location.hostname);
+  }, []);
+
+  useEffect(() => {
+    const browserTimeZone =
+      Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    setNewAutomation((current) =>
+      current.scheduleTimezone === "UTC"
+        ? { ...current, scheduleTimezone: browserTimeZone }
+        : current
+    );
   }, []);
 
   useEffect(() => {
@@ -2227,7 +2486,14 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error(data.error ?? "Failed");
       setAutomations((prev) => [data.automation!, ...prev]);
       setShowNewAutomation(false);
-      setNewAutomation({ name: "", action: "regenerate_profile", schedule: "weekly", config: {} });
+      setNewAutomation((current) => ({
+        name: "",
+        action: "regenerate_profile",
+        schedule: "weekly",
+        scheduleTime: current.scheduleTime,
+        scheduleTimezone: current.scheduleTimezone,
+        config: {},
+      }));
       setMessage({ type: "success", text: "Automation created!" });
     } catch (err) {
       setMessage({ type: "error", text: String(err) });
@@ -2407,6 +2673,30 @@ export default function DashboardPage() {
     !["localhost", "127.0.0.1", "::1", "[::1]"].includes(currentHost)
       ? currentHost
       : "your-app-host";
+  const customDomainTargetHost =
+    customDomainVerificationValue || dnsTargetHost;
+  const hasSavedCustomDomain = customDomain.length > 0;
+  const hasActiveCustomDomain = customDomainStatus === "active";
+  const canVerifyCustomDomain =
+    hasSavedCustomDomain &&
+    !hasCustomDomainChanges &&
+    customDomainStatus !== "active";
+  const canAttachCustomDomain =
+    hasSavedCustomDomain &&
+    !hasCustomDomainChanges &&
+    customDomainStatus === "verified";
+  const customDomainLastCheckedLabel = customDomainLastCheckedAt
+    ? new Date(customDomainLastCheckedAt).toLocaleString()
+    : null;
+  const billingIntervalForCards = selectedBillingInterval;
+  const hasYearlyBillingOption = availableIntervals.includes("year");
+  const activePlanPriceSuffix = formatPlanIntervalSuffix(billingIntervalForCards);
+  const nextRenewalDate = billing?.subscriptionCurrentPeriodEnd
+    ? new Date(billing.subscriptionCurrentPeriodEnd).toLocaleDateString()
+    : null;
+  const billingSyncedAt = billing?.billingSyncedAt
+    ? new Date(billing.billingSyncedAt).toLocaleString()
+    : null;
   const selectedProviderDef =
     availableProviders.find((provider) => provider.id === selectedAiProvider) ??
     availableProviders[0] ??
@@ -2843,6 +3133,19 @@ export default function DashboardPage() {
                         <p className="font-medium text-sm truncate">
                           {item.title ?? item.url}
                         </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-gray-300">
+                            Crawl {formatEvidenceStatusLabel(item.crawlStatus)}
+                          </span>
+                          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-gray-300">
+                            Screenshot {formatEvidenceStatusLabel(item.screenshotStatus)}
+                          </span>
+                          {!item.visible && (
+                            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-gray-400">
+                              Hidden
+                            </span>
+                          )}
+                        </div>
                         {item.description && (
                           <p className="text-gray-400 text-xs mt-1 line-clamp-2">
                             {item.description}
@@ -2857,6 +3160,17 @@ export default function DashboardPage() {
                           >
                             {item.url}
                           </a>
+                        )}
+                        {item.canonicalUrl &&
+                          item.canonicalUrl !== item.url && (
+                            <p className="mt-1 truncate text-[11px] text-gray-500">
+                              Canonical: {item.canonicalUrl}
+                            </p>
+                          )}
+                        {item.screenshotError && (
+                          <p className="mt-2 text-[11px] text-yellow-300">
+                            Screenshot issue: {item.screenshotError}
+                          </p>
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
@@ -3263,7 +3577,9 @@ export default function DashboardPage() {
                       {new Date(billing.cycleEndsAt).toLocaleDateString()}
                     </p>
                     <p className="mt-1 text-xs text-gray-400">
-                      Credits reset automatically at the start of the next cycle.
+                      {billing.billingInterval === "year"
+                        ? "Credits refresh monthly even on yearly billing."
+                        : "Credits reset automatically at the start of the next cycle."}
                     </p>
                   </div>
                 </div>
@@ -3287,6 +3603,12 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-sm text-gray-300">
                       Plan: <span className="text-white">{billing.plan.label}</span>
+                      {billing.billingInterval && (
+                        <span className="text-gray-500">
+                          {" "}
+                          · {formatBillingIntervalLabel(billing.billingInterval)}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -3318,6 +3640,23 @@ export default function DashboardPage() {
                       <p>Automation runs only spend a credit when they use the advanced model.</p>
                       <p>Fallback runs do not spend advanced credits after your allowance is exhausted.</p>
                     </div>
+                    {!billing.unlimitedAdvanced && (
+                      <button
+                        onClick={() => {
+                          if (billing.canManageSubscription) {
+                            void handleOpenBillingPortal();
+                            return;
+                          }
+                          void handleStartCheckout("plus", billingIntervalForCards);
+                        }}
+                        className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[#00f5ff]/25 bg-[#00f5ff]/10 px-3 py-2 text-xs font-medium text-[#7ef4ff] transition hover:border-[#00f5ff]/40 hover:bg-[#00f5ff]/15"
+                      >
+                        {billing.planTier === "free"
+                          ? "Upgrade to Plus"
+                          : "Manage paid plan"}
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
 
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
@@ -3828,7 +4167,7 @@ export default function DashboardPage() {
                   Automations
                 </h2>
                 <p className="text-sm text-gray-400 mt-1">
-                  Schedule recurring tasks — re-crawl a URL weekly, regenerate your profile, refresh your timeline.
+                  Schedule recurring tasks with a saved cadence, time of day, and timezone. The runner now locks work in flight and retries transient failures automatically.
                 </p>
               </div>
               <button
@@ -3925,6 +4264,41 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">
+                      Time of day
+                    </label>
+                    <input
+                      type="time"
+                      value={newAutomation.scheduleTime}
+                      onChange={(e) =>
+                        setNewAutomation((n) => ({
+                          ...n,
+                          scheduleTime: e.target.value || "09:00",
+                        }))
+                      }
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#00f5ff]/40"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">
+                      Timezone
+                    </label>
+                    <input
+                      value={newAutomation.scheduleTimezone}
+                      onChange={(e) =>
+                        setNewAutomation((n) => ({
+                          ...n,
+                          scheduleTimezone: e.target.value,
+                        }))
+                      }
+                      placeholder="America/Los_Angeles"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#00f5ff]/40"
+                    />
+                  </div>
+                </div>
+
                 <div className="flex gap-2 pt-2">
                   <button
                     onClick={handleCreateAutomation}
@@ -3951,7 +4325,7 @@ export default function DashboardPage() {
                 </div>
                 <p className="font-semibold mb-1">No automations yet</p>
                 <p className="text-sm text-gray-400 mb-6">
-                  Set up a weekly re-crawl or profile refresh so your portfolio stays fresh automatically.
+                  Set up a recurring re-crawl or profile refresh so your portfolio stays fresh automatically.
                 </p>
                 <button
                   onClick={() => setShowNewAutomation(true)}
@@ -3999,12 +4373,23 @@ export default function DashboardPage() {
                                   {auto.lastStatus}
                                 </span>
                               )}
+                              {auto.lockedAt && auto.lastStatus === "running" && (
+                                <span className="text-xs px-2 py-0.5 rounded-full border border-yellow-500/30 text-yellow-300">
+                                  Locked
+                                </span>
+                              )}
                             </div>
-                            <p className="text-xs text-gray-400 mt-0.5 capitalize">{meta.label} · {SCHEDULE_LABELS[auto.schedule] ?? auto.schedule}</p>
+                            <p className="text-xs text-gray-400 mt-0.5 capitalize">
+                              {meta.label} · {SCHEDULE_LABELS[auto.schedule] ?? auto.schedule} · {auto.scheduleTime} · {auto.scheduleTimezone}
+                            </p>
                             <div className="flex gap-4 mt-1.5 text-xs text-gray-500">
-                              {auto.lastRun && <span>Last run: {new Date(auto.lastRun).toLocaleDateString()}</span>}
-                              {auto.nextRun && <span>Next: {new Date(auto.nextRun).toLocaleDateString()}</span>}
+                              {auto.lastRun && <span>Last run: {new Date(auto.lastRun).toLocaleString()}</span>}
+                              {!auto.lastRun && auto.lastAttemptAt && (
+                                <span>Last attempt: {new Date(auto.lastAttemptAt).toLocaleString()}</span>
+                              )}
+                              {auto.nextRun && <span>Next: {new Date(auto.nextRun).toLocaleString()}</span>}
                               <span>Runs: {auto.runCount}</span>
+                              {auto.retryCount > 0 && <span>Retries queued: {auto.retryCount}</span>}
                             </div>
                             {auto.lastError && (
                               <p className="text-xs text-red-400 mt-1 truncate">{auto.lastError}</p>
@@ -4053,7 +4438,7 @@ export default function DashboardPage() {
                 <Settings className="h-3.5 w-3.5" />
                 How automations run
               </p>
-              <p>Automations are triggered by calling <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1 rounded">POST /api/automations/run</code> with your <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1 rounded">CRON_SECRET</code> header. Set this up with Vercel Cron, GitHub Actions, or Upstash QStash for fully automatic scheduling.</p>
+              <p>Automations are triggered by calling <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1 rounded">POST /api/automations/run</code> with your <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1 rounded">CRON_SECRET</code> header. Each run now stores its scheduled time and timezone, prevents overlapping execution with a lock, and requeues transient failures with backoff.</p>
             </div>
           </div>
         )}
@@ -4324,7 +4709,7 @@ export default function DashboardPage() {
                   <h2 className="text-lg font-semibold">Usage</h2>
                 </div>
                 <p className="text-sm text-gray-400 mb-5">
-                  Track your current advanced AI credits and fallback behavior.
+                  Track your current advanced AI credits, fallback behavior, and monthly refresh cadence.
                 </p>
 
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -4362,12 +4747,31 @@ export default function DashboardPage() {
                       </div>
                     )}
                     <p className="mt-3 text-xs text-gray-500">
-                      Cycle resets on {new Date(billing.cycleEndsAt).toLocaleDateString()}.
+                      {billing.billingInterval === "year"
+                        ? `Next monthly credit refresh: ${new Date(billing.cycleEndsAt).toLocaleDateString()}.`
+                        : `Cycle resets on ${new Date(billing.cycleEndsAt).toLocaleDateString()}.`}
                     </p>
                     {billing.fallbackToStandard && (
                       <p className="mt-2 text-xs text-yellow-300">
                         Advanced credits are exhausted. AI is now using {billing.standardModel}.
                       </p>
+                    )}
+                    {!billing.unlimitedAdvanced && (
+                      <button
+                        onClick={() => {
+                          if (billing.canManageSubscription) {
+                            void handleOpenBillingPortal();
+                            return;
+                          }
+                          void handleStartCheckout("plus", billingIntervalForCards);
+                        }}
+                        className="mt-3 inline-flex items-center gap-2 rounded-xl border border-[#00f5ff]/25 bg-[#00f5ff]/10 px-3 py-2 text-xs font-medium text-[#7ef4ff] transition hover:border-[#00f5ff]/40 hover:bg-[#00f5ff]/15"
+                      >
+                        {billing.planTier === "free"
+                          ? "Upgrade to Plus"
+                          : "Manage paid plan"}
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </button>
                     )}
                   </div>
 
@@ -4390,7 +4794,7 @@ export default function DashboardPage() {
                       Fallback: {billing.standardModel}
                     </p>
                     <p className="mt-2 text-xs leading-relaxed text-gray-400">
-                      AI intensity is configured in AI Preferences. Usage here is counted in credits, not token totals.
+                      AI intensity is configured in AI Preferences. Usage here is counted in credits, not token totals. Yearly billing still refreshes credits monthly.
                     </p>
                   </div>
                 </div>
@@ -4407,17 +4811,157 @@ export default function DashboardPage() {
                   <h2 className="text-lg font-semibold">Billing</h2>
                 </div>
                 <p className="text-sm text-gray-400 mb-5">
-                  Pick your plan and control how much advanced AI capacity you want each month.
+                  Plans and intervals now come from Stripe. Use checkout to upgrade and the Stripe portal to manage changes, renewals, and cancellations.
                 </p>
+                {!stripeConfigured && (
+                  <div className="mb-5 rounded-2xl border border-yellow-500/20 bg-yellow-500/8 p-4 text-sm text-yellow-100">
+                    Stripe billing is not configured in this environment yet. AI preferences still save normally, but paid upgrades and subscription changes stay disabled until the Stripe env vars are present.
+                  </div>
+                )}
+
+                <div className="mb-5 grid gap-4 xl:grid-cols-4">
+                  <div className="rounded-2xl border border-white/10 bg-white/3 p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
+                      Current plan
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-white">
+                      {billing.plan.label}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      {billing.planTier === "free"
+                        ? "No active Stripe subscription yet."
+                        : `${formatPlanPrice(
+                            billing.plan,
+                            billing.billingInterval ?? "month"
+                          )}${formatPlanIntervalSuffix(
+                            billing.billingInterval ?? "month"
+                          )} billed through Stripe.`}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/3 p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
+                      Billing interval
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-white">
+                      {formatBillingIntervalLabel(billing.billingInterval)}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      {billing.billingInterval === "year"
+                        ? "Billed once a year, credits still refresh monthly."
+                        : billing.billingInterval === "month"
+                          ? "Billed every month."
+                          : "Upgrade to Plus or Pro to start billing."}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/3 p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
+                      Subscription status
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-white">
+                      {formatSubscriptionStatus(billing.subscriptionStatus)}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      {billing.cancelAtPeriodEnd
+                        ? "Cancellation is scheduled at the end of the current period."
+                        : billing.subscriptionStatus
+                          ? "Stripe webhook sync controls access and renewal state."
+                          : "You are currently on the free plan."}
+                    </p>
+                    {billingSyncedAt && (
+                      <p className="mt-2 text-[11px] text-gray-500">
+                        Last synced: {billingSyncedAt}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/3 p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
+                      Next renewal
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-white">
+                      {nextRenewalDate ?? "Not scheduled"}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      {billing.cancelAtPeriodEnd && nextRenewalDate
+                        ? "Access stays active until this date."
+                        : billing.subscriptionCurrentPeriodEnd
+                          ? "Stripe reports the current period end here."
+                          : "No paid renewal on file."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="inline-flex rounded-2xl border border-white/10 bg-white/4 p-1">
+                    {availableIntervals.map((interval) => {
+                      const isActive = billingIntervalForCards === interval;
+                      return (
+                        <button
+                          key={interval}
+                          type="button"
+                          onClick={() => setSelectedBillingInterval(interval)}
+                          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                            isActive
+                              ? "bg-[#00f5ff] text-black"
+                              : "text-gray-300 hover:text-white"
+                          }`}
+                        >
+                          {interval === "year" ? "Yearly" : "Monthly"}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
+                    {hasYearlyBillingOption && (
+                      <span className="rounded-full border border-[#00f5ff]/20 bg-[#00f5ff]/8 px-3 py-1 text-[#7ef4ff]">
+                        Yearly pricing is 10 months effective
+                      </span>
+                    )}
+                    {billing.canManageSubscription && stripeConfigured && (
+                      <button
+                        onClick={handleOpenBillingPortal}
+                        disabled={updatingPlan}
+                        className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/8 disabled:opacity-50"
+                      >
+                        Manage subscription
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
 
                 <div className="mb-5 grid gap-4 md:grid-cols-3">
                   {availablePlans.map((plan) => {
-                    const isCurrent = billing.planTier === plan.id;
+                    const isCurrentPlan = billing.planTier === plan.id;
+                    const isCurrentInterval =
+                      billing.billingInterval === billingIntervalForCards;
+                    const savingsCopy = getPlanSavingsCopy(
+                      plan,
+                      billingIntervalForCards
+                    );
+                    const cardPrice = formatPlanPrice(plan, billingIntervalForCards);
+                    const buttonLabel =
+                      plan.id === "free"
+                        ? isCurrentPlan
+                          ? "Current plan"
+                          : stripeConfigured
+                            ? "Downgrade in Stripe"
+                            : "Stripe unavailable"
+                        : !stripeConfigured
+                          ? "Stripe unavailable"
+                        : billing.canManageSubscription
+                          ? isCurrentPlan && isCurrentInterval
+                            ? "Manage in Stripe"
+                            : "Change in Stripe"
+                          : `Choose ${plan.label}`;
                     return (
                       <div
                         key={plan.id}
                         className={`rounded-2xl border p-4 ${
-                          isCurrent
+                          isCurrentPlan
                             ? "border-[#00f5ff]/40 bg-[#00f5ff]/8"
                             : "border-white/10 bg-white/3"
                         }`}
@@ -4426,12 +4970,20 @@ export default function DashboardPage() {
                           <div>
                             <p className="text-sm font-semibold">{plan.label}</p>
                             <p className="text-xs text-gray-400 mt-1">
-                              ${plan.monthlyPriceUsd}/month
+                              {cardPrice}
+                              {plan.id === "free" ? "" : activePlanPriceSuffix}
                             </p>
+                            {savingsCopy && (
+                              <p className="mt-1 text-[11px] text-[#7ef4ff]">
+                                {savingsCopy}
+                              </p>
+                            )}
                           </div>
-                          {isCurrent && (
+                          {isCurrentPlan && (
                             <span className="rounded-full border border-[#00f5ff]/30 bg-[#00f5ff]/10 px-2 py-0.5 text-[11px] text-[#00f5ff]">
-                              Current
+                              {billing.billingInterval === billingIntervalForCards
+                                ? "Current"
+                                : "Current plan"}
                             </span>
                           )}
                         </div>
@@ -4446,15 +4998,29 @@ export default function DashboardPage() {
                           ))}
                         </div>
                         <button
-                          onClick={() => handleChangePlan(plan.id)}
-                          disabled={updatingPlan || isCurrent}
+                          onClick={() => {
+                            if (plan.id === "free") {
+                              if (billing.canManageSubscription) {
+                                void handleOpenBillingPortal();
+                              }
+                              return;
+                            }
+                            void handleStartCheckout(plan.id, billingIntervalForCards);
+                          }}
+                          disabled={
+                            updatingPlan ||
+                            (plan.id !== "free" && !stripeConfigured) ||
+                            (plan.id === "free" && !isCurrentPlan && !stripeConfigured) ||
+                            (plan.id === "free" && !billing.canManageSubscription) ||
+                            (plan.id === "free" && isCurrentPlan)
+                          }
                           className={`mt-4 w-full rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                            isCurrent
+                            (plan.id === "free" && isCurrentPlan)
                               ? "bg-white/5 text-gray-500"
                               : "bg-[#00f5ff] text-black hover:bg-[#00e5ef]"
                           } disabled:opacity-50`}
                         >
-                          {isCurrent ? "Current plan" : `Switch to ${plan.label}`}
+                          {buttonLabel}
                         </button>
                       </div>
                     );
@@ -4462,7 +5028,7 @@ export default function DashboardPage() {
                 </div>
 
                 <p className="text-xs text-gray-500">
-                  Usage details, current rate, and active models are tracked in the Usage section above.
+                  Usage details, current rate, and active models are tracked in the Usage section above. Yearly subscriptions still refresh credits every 30 days from the subscription anchor.
                 </p>
               </div>
             )}
@@ -5041,10 +5607,10 @@ export default function DashboardPage() {
                 <h2 className="text-lg font-semibold">Deploy</h2>
               </div>
               <p className="text-sm text-gray-400 mb-5">
-                The first Cloudflare launch goes live on a <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1 rounded">workers.dev</code> URL. Save a custom domain here if you want to map it later, but domain verification and Cloudflare routing are still a manual step in this version.
+                The first Cloudflare launch goes live on a <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1 rounded">workers.dev</code> URL. Managed domains now move through a visible lifecycle here: save the hostname, point DNS, verify, then activate it for public traffic.
               </p>
 
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] lg:items-end">
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">
                     Custom domain
@@ -5069,6 +5635,22 @@ export default function DashboardPage() {
                 </button>
 
                 <button
+                  onClick={handleVerifyCustomDomain}
+                  disabled={savingSettings || verifyingDomain || !canVerifyCustomDomain}
+                  className="inline-flex items-center justify-center gap-2 border border-white/10 px-4 py-2.5 rounded-lg text-sm text-gray-200 hover:border-white/20 hover:bg-white/5 transition-colors disabled:opacity-50"
+                >
+                  {verifyingDomain ? "Verifying…" : "Verify DNS"}
+                </button>
+
+                <button
+                  onClick={handleAttachCustomDomain}
+                  disabled={savingSettings || attachingDomain || !canAttachCustomDomain}
+                  className="inline-flex items-center justify-center gap-2 border border-[#00f5ff]/30 bg-[#00f5ff]/10 px-4 py-2.5 rounded-lg text-sm text-[#7ef4ff] hover:bg-[#00f5ff]/15 transition-colors disabled:opacity-50"
+                >
+                  {attachingDomain ? "Attaching…" : "Attach Domain"}
+                </button>
+
+                <button
                   onClick={handleClearCustomDomain}
                   disabled={savingSettings || !customDomain}
                   className="inline-flex items-center justify-center gap-2 border border-white/10 px-4 py-2.5 rounded-lg text-sm text-gray-300 hover:border-white/20 hover:bg-white/5 transition-colors disabled:opacity-50"
@@ -5079,21 +5661,69 @@ export default function DashboardPage() {
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <div className="rounded-xl border border-white/10 bg-white/3 p-4 text-sm text-gray-400">
+                  <p className="font-medium text-white mb-2">Domain status</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-xs ${
+                        customDomainStatus === "active"
+                          ? "border-green-500/30 bg-green-500/10 text-green-300"
+                          : customDomainStatus === "verified"
+                            ? "border-[#00f5ff]/30 bg-[#00f5ff]/10 text-[#7ef4ff]"
+                            : customDomainStatus === "error"
+                              ? "border-red-500/30 bg-red-500/10 text-red-300"
+                              : "border-white/10 bg-white/5 text-gray-300"
+                      }`}
+                    >
+                      {formatCustomDomainStatus(customDomainStatus)}
+                    </span>
+                    {customDomainLastCheckedLabel && (
+                      <span className="text-xs text-gray-500">
+                        Last checked: {customDomainLastCheckedLabel}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-3 leading-relaxed">
+                    {getCustomDomainStatusCopy(customDomainStatus)}
+                  </p>
+                  {customDomainError && (
+                    <p className="mt-3 text-xs text-red-300">
+                      {customDomainError}
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/3 p-4 text-sm text-gray-400">
                   <p className="font-medium text-white mb-2">DNS setup</p>
                   <p className="leading-relaxed">
-                    Point <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1.5 py-0.5 rounded">{normalizedCustomDomainInput || "portfolio.example.com"}</code> to
+                    Point <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1.5 py-0.5 rounded">{normalizedCustomDomainInput || customDomain || "portfolio.example.com"}</code> to
                     {" "}
-                    <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1.5 py-0.5 rounded">{dnsTargetHost}</code>.
-                    Use a CNAME for subdomains, or ALIAS/ANAME flattening if you want to use an apex domain. This app stores the hostname now; the Cloudflare route attachment still happens outside the dashboard.
+                    <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1.5 py-0.5 rounded">{customDomainTargetHost}</code>.
+                    Use a CNAME for subdomains, or ALIAS/ANAME flattening if you want to use an apex domain.
                   </p>
+                  {customDomainVerificationName && (
+                    <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-gray-300">
+                      <p>
+                        Record name:{" "}
+                        <code className="text-[#7ef4ff]">
+                          {customDomainVerificationName}
+                        </code>
+                      </p>
+                      <p className="mt-1">
+                        Target value:{" "}
+                        <code className="text-[#7ef4ff]">
+                          {customDomainVerificationValue || customDomainTargetHost}
+                        </code>
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-white/3 p-4 text-sm text-gray-400">
                   <p className="font-medium text-white mb-2">Behavior</p>
                   <p className="leading-relaxed">
-                    The public site already knows how to serve mapped hosts. What is missing today is the self-serve Cloudflare verification and routing workflow, so treat this as deployment metadata rather than a one-click publish button.
+                    Public resolution stays blocked until the domain reaches <span className="text-white">Active</span>. Verification confirms DNS, and activation flips the hostname into the live portfolio routing path.
                   </p>
-                  {customDomain && (
+                  {hasActiveCustomDomain && (
                     <a
                       href={`https://${customDomain}`}
                       target="_blank"
@@ -5103,6 +5733,11 @@ export default function DashboardPage() {
                       Open connected domain
                       <ExternalLink className="h-3.5 w-3.5" />
                     </a>
+                  )}
+                  {hasSavedCustomDomain && !hasActiveCustomDomain && (
+                    <p className="mt-3 text-xs text-gray-500">
+                      The hostname is saved, but it will not resolve publicly until verification succeeds and activation completes.
+                    </p>
                   )}
                 </div>
               </div>
