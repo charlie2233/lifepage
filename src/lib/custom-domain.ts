@@ -81,6 +81,9 @@ export function normalizeCustomDomain(input: string) {
   if (labels.length < 2 || labels.some((label) => !HOST_LABEL.test(label))) {
     throw new Error("Enter a valid domain like portfolio.example.com.");
   }
+  if (labels.length < 3) {
+    throw new Error("Use a subdomain like portfolio.example.com. Apex domains are not supported yet.");
+  }
 
   return hostname;
 }

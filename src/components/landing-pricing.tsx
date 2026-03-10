@@ -35,8 +35,10 @@ function getSavingsCopy(plan: LandingPricingPlan) {
 
 export function LandingPricing({
   plans,
+  stripeConfigured = true,
 }: {
   plans: readonly LandingPricingPlan[];
+  stripeConfigured?: boolean;
 }) {
   const [interval, setInterval] = useState<BillingInterval>("month");
 
@@ -72,6 +74,7 @@ export function LandingPricing({
             tier.id === "free"
               ? "/register"
               : `/upgrade?plan=${tier.id}&interval=${interval}`;
+          const paidPlanDisabled = tier.id !== "free" && !stripeConfigured;
 
           return (
             <div
@@ -120,15 +123,21 @@ export function LandingPricing({
                   Billed yearly. Credits still refresh monthly.
                 </p>
               )}
+              {paidPlanDisabled && (
+                <p className="mt-4 text-xs text-[#f1d78c]">
+                  Stripe checkout is not configured in this environment yet.
+                </p>
+              )}
               <Link
                 href={href}
+                aria-disabled={paidPlanDisabled}
                 className={`mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${
                   tier.id === "plus"
                     ? "bg-[#79e5d2] text-[#041117] hover:bg-[#8deedb]"
                     : tier.id === "pro"
                       ? "bg-white text-[#041117] hover:bg-[#f2f2f2]"
                       : "border border-white/10 bg-white/5 text-white hover:border-white/20 hover:bg-white/8"
-                }`}
+                } ${paidPlanDisabled ? "pointer-events-none opacity-55" : ""}`}
               >
                 {tier.id === "free" ? "Start free" : `Choose ${tier.name}`}
                 <ArrowRight className="h-4 w-4" />

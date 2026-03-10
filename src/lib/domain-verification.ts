@@ -10,7 +10,7 @@ interface DnsResponse {
   }>;
 }
 
-async function queryDns(name: string, type: "A" | "AAAA" | "CNAME") {
+async function queryDns(name: string, type: "CNAME") {
   const response = await fetch(
     `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=${type}`,
     {
@@ -32,7 +32,7 @@ function normalizeDnsValue(value: string) {
   return value.trim().toLowerCase().replace(/\.+$/, "");
 }
 
-async function resolveRecordValues(name: string, type: "A" | "AAAA" | "CNAME") {
+async function resolveRecordValues(name: string, type: "CNAME") {
   const result = await queryDns(name, type);
   return (result.Answer ?? [])
     .map((answer) => answer.data?.trim())
@@ -62,26 +62,9 @@ export async function verifyCustomDomainDns(hostname: string) {
     return { ok: true, verification };
   }
 
-  const [hostA, hostAAAA, targetA, targetAAAA] = await Promise.all([
-    resolveRecordValues(hostname, "A").catch(() => [] as string[]),
-    resolveRecordValues(hostname, "AAAA").catch(() => [] as string[]),
-    resolveRecordValues(targetHost, "A").catch(() => [] as string[]),
-    resolveRecordValues(targetHost, "AAAA").catch(() => [] as string[]),
-  ]);
-
-  const hostAddresses = new Set([...hostA, ...hostAAAA]);
-  const targetAddresses = [...targetA, ...targetAAAA];
-  const matchesTargetAddress = targetAddresses.some((value) =>
-    hostAddresses.has(value)
-  );
-
-  if (matchesTargetAddress) {
-    return { ok: true, verification };
-  }
-
   return {
     ok: false,
-    error: `DNS is not pointing ${hostname} to ${targetHost} yet.`,
+    error: `DNS is not pointing ${hostname} to the required CNAME target ${targetHost} yet.`,
     verification,
   };
 }

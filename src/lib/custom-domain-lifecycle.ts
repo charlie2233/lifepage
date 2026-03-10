@@ -1,4 +1,4 @@
-import { getPrimaryAppHostname } from "@/lib/custom-domain";
+import { getCloudflareSaasCnameTarget } from "@/lib/cloudflare-saas";
 
 export const CUSTOM_DOMAIN_STATUSES = [
   "none",
@@ -29,11 +29,7 @@ export function isCustomDomainActive(settings?: {
 }
 
 export function getManagedCustomDomainTargetHost() {
-  return (
-    process.env.CUSTOM_DOMAIN_TARGET_HOST?.trim().toLowerCase() ??
-    getPrimaryAppHostname() ??
-    null
-  );
+  return getCloudflareSaasCnameTarget();
 }
 
 export function buildCustomDomainVerificationRecord(hostname: string) {
@@ -41,4 +37,49 @@ export function buildCustomDomainVerificationRecord(hostname: string) {
     name: hostname,
     value: getManagedCustomDomainTargetHost(),
   };
+}
+
+function normalizeProviderState(value?: string | null) {
+  const normalized = value?.trim().toLowerCase().replace(/\s+/g, "_");
+  return normalized || null;
+}
+
+export function normalizeCustomDomainProviderStatus(value?: string | null) {
+  return normalizeProviderState(value);
+}
+
+export function normalizeCustomDomainSslStatus(value?: string | null) {
+  return normalizeProviderState(value);
+}
+
+export function deriveCustomDomainLifecycleState(args: {
+  dnsVerified: boolean;
+  providerStatus?: string | null;
+  sslStatus?: string | null;
+  providerError?: string | null;
+  forceError?: boolean;
+}) {
+  const providerStatus = normalizeCustomDomainProviderStatus(args.providerStatus);
+  const sslStatus = normalizeCustomDomainSslStatus(args.sslStatus);
+
+  if (providerStatus === "active" && sslStatus === "active") {
+    return "active" satisfies CustomDomainStatus;
+  }
+
+  if (
+    args.forceError ||
+    Boolean(args.providerError) ||
+    providerStatus === "deleted" ||
+    providerStatus === "blocked" ||
+    sslStatus === "deleted" ||
+    sslStatus === "validation_timed_out"
+  ) {
+    return "error" satisfies CustomDomainStatus;
+  }
+
+  if (args.dnsVerified) {
+    return "verified" satisfies CustomDomainStatus;
+  }
+
+  return "pending_verification" satisfies CustomDomainStatus;
 }

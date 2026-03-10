@@ -1839,11 +1839,16 @@ function DashboardPageContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planTier, interval }),
       });
-      const data = (await res.json()) as { checkoutUrl?: string; error?: string };
-      if (!res.ok || !data.checkoutUrl) {
+      const data = (await res.json()) as {
+        url?: string;
+        checkoutUrl?: string;
+        error?: string;
+      };
+      const checkoutUrl = data.checkoutUrl ?? data.url;
+      if (!res.ok || !checkoutUrl) {
         throw new Error(data.error ?? "Failed to start checkout.");
       }
-      window.location.href = data.checkoutUrl;
+      window.location.href = checkoutUrl;
     } catch (error) {
       setMessage({
         type: "error",
@@ -1861,11 +1866,16 @@ function DashboardPageContent() {
       const res = await fetch("/api/billing/portal", {
         method: "POST",
       });
-      const data = (await res.json()) as { portalUrl?: string; error?: string };
-      if (!res.ok || !data.portalUrl) {
+      const data = (await res.json()) as {
+        url?: string;
+        portalUrl?: string;
+        error?: string;
+      };
+      const portalUrl = data.portalUrl ?? data.url;
+      if (!res.ok || !portalUrl) {
         throw new Error(data.error ?? "Failed to open billing portal.");
       }
-      window.location.href = data.portalUrl;
+      window.location.href = portalUrl;
     } catch (error) {
       setMessage({
         type: "error",
@@ -4816,6 +4826,18 @@ function DashboardPageContent() {
                 {!stripeConfigured && (
                   <div className="mb-5 rounded-2xl border border-yellow-500/20 bg-yellow-500/8 p-4 text-sm text-yellow-100">
                     Stripe billing is not configured in this environment yet. AI preferences still save normally, but paid upgrades and subscription changes stay disabled until the Stripe env vars are present.
+                  </div>
+                )}
+                {billing.subscriptionStatus === "past_due" && (
+                  <div className="mb-5 rounded-2xl border border-yellow-500/20 bg-yellow-500/8 p-4 text-sm text-yellow-100">
+                    Stripe marked this subscription as past due. Advanced access stays active for now, but you should update the payment method in the Stripe portal before the subscription moves to an unpaid or canceled state.
+                  </div>
+                )}
+                {billing.cancelAtPeriodEnd && billing.subscriptionCurrentPeriodEnd && (
+                  <div className="mb-5 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-gray-200">
+                    This subscription is scheduled to cancel at the end of the current period on{" "}
+                    {new Date(billing.subscriptionCurrentPeriodEnd).toLocaleDateString()}.
+                    Paid access stays active until then.
                   </div>
                 )}
 

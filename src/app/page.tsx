@@ -7,6 +7,7 @@ import type { ProfileJSON } from "@/lib/schema";
 import { PublicProfilePage } from "@/components/public-profile-page";
 import { ContactSection } from "@/components/contact-section";
 import { LandingPricing } from "@/components/landing-pricing";
+import { isStripeBillingConfigured } from "@/lib/stripe-billing";
 import {
   getPublicPageUserByCustomDomain,
 } from "@/lib/public-page";
@@ -214,6 +215,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 function LandingPage() {
+  const stripeConfigured = isStripeBillingConfigured();
+
   return (
     <div className="lp-page overflow-hidden text-white">
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
@@ -739,7 +742,7 @@ function LandingPage() {
             </p>
           </div>
 
-          <LandingPricing plans={PRICING} />
+          <LandingPricing plans={PRICING} stripeConfigured={stripeConfigured} />
         </div>
       </section>
 

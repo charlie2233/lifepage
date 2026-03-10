@@ -44,7 +44,7 @@ export async function POST(req: Request) {
       interval: parsed.data.interval,
     });
 
-    return NextResponse.json({ url });
+    return NextResponse.json({ url, checkoutUrl: url });
   } catch (error) {
     return NextResponse.json(
       {

@@ -60,14 +60,16 @@ function UpgradePageContent() {
           body: JSON.stringify(selection),
         });
         const data = (await res.json()) as {
+          url?: string;
           checkoutUrl?: string;
           error?: string;
         };
-        if (!res.ok || !data.checkoutUrl) {
+        const checkoutUrl = data.checkoutUrl ?? data.url;
+        if (!res.ok || !checkoutUrl) {
           throw new Error(data.error ?? "Unable to start Stripe checkout.");
         }
         if (!cancelled) {
-          window.location.href = data.checkoutUrl;
+          window.location.href = checkoutUrl;
         }
       } catch (nextError) {
         if (!cancelled) {

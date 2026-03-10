@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
   PLAN_INTERVALS,
@@ -12,6 +13,20 @@ import {
 
 const PAID_PLAN_TIERS = PLAN_TIERS.filter((plan) => plan !== "free");
 type PaidPlanTier = Exclude<PlanTier, "free">;
+type StripeWebhookProcessingStatus =
+  | "processing"
+  | "processed"
+  | "failed";
+
+interface StripeBillingSyncResult {
+  billing: Awaited<ReturnType<typeof syncStripeBillingState>>;
+  userId: string;
+}
+
+interface StripeWebhookReservation {
+  duplicate: boolean;
+  shouldProcess: boolean;
+}
 
 export function isStripeBillingConfigured() {
   return Boolean(
@@ -30,7 +45,12 @@ export function getStripe() {
     throw new Error("STRIPE_SECRET_KEY is not configured.");
   }
 
-  return new Stripe(secretKey);
+  return new Stripe(secretKey, {
+    appInfo: {
+      name: "LifePage",
+      version: "0.1.0",
+    },
+  });
 }
 
 function normalizeInterval(value?: string | null): BillingInterval | null {
@@ -211,6 +231,32 @@ function getInvoiceSubscriptionId(invoice: Stripe.Invoice) {
   return null;
 }
 
+function getStripeSubscriptionId(
+  subscription: string | Stripe.Subscription | null | undefined
+) {
+  if (!subscription) return null;
+  return typeof subscription === "string" ? subscription : subscription.id;
+}
+
+function getStripeEventCreatedAt(event: Stripe.Event) {
+  return typeof event.created === "number"
+    ? new Date(event.created * 1000)
+    : null;
+}
+
+function getSafeWebhookErrorMessage(error: unknown) {
+  const message =
+    error instanceof Error ? error.message : "Stripe webhook processing failed.";
+  return message.slice(0, 1000);
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
+
 async function resolveUserIdForStripeSync(args: {
   customerId: string | null;
   fallbackUserId?: string | null;
@@ -239,7 +285,7 @@ async function resolveUserIdForStripeSync(args: {
 async function syncSubscriptionRecord(
   subscription: Stripe.Subscription,
   fallbackUserId?: string | null
-) {
+): Promise<StripeBillingSyncResult> {
   const customerId = getStripeCustomerId(subscription.customer);
   const firstPrice = subscription.items.data[0]?.price;
   const mappedPlan = getPlanFromStripePriceId(firstPrice?.id ?? null);
@@ -256,7 +302,7 @@ async function syncSubscriptionRecord(
   const entitled =
     mappedPlan !== null && isEntitledStripeStatus(subscription.status);
 
-  return syncStripeBillingState(userId, {
+  const billing = await syncStripeBillingState(userId, {
     planTier: entitled ? mappedPlan.planTier : "free",
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscription.id,
@@ -279,6 +325,8 @@ async function syncSubscriptionRecord(
     ),
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
   });
+
+  return { billing, userId };
 }
 
 export async function createStripeCheckoutUrl(args: {
@@ -298,7 +346,7 @@ export async function createStripeCheckoutUrl(args: {
     client_reference_id: args.userId,
     line_items: [{ price: priceId, quantity: 1 }],
     allow_promotion_codes: false,
-    success_url: `${baseUrl}/dashboard?billing=success`,
+    success_url: `${baseUrl}/dashboard?billing=success#settings-billing`,
     cancel_url: `${baseUrl}/dashboard?billing=canceled#settings-billing`,
     metadata: {
       userId: args.userId,
@@ -357,7 +405,7 @@ export async function getBillingRedirectUrl(args: {
 
 export async function syncCheckoutSessionToBilling(
   session: Stripe.Checkout.Session
-) {
+): Promise<StripeBillingSyncResult | null> {
   if (session.mode !== "subscription") {
     return null;
   }
@@ -396,11 +444,13 @@ export async function syncCheckoutSessionToBilling(
 
 export async function syncStripeSubscriptionToBilling(
   subscription: Stripe.Subscription
-) {
+): Promise<StripeBillingSyncResult> {
   return syncSubscriptionRecord(subscription);
 }
 
-export async function syncStripeInvoiceToBilling(invoice: Stripe.Invoice) {
+export async function syncStripeInvoiceToBilling(
+  invoice: Stripe.Invoice
+): Promise<StripeBillingSyncResult | null> {
   const subscriptionId = getInvoiceSubscriptionId(invoice);
   if (!subscriptionId) {
     return null;
@@ -418,4 +468,120 @@ export function constructStripeWebhookEvent(payload: string, signature: string) 
   }
 
   return getStripe().webhooks.constructEvent(payload, signature, webhookSecret);
+}
+
+export async function reserveStripeWebhookEvent(
+  event: Stripe.Event
+): Promise<StripeWebhookReservation> {
+  try {
+    await prisma.stripeWebhookEvent.create({
+      data: {
+        id: event.id,
+        type: event.type,
+        status: "processing",
+        livemode: event.livemode,
+        eventCreatedAt: getStripeEventCreatedAt(event),
+      },
+    });
+
+    return { shouldProcess: true, duplicate: false };
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+
+    const existing = await prisma.stripeWebhookEvent.findUnique({
+      where: { id: event.id },
+      select: { status: true },
+    });
+
+    if (!existing) {
+      throw error;
+    }
+
+    if (existing.status === "processed" || existing.status === "processing") {
+      return { shouldProcess: false, duplicate: true };
+    }
+
+    await prisma.stripeWebhookEvent.update({
+      where: { id: event.id },
+      data: {
+        status: "processing",
+        lastError: null,
+        processedAt: null,
+        livemode: event.livemode,
+        eventCreatedAt: getStripeEventCreatedAt(event),
+        attemptCount: { increment: 1 },
+      },
+    });
+
+    return { shouldProcess: true, duplicate: false };
+  }
+}
+
+export async function markStripeWebhookEventProcessed(args: {
+  eventId: string;
+  userId?: string | null;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+}) {
+  await prisma.stripeWebhookEvent.update({
+    where: { id: args.eventId },
+    data: {
+      status: "processed" satisfies StripeWebhookProcessingStatus,
+      userId: args.userId ?? null,
+      stripeCustomerId: args.stripeCustomerId ?? null,
+      stripeSubscriptionId: args.stripeSubscriptionId ?? null,
+      processedAt: new Date(),
+      lastError: null,
+    },
+  });
+}
+
+export async function markStripeWebhookEventFailed(args: {
+  eventId: string;
+  error: unknown;
+}) {
+  await prisma.stripeWebhookEvent.update({
+    where: { id: args.eventId },
+    data: {
+      status: "failed" satisfies StripeWebhookProcessingStatus,
+      processedAt: null,
+      lastError: getSafeWebhookErrorMessage(args.error),
+    },
+  });
+}
+
+export function getStripeWebhookReferences(event: Stripe.Event) {
+  switch (event.type) {
+    case "checkout.session.completed": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      return {
+        stripeCustomerId: getStripeCustomerId(session.customer),
+        stripeSubscriptionId: getStripeSubscriptionId(session.subscription),
+      };
+    }
+    case "customer.subscription.created":
+    case "customer.subscription.updated":
+    case "customer.subscription.deleted": {
+      const subscription = event.data.object as Stripe.Subscription;
+      return {
+        stripeCustomerId: getStripeCustomerId(subscription.customer),
+        stripeSubscriptionId: subscription.id,
+      };
+    }
+    case "invoice.paid":
+    case "invoice.payment_failed": {
+      const invoice = event.data.object as Stripe.Invoice;
+      return {
+        stripeCustomerId: getStripeCustomerId(invoice.customer),
+        stripeSubscriptionId: getInvoiceSubscriptionId(invoice),
+      };
+    }
+    default:
+      return {
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+      };
+  }
 }

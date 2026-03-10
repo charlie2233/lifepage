@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import {
   constructStripeWebhookEvent,
+  getStripeWebhookReferences,
   isStripeBillingConfigured,
+  markStripeWebhookEventFailed,
+  markStripeWebhookEventProcessed,
+  reserveStripeWebhookEvent,
   syncCheckoutSessionToBilling,
   syncStripeInvoiceToBilling,
   syncStripeSubscriptionToBilling,
 } from "@/lib/stripe-billing";
+
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   if (!isStripeBillingConfigured()) {
@@ -27,25 +33,53 @@ export async function POST(req: Request) {
 
   try {
     const event = constructStripeWebhookEvent(payload, signature);
-
-    switch (event.type) {
-      case "checkout.session.completed":
-        await syncCheckoutSessionToBilling(event.data.object);
-        break;
-      case "customer.subscription.created":
-      case "customer.subscription.updated":
-      case "customer.subscription.deleted":
-        await syncStripeSubscriptionToBilling(event.data.object);
-        break;
-      case "invoice.paid":
-      case "invoice.payment_failed":
-        await syncStripeInvoiceToBilling(event.data.object);
-        break;
-      default:
-        break;
+    const reservation = await reserveStripeWebhookEvent(event);
+    if (!reservation.shouldProcess) {
+      return NextResponse.json({ received: true, duplicate: true });
     }
 
-    return NextResponse.json({ received: true });
+    let syncResult: Awaited<
+      ReturnType<
+        | typeof syncCheckoutSessionToBilling
+        | typeof syncStripeSubscriptionToBilling
+        | typeof syncStripeInvoiceToBilling
+      >
+    > = null;
+
+    try {
+      switch (event.type) {
+        case "checkout.session.completed":
+          syncResult = await syncCheckoutSessionToBilling(event.data.object);
+          break;
+        case "customer.subscription.created":
+        case "customer.subscription.updated":
+        case "customer.subscription.deleted":
+          syncResult = await syncStripeSubscriptionToBilling(event.data.object);
+          break;
+        case "invoice.paid":
+        case "invoice.payment_failed":
+          syncResult = await syncStripeInvoiceToBilling(event.data.object);
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      await markStripeWebhookEventFailed({
+        eventId: event.id,
+        error,
+      });
+      throw error;
+    }
+
+    const refs = getStripeWebhookReferences(event);
+    await markStripeWebhookEventProcessed({
+      eventId: event.id,
+      userId: syncResult?.userId ?? null,
+      stripeCustomerId: refs.stripeCustomerId,
+      stripeSubscriptionId: refs.stripeSubscriptionId,
+    });
+
+    return NextResponse.json({ received: true, duplicate: false });
   } catch (error) {
     return NextResponse.json(
       {

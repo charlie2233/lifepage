@@ -58,6 +58,12 @@ NEXTAUTH_SECRET="run: openssl rand -base64 32"
 NEXTAUTH_URL="http://localhost:3000"
 OPENAI_API_KEY="sk-your-openai-key-from-platform.openai.com"
 OPENAI_SORA_MODEL="sora-2"
+STRIPE_SECRET_KEY="sk_test_or_live_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+STRIPE_PLUS_MONTHLY_PRICE_ID="price_..."
+STRIPE_PLUS_YEARLY_PRICE_ID="price_..."
+STRIPE_PRO_MONTHLY_PRICE_ID="price_..."
+STRIPE_PRO_YEARLY_PRICE_ID="price_..."
 R2_ACCESS_KEY_ID="your-r2-access-key"
 R2_SECRET_ACCESS_KEY="your-r2-secret-key"
 R2_BUCKET="lifepage-project-videos"
@@ -66,6 +72,19 @@ R2_PUBLIC_BASE_URL="https://your-public-r2-host.example.com"
 ```
 
 If the R2 variables are missing, project demo videos still work locally and are served from `/api/project-videos/assets/...` using files written under `output/project-videos/`.
+
+### Stripe Billing Setup
+
+Create exactly four recurring Stripe prices:
+
+- `LifePage Plus Monthly` — `$5/month`
+- `LifePage Plus Yearly` — `$50/year`
+- `LifePage Pro Monthly` — `$10/month`
+- `LifePage Pro Yearly` — `$100/year`
+
+Then wire the resulting price ids into the Stripe env vars above.
+
+LifePage only trusts the server-side Stripe price map. Do not expose price ids or amounts from the client as the source of truth.
 
 ### 3. Set Up Database
 
@@ -115,6 +134,12 @@ npx wrangler secret put DATABASE_URL
 npx wrangler secret put AUTH_SECRET
 npx wrangler secret put OPENAI_API_KEY
 npx wrangler secret put CRON_SECRET
+npx wrangler secret put STRIPE_SECRET_KEY
+npx wrangler secret put STRIPE_WEBHOOK_SECRET
+npx wrangler secret put STRIPE_PLUS_MONTHLY_PRICE_ID
+npx wrangler secret put STRIPE_PLUS_YEARLY_PRICE_ID
+npx wrangler secret put STRIPE_PRO_MONTHLY_PRICE_ID
+npx wrangler secret put STRIPE_PRO_YEARLY_PRICE_ID
 ```
 
 If you want Auth.js to use a fixed canonical hostname instead of trusting forwarded headers, also set:
@@ -136,6 +161,63 @@ npm run cf:deploy
 ```
 
 The initial launch target is the Worker's `*.workers.dev` hostname defined in `wrangler.jsonc`.
+
+## Stripe Billing Runbook
+
+### 1. Create prices in Stripe
+
+Create the four recurring prices listed above in both Stripe test mode and live mode.
+
+### 2. Set environment variables
+
+Set all six Stripe variables in local `.env.local` for development and in your deployed platform secrets for production.
+
+### 3. Register the webhook
+
+Point Stripe at:
+
+```text
+https://<your-host>/api/stripe/webhook
+```
+
+Subscribe to:
+
+- `checkout.session.completed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.paid`
+- `invoice.payment_failed`
+
+LifePage stores Stripe webhook event ids in the database to dedupe retries and keep an audit trail.
+
+### 4. Local webhook testing
+
+Use the Stripe CLI during local development:
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
+Copy the emitted signing secret into `STRIPE_WEBHOOK_SECRET`, then run test card flows against the app.
+
+### 5. Production smoke checks
+
+1. Sign in with a real test account.
+2. Start a `Plus` monthly checkout.
+3. Complete payment with a Stripe test card.
+4. Confirm the Stripe dashboard shows successful webhook delivery.
+5. Confirm `/api/billing` and the dashboard update to `Plus`.
+6. Open `Manage subscription` and verify the Billing Portal opens.
+7. Cancel at period end in Stripe and confirm the dashboard reflects that state.
+
+### 6. Rollback
+
+If webhook sync fails in production:
+
+1. disable billing CTAs by removing the Stripe env vars for the environment
+2. fix webhook delivery or price config
+3. replay failed Stripe events from the Stripe dashboard
 
 ### Rollback
 

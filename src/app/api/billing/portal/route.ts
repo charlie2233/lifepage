@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       request: req,
     });
 
-    return NextResponse.json({ url });
+    return NextResponse.json({ url, portalUrl: url });
   } catch (error) {
     return NextResponse.json(
       {
