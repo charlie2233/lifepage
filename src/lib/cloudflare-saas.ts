@@ -1,5 +1,3 @@
-import { getPrimaryAppHostname } from "@/lib/custom-domain";
-
 const CLOUDFLARE_API_ROOT = "https://api.cloudflare.com/client/v4";
 
 interface CloudflareApiError {
@@ -61,11 +59,7 @@ function normalizeHostname(value?: string | null) {
 }
 
 export function getCloudflareSaasCnameTarget() {
-  return (
-    normalizeHostname(process.env.CLOUDFLARE_SAAS_CNAME_TARGET) ??
-    normalizeHostname(process.env.CUSTOM_DOMAIN_TARGET_HOST) ??
-    getPrimaryAppHostname()
-  );
+  return normalizeHostname(process.env.CLOUDFLARE_SAAS_CNAME_TARGET);
 }
 
 export function getCloudflareSaasFallbackOrigin() {
@@ -207,12 +201,19 @@ export async function findCloudflareCustomHostnameByHostname(hostname: string) {
 }
 
 export async function deleteCloudflareCustomHostname(id: string) {
-  await cloudflareRequest<CloudflareCustomHostname | { id?: string }>(
-    `/zones/${getCloudflareSaasConfig().zoneId}/custom_hostnames/${id}`,
-    {
-      method: "DELETE",
+  try {
+    await cloudflareRequest<CloudflareCustomHostname | { id?: string }>(
+      `/zones/${getCloudflareSaasConfig().zoneId}/custom_hostnames/${id}`,
+      {
+        method: "DELETE",
+      }
+    );
+  } catch (error) {
+    if (error instanceof CloudflareSaasError && error.statusCode === 404) {
+      return;
     }
-  );
+    throw error;
+  }
 }
 
 export function extractCloudflareHostnameError(

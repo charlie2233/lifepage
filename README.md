@@ -69,6 +69,10 @@ R2_SECRET_ACCESS_KEY="your-r2-secret-key"
 R2_BUCKET="lifepage-project-videos"
 R2_ACCOUNT_ID="your-cloudflare-account-id"
 R2_PUBLIC_BASE_URL="https://your-public-r2-host.example.com"
+CLOUDFLARE_API_TOKEN="your-cloudflare-api-token"
+CLOUDFLARE_SAAS_ZONE_ID="your-cloudflare-zone-id"
+CLOUDFLARE_SAAS_CNAME_TARGET="customers.your-saas-zone.com"
+CLOUDFLARE_SAAS_FALLBACK_ORIGIN="origin.your-saas-zone.com"
 ```
 
 If the R2 variables are missing, project demo videos still work locally and are served from `/api/project-videos/assets/...` using files written under `output/project-videos/`.
@@ -140,6 +144,10 @@ npx wrangler secret put STRIPE_PLUS_MONTHLY_PRICE_ID
 npx wrangler secret put STRIPE_PLUS_YEARLY_PRICE_ID
 npx wrangler secret put STRIPE_PRO_MONTHLY_PRICE_ID
 npx wrangler secret put STRIPE_PRO_YEARLY_PRICE_ID
+npx wrangler secret put CLOUDFLARE_API_TOKEN
+npx wrangler secret put CLOUDFLARE_SAAS_ZONE_ID
+npx wrangler secret put CLOUDFLARE_SAAS_CNAME_TARGET
+npx wrangler secret put CLOUDFLARE_SAAS_FALLBACK_ORIGIN
 ```
 
 If you want Auth.js to use a fixed canonical hostname instead of trusting forwarded headers, also set:
@@ -161,6 +169,31 @@ npm run cf:deploy
 ```
 
 The initial launch target is the Worker's `*.workers.dev` hostname defined in `wrangler.jsonc`.
+
+## Cloudflare for SaaS Domains
+
+LifePage supports customer-owned custom domains through Cloudflare for SaaS custom hostnames.
+
+### Required SaaS hostnames
+
+Configure two provider-owned hostnames inside a Cloudflare-managed zone:
+
+- `CLOUDFLARE_SAAS_CNAME_TARGET`: the hostname customers point their CNAME at, for example `customers.your-saas-zone.com`
+- `CLOUDFLARE_SAAS_FALLBACK_ORIGIN`: the proxied fallback origin for custom hostnames, for example `origin.your-saas-zone.com`
+
+Do not use `*.workers.dev` as the customer-facing CNAME target in production.
+
+### Launch scope
+
+- Subdomain custom domains only
+- Apex domains are intentionally out of scope for now
+
+### How verification works
+
+1. Saving a domain provisions a Cloudflare custom hostname.
+2. The dashboard shows the required customer CNAME target.
+3. `Verify DNS` confirms the customer CNAME is in place and refreshes Cloudflare hostname validation.
+4. The domain becomes active only when both the Cloudflare hostname status and SSL status are active.
 
 ## Stripe Billing Runbook
 
@@ -234,7 +267,7 @@ Cloudflare keeps prior Worker versions. Roll back from the dashboard or redeploy
 
 ### Current limitation
 
-The crawler still captures screenshots locally with Puppeteer, but the Cloudflare runtime path treats screenshots as best-effort and may return `null` until a later Browser Rendering integration is added.
+Customer-owned custom domains require a Cloudflare-managed SaaS zone and the four Cloudflare SaaS environment variables listed above. Without them, the dashboard returns a hard error instead of simulating activation.
 
 ## 🎬 Project Demo Videos
 
@@ -325,7 +358,7 @@ src/
 │   ├── db.ts                      # Prisma client singleton
 │   ├── schema.ts                  # Zod schemas for AI output
 │   └── utils.ts                   # cn() utility
-├── middleware.ts                   # Route protection (/dashboard requires auth)
+├── proxy.ts                        # Route protection (/dashboard requires auth)
 └── types/next-auth.d.ts           # Extended session types
 prisma/
 └── schema.prisma                  # DB models

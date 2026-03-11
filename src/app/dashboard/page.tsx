@@ -403,13 +403,18 @@ interface DashboardSettingsSnapshot {
   customDomainStatus?: CustomDomainStatus | null;
   customDomainVerificationName?: string | null;
   customDomainVerificationValue?: string | null;
+  customDomainProviderId?: string | null;
+  customDomainProviderStatus?: string | null;
+  customDomainSslStatus?: string | null;
+  customDomainProviderError?: string | null;
   customDomainLastCheckedAt?: string | null;
   customDomainError?: string | null;
 }
 interface ApiSettingsResponse {
   settings?: DashboardSettingsSnapshot | null;
   verified?: boolean;
-  attached?: boolean;
+  cloudflareSaasConfigured?: boolean;
+  cloudflareSaasCnameTarget?: string | null;
   error?: string | null;
 }
 interface ApiProjectVideoResponse {
@@ -579,16 +584,21 @@ function formatCustomDomainStatus(status: CustomDomainStatus) {
 function getCustomDomainStatusCopy(status: CustomDomainStatus) {
   switch (status) {
     case "pending_verification":
-      return "Save the hostname, point DNS to the target below, then verify it here.";
+      return "Cloudflare has the hostname provisioned, but DNS is not pointing at the required CNAME target yet.";
     case "verified":
-      return "DNS matches. You can attach the domain and start serving traffic.";
+      return "DNS matches and Cloudflare is finishing validation and certificate issuance.";
     case "active":
-      return "This hostname is live and public requests can resolve through it.";
+      return "The hostname and certificate are both active, so public requests can resolve through it.";
     case "error":
-      return "The latest verification or attachment attempt failed. Review the DNS target and try again.";
+      return "The latest Cloudflare sync found a provider or DNS error. Review the details below and verify again.";
     default:
       return "Add a hostname to start the managed domain flow.";
   }
+}
+
+function formatExternalStatusLabel(status?: string | null) {
+  if (!status) return "Unknown";
+  return status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function formatEvidenceStatusLabel(status?: EvidenceItem["crawlStatus"] | EvidenceItem["screenshotStatus"]) {
@@ -1576,10 +1586,20 @@ function DashboardPageContent() {
     useState("");
   const [customDomainVerificationValue, setCustomDomainVerificationValue] =
     useState("");
+  const [customDomainProviderId, setCustomDomainProviderId] = useState("");
+  const [customDomainProviderStatus, setCustomDomainProviderStatus] =
+    useState<string | null>(null);
+  const [customDomainSslStatus, setCustomDomainSslStatus] =
+    useState<string | null>(null);
+  const [customDomainProviderError, setCustomDomainProviderError] =
+    useState<string | null>(null);
   const [customDomainLastCheckedAt, setCustomDomainLastCheckedAt] =
     useState<string | null>(null);
   const [customDomainError, setCustomDomainError] = useState<string | null>(null);
-  const [currentHost, setCurrentHost] = useState("");
+  const [cloudflareSaasConfigured, setCloudflareSaasConfigured] =
+    useState(true);
+  const [cloudflareSaasCnameTarget, setCloudflareSaasCnameTarget] =
+    useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [account, setAccount] = useState<AccountSettings | null>(null);
   const [accountNameInput, setAccountNameInput] = useState("");
@@ -1604,7 +1624,6 @@ function DashboardPageContent() {
   const [stripeConfigured, setStripeConfigured] = useState(false);
   const [updatingPlan, setUpdatingPlan] = useState(false);
   const [verifyingDomain, setVerifyingDomain] = useState(false);
-  const [attachingDomain, setAttachingDomain] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>("crawl");
   const [message, setMessage] = useState<{
     type: "success" | "error";
@@ -1692,6 +1711,10 @@ function DashboardPageContent() {
       setCustomDomainVerificationValue(
         settings.customDomainVerificationValue ?? ""
       );
+      setCustomDomainProviderId(settings.customDomainProviderId ?? "");
+      setCustomDomainProviderStatus(settings.customDomainProviderStatus ?? null);
+      setCustomDomainSslStatus(settings.customDomainSslStatus ?? null);
+      setCustomDomainProviderError(settings.customDomainProviderError ?? null);
       setCustomDomainLastCheckedAt(settings.customDomainLastCheckedAt ?? null);
       setCustomDomainError(settings.customDomainError ?? null);
     },
@@ -1712,6 +1735,8 @@ function DashboardPageContent() {
     setEvidence(ev.items ?? []);
     if (pr.profile) setProfile(pr.profile);
     applySettingsSnapshot(st.settings);
+    setCloudflareSaasConfigured(st.cloudflareSaasConfigured !== false);
+    setCloudflareSaasCnameTarget(st.cloudflareSaasCnameTarget ?? null);
     setSavedArtifacts(arts.artifacts ?? []);
     setBilling(billingRes.billing ?? null);
     setAvailablePlans(billingRes.plans ?? []);
@@ -1781,6 +1806,8 @@ function DashboardPageContent() {
         body: JSON.stringify(patch),
       });
       const data = (await res.json()) as ApiSettingsResponse;
+      setCloudflareSaasConfigured(data.cloudflareSaasConfigured !== false);
+      setCloudflareSaasCnameTarget(data.cloudflareSaasCnameTarget ?? null);
       if (!res.ok) {
         throw new Error(data.error ?? "Failed to save settings.");
       }
@@ -1939,9 +1966,17 @@ function DashboardPageContent() {
   };
 
   const handleSaveCustomDomain = async () => {
-    await saveSettings({
+    const settings = await saveSettings({
       customDomain: customDomainInput.trim() || null,
     });
+
+    if (settings?.customDomain) {
+      setMessage({
+        type: "success",
+        text:
+          "Custom domain saved and provisioned in Cloudflare. Point DNS to the CNAME target below, then verify to refresh status.",
+      });
+    }
   };
 
   const handleClearCustomDomain = async () => {
@@ -1955,6 +1990,8 @@ function DashboardPageContent() {
         method: "POST",
       });
       const data = (await res.json()) as ApiSettingsResponse;
+      setCloudflareSaasConfigured(data.cloudflareSaasConfigured !== false);
+      setCloudflareSaasCnameTarget(data.cloudflareSaasCnameTarget ?? null);
       if (!res.ok || !data.settings) {
         throw new Error(data.error ?? "Failed to verify the custom domain.");
       }
@@ -1962,7 +1999,9 @@ function DashboardPageContent() {
       setMessage({
         type: data.verified ? "success" : "error",
         text: data.verified
-          ? "DNS looks correct. You can attach the domain now."
+          ? data.settings.customDomainStatus === "active"
+            ? "DNS and Cloudflare certificate validation are complete. The domain is active."
+            : "DNS looks correct. Cloudflare validation was refreshed and the domain is waiting on certificate activation."
           : data.error ?? "DNS does not match the required target yet.",
       });
     } catch (error) {
@@ -1975,36 +2014,6 @@ function DashboardPageContent() {
       });
     } finally {
       setVerifyingDomain(false);
-    }
-  };
-
-  const handleAttachCustomDomain = async () => {
-    setAttachingDomain(true);
-    try {
-      const res = await fetch("/api/settings/domain/attach", {
-        method: "POST",
-      });
-      const data = (await res.json()) as ApiSettingsResponse;
-      if (!res.ok || !data.settings) {
-        throw new Error(data.error ?? "Failed to attach the custom domain.");
-      }
-      applySettingsSnapshot(data.settings);
-      setMessage({
-        type: data.attached ? "success" : "error",
-        text: data.attached
-          ? "Custom domain attached. Public traffic can now resolve through it."
-          : data.error ?? "Failed to attach the custom domain.",
-      });
-    } catch (error) {
-      setMessage({
-        type: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "Failed to attach the custom domain.",
-      });
-    } finally {
-      setAttachingDomain(false);
     }
   };
 
@@ -2268,10 +2277,6 @@ function DashboardPageContent() {
     nextUrl.searchParams.delete("billing");
     window.history.replaceState({}, "", nextUrl.toString());
   }, [searchParams]);
-
-  useEffect(() => {
-    setCurrentHost(window.location.hostname);
-  }, []);
 
   useEffect(() => {
     const browserTimeZone =
@@ -2678,23 +2683,15 @@ function DashboardPageContent() {
     session?.user?.email?.split("@")[0];
   const normalizedCustomDomainInput = customDomainInput.trim().toLowerCase();
   const hasCustomDomainChanges = normalizedCustomDomainInput !== customDomain;
-  const dnsTargetHost =
-    currentHost &&
-    !["localhost", "127.0.0.1", "::1", "[::1]"].includes(currentHost)
-      ? currentHost
-      : "your-app-host";
   const customDomainTargetHost =
-    customDomainVerificationValue || dnsTargetHost;
+    customDomainVerificationValue || cloudflareSaasCnameTarget || "";
   const hasSavedCustomDomain = customDomain.length > 0;
   const hasActiveCustomDomain = customDomainStatus === "active";
   const canVerifyCustomDomain =
     hasSavedCustomDomain &&
     !hasCustomDomainChanges &&
-    customDomainStatus !== "active";
-  const canAttachCustomDomain =
-    hasSavedCustomDomain &&
-    !hasCustomDomainChanges &&
-    customDomainStatus === "verified";
+    customDomainStatus !== "active" &&
+    cloudflareSaasConfigured;
   const customDomainLastCheckedLabel = customDomainLastCheckedAt
     ? new Date(customDomainLastCheckedAt).toLocaleString()
     : null;
@@ -5629,10 +5626,10 @@ function DashboardPageContent() {
                 <h2 className="text-lg font-semibold">Deploy</h2>
               </div>
               <p className="text-sm text-gray-400 mb-5">
-                The first Cloudflare launch goes live on a <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1 rounded">workers.dev</code> URL. Managed domains now move through a visible lifecycle here: save the hostname, point DNS, verify, then activate it for public traffic.
+                Customer-owned domains are provisioned through Cloudflare for SaaS. Save the hostname to create the custom hostname, point DNS at the CNAME target below, then verify until Cloudflare reports both hostname and SSL as active.
               </p>
 
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] lg:items-end">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-end">
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">
                     Custom domain
@@ -5650,7 +5647,11 @@ function DashboardPageContent() {
 
                 <button
                   onClick={handleSaveCustomDomain}
-                  disabled={savingSettings || !hasCustomDomainChanges}
+                  disabled={
+                    savingSettings ||
+                    !hasCustomDomainChanges ||
+                    !cloudflareSaasConfigured
+                  }
                   className="inline-flex items-center justify-center gap-2 bg-[#00f5ff] text-black px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#00e5ef] transition-colors disabled:opacity-50"
                 >
                   Save Domain
@@ -5662,14 +5663,6 @@ function DashboardPageContent() {
                   className="inline-flex items-center justify-center gap-2 border border-white/10 px-4 py-2.5 rounded-lg text-sm text-gray-200 hover:border-white/20 hover:bg-white/5 transition-colors disabled:opacity-50"
                 >
                   {verifyingDomain ? "Verifying…" : "Verify DNS"}
-                </button>
-
-                <button
-                  onClick={handleAttachCustomDomain}
-                  disabled={savingSettings || attachingDomain || !canAttachCustomDomain}
-                  className="inline-flex items-center justify-center gap-2 border border-[#00f5ff]/30 bg-[#00f5ff]/10 px-4 py-2.5 rounded-lg text-sm text-[#7ef4ff] hover:bg-[#00f5ff]/15 transition-colors disabled:opacity-50"
-                >
-                  {attachingDomain ? "Attaching…" : "Attach Domain"}
                 </button>
 
                 <button
@@ -5703,24 +5696,52 @@ function DashboardPageContent() {
                         Last checked: {customDomainLastCheckedLabel}
                       </span>
                     )}
+                    {customDomainProviderId && (
+                      <span className="text-xs text-gray-500">
+                        Cloudflare ID: {customDomainProviderId}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-3 leading-relaxed">
                     {getCustomDomainStatusCopy(customDomainStatus)}
                   </p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    {customDomainProviderStatus && (
+                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-gray-300">
+                        Hostname {formatExternalStatusLabel(customDomainProviderStatus)}
+                      </span>
+                    )}
+                    {customDomainSslStatus && (
+                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-gray-300">
+                        SSL {formatExternalStatusLabel(customDomainSslStatus)}
+                      </span>
+                    )}
+                  </div>
                   {customDomainError && (
                     <p className="mt-3 text-xs text-red-300">
                       {customDomainError}
                     </p>
                   )}
+                  {customDomainProviderError &&
+                    customDomainProviderError !== customDomainError && (
+                      <p className="mt-2 text-xs text-yellow-300">
+                        Cloudflare: {customDomainProviderError}
+                      </p>
+                    )}
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-white/3 p-4 text-sm text-gray-400">
                   <p className="font-medium text-white mb-2">DNS setup</p>
+                  {!cloudflareSaasConfigured && (
+                    <p className="mb-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                      Cloudflare for SaaS is not configured in this environment yet. Set the Cloudflare SaaS env vars before saving or verifying customer domains.
+                    </p>
+                  )}
                   <p className="leading-relaxed">
                     Point <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1.5 py-0.5 rounded">{normalizedCustomDomainInput || customDomain || "portfolio.example.com"}</code> to
                     {" "}
-                    <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1.5 py-0.5 rounded">{customDomainTargetHost}</code>.
-                    Use a CNAME for subdomains, or ALIAS/ANAME flattening if you want to use an apex domain.
+                    <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1.5 py-0.5 rounded">{customDomainTargetHost || "not configured"}</code>.
+                    Use a CNAME record. Apex domains are intentionally out of scope for now.
                   </p>
                   {customDomainVerificationName && (
                     <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-gray-300">
@@ -5743,7 +5764,7 @@ function DashboardPageContent() {
                 <div className="rounded-xl border border-white/10 bg-white/3 p-4 text-sm text-gray-400">
                   <p className="font-medium text-white mb-2">Behavior</p>
                   <p className="leading-relaxed">
-                    Public resolution stays blocked until the domain reaches <span className="text-white">Active</span>. Verification confirms DNS, and activation flips the hostname into the live portfolio routing path.
+                    Public resolution stays blocked until both the Cloudflare hostname status and SSL status are active. Verification refreshes Cloudflare validation after DNS is in place.
                   </p>
                   {hasActiveCustomDomain && (
                     <a

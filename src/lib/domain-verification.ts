@@ -48,7 +48,7 @@ export async function verifyCustomDomainDns(hostname: string) {
     return {
       ok: false,
       error:
-        "No target host is configured. Set CUSTOM_DOMAIN_TARGET_HOST or AUTH_URL first.",
+        "No Cloudflare SaaS CNAME target is configured. Set CLOUDFLARE_SAAS_CNAME_TARGET first.",
       verification,
     };
   }
