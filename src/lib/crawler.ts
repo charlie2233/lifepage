@@ -10,6 +10,7 @@ import {
   captureCloudflareBrowserScreenshot,
   isCloudflareBrowserRenderingConfigured,
 } from "@/lib/cloudflare-browser";
+import { getE2ECrawlFixture, isFakeCrawlEnabled } from "@/lib/e2e-mode";
 
 const GOOGLE_SITES_HOSTNAME = "sites.google.com";
 const GOOGLE_SITES_IMPORT_LIMIT = 6;
@@ -83,6 +84,34 @@ export function expandGoogleSitesUrls(rootUrl: string, links: string[]) {
 export async function crawlUrl(url: string): Promise<CrawlResult> {
   if (!url.startsWith("http://") && !url.startsWith("https://")) {
     url = "https://" + url;
+  }
+
+  if (isFakeCrawlEnabled()) {
+    const fixture = getE2ECrawlFixture(url);
+    if (!fixture) {
+      throw new Error(`No E2E crawl fixture is configured for ${url}.`);
+    }
+
+    return {
+      url: fixture.canonicalUrl,
+      title: fixture.title,
+      description: fixture.description,
+      ogImage: null,
+      headings: fixture.headings,
+      links: fixture.links ?? [],
+      bodyText: fixture.bodyText,
+      screenshot: fixture.screenshot,
+      crawlStatus: deriveCrawlStatus({
+        screenshot: fixture.screenshot,
+        screenshotError: fixture.screenshotError,
+      }),
+      screenshotStatus: deriveScreenshotStatus(
+        fixture.screenshot,
+        fixture.screenshotError
+      ),
+      screenshotError: fixture.screenshotError,
+      metadata: fixture.metadata ?? {},
+    };
   }
 
   let html = "";

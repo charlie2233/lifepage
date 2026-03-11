@@ -1,4 +1,9 @@
 import OpenAI from "openai";
+import {
+  buildE2EProfileFromCrawl,
+  buildE2EProfileFromText,
+  isFakeAiEnabled,
+} from "@/lib/e2e-mode";
 import { ProfileJSONSchema, type ProfileJSON } from "@/lib/schema";
 import { type CrawlResult } from "@/lib/crawler";
 
@@ -61,6 +66,10 @@ export async function generateProfileFromCrawl(
   clientConfig?: { apiKey: string; baseURL?: string },
   maxTokens?: number
 ): Promise<ProfileJSON> {
+  if (isFakeAiEnabled()) {
+    return buildE2EProfileFromCrawl(crawlResults);
+  }
+
   const evidenceSummary = crawlResults
     .map((r, i) => {
       return `--- Evidence ${i + 1}: ${r.url} ---
@@ -116,6 +125,10 @@ export async function generateProfileFromText(
   clientConfig?: { apiKey: string; baseURL?: string },
   maxTokens?: number
 ): Promise<ProfileJSON> {
+  if (isFakeAiEnabled()) {
+    return buildE2EProfileFromText(text, userInfo.name);
+  }
+
   const prompt = `You are an expert personal brand analyst. Based on the following text description, generate a rich and specific professional profile JSON.
 
 Text: ${text}

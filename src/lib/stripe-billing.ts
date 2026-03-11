@@ -2,6 +2,10 @@ import Stripe from "stripe";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
+  isFakeStripeEnabled,
+  verifyE2EStripeSignature,
+} from "@/lib/e2e-mode";
+import {
   PLAN_INTERVALS,
   PLAN_TIERS,
   type BillingInterval,
@@ -28,7 +32,54 @@ interface StripeWebhookReservation {
   shouldProcess: boolean;
 }
 
+type FakeStripeState = {
+  subscriptions: Map<string, Stripe.Subscription>;
+};
+
+function getFakeStripeState(): FakeStripeState {
+  const globalForFakeStripe = globalThis as typeof globalThis & {
+    __lifepageFakeStripe?: FakeStripeState;
+  };
+
+  if (!globalForFakeStripe.__lifepageFakeStripe) {
+    globalForFakeStripe.__lifepageFakeStripe = {
+      subscriptions: new Map(),
+    };
+  }
+
+  return globalForFakeStripe.__lifepageFakeStripe;
+}
+
+function rememberFakeStripeSubscription(subscription: Stripe.Subscription) {
+  getFakeStripeState().subscriptions.set(subscription.id, subscription);
+}
+
+function getFakeStripeSubscription(subscriptionId: string) {
+  return getFakeStripeState().subscriptions.get(subscriptionId) ?? null;
+}
+
+function buildFakeBillingUrl(
+  kind: "checkout" | "portal",
+  request: Request | undefined,
+  params?: Record<string, string>
+) {
+  const baseUrl = getAppBaseUrl(request);
+  const url = new URL("/dashboard", baseUrl);
+  url.hash = "settings-billing";
+  url.searchParams.set("e2e_billing", kind);
+
+  for (const [key, value] of Object.entries(params ?? {})) {
+    url.searchParams.set(key, value);
+  }
+
+  return url.toString();
+}
+
 export function isStripeBillingConfigured() {
+  if (isFakeStripeEnabled()) {
+    return true;
+  }
+
   return Boolean(
     process.env.STRIPE_SECRET_KEY &&
       process.env.STRIPE_WEBHOOK_SECRET &&
@@ -335,6 +386,13 @@ export async function createStripeCheckoutUrl(args: {
   request?: Request;
   userId: string;
 }) {
+  if (isFakeStripeEnabled()) {
+    return buildFakeBillingUrl("checkout", args.request, {
+      planTier: args.planTier,
+      interval: args.interval,
+    });
+  }
+
   const stripe = getStripe();
   const baseUrl = getAppBaseUrl(args.request);
   const customerId = await ensureStripeCustomer(args.userId);
@@ -373,6 +431,10 @@ export async function createStripePortalUrl(args: {
   request?: Request;
   userId: string;
 }) {
+  if (isFakeStripeEnabled()) {
+    return buildFakeBillingUrl("portal", args.request);
+  }
+
   const stripe = getStripe();
   const baseUrl = getAppBaseUrl(args.request);
   const customerId = await getExistingStripeCustomerId(args.userId);
@@ -432,6 +494,22 @@ export async function syncCheckoutSessionToBilling(
     return null;
   }
 
+  if (isFakeStripeEnabled()) {
+    const fakeSubscription =
+      typeof session.subscription === "string"
+        ? getFakeStripeSubscription(session.subscription)
+        : (session.subscription as Stripe.Subscription);
+
+    if (!fakeSubscription) {
+      throw new Error(
+        "Fake Stripe checkout session did not include a stored subscription."
+      );
+    }
+
+    rememberFakeStripeSubscription(fakeSubscription);
+    return syncSubscriptionRecord(fakeSubscription, userId);
+  }
+
   const stripe = getStripe();
   const subscriptionId =
     typeof session.subscription === "string"
@@ -445,6 +523,10 @@ export async function syncCheckoutSessionToBilling(
 export async function syncStripeSubscriptionToBilling(
   subscription: Stripe.Subscription
 ): Promise<StripeBillingSyncResult> {
+  if (isFakeStripeEnabled()) {
+    rememberFakeStripeSubscription(subscription);
+  }
+
   return syncSubscriptionRecord(subscription);
 }
 
@@ -456,6 +538,17 @@ export async function syncStripeInvoiceToBilling(
     return null;
   }
 
+  if (isFakeStripeEnabled()) {
+    const subscription = getFakeStripeSubscription(subscriptionId);
+    if (!subscription) {
+      throw new Error(
+        "Fake Stripe invoice referenced a subscription that was not seeded."
+      );
+    }
+
+    return syncSubscriptionRecord(subscription);
+  }
+
   const stripe = getStripe();
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   return syncSubscriptionRecord(subscription);
@@ -465,6 +558,11 @@ export function constructStripeWebhookEvent(payload: string, signature: string) 
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
     throw new Error("STRIPE_WEBHOOK_SECRET is not configured.");
+  }
+
+  if (isFakeStripeEnabled()) {
+    verifyE2EStripeSignature(payload, signature, webhookSecret);
+    return JSON.parse(payload) as Stripe.Event;
   }
 
   return getStripe().webhooks.constructEvent(payload, signature, webhookSecret);

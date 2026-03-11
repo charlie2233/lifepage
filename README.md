@@ -108,9 +108,45 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
+## End-to-End Tests
+
+LifePage now ships with a Playwright release-gate suite for auth, billing webhook sync, crawl imports, profile generation, public pages, resume export, and Cloudflare SaaS domain activation.
+
+### Local E2E environment
+
+Set the test-specific env vars before running the suite:
+
+```env
+TEST_DATABASE_URL="postgresql://user:password@localhost:5432/lifepage_test"
+E2E_BASE_URL="http://127.0.0.1:3001"
+E2E_TEST_MODE="1"
+E2E_FAKE_STRIPE="1"
+E2E_FAKE_CLOUDFLARE="1"
+E2E_FAKE_DNS="1"
+E2E_FAKE_CRAWL="1"
+```
+
+The Playwright harness uses deterministic fake providers instead of live Stripe, Cloudflare, DNS, crawl, or OpenAI calls. It still exercises the real app routes and UI.
+
+### Run the suite
+
+```bash
+npx prisma db push --force-reset
+npx playwright install chromium
+npm run test:e2e
+```
+
+For CI-style reporting:
+
+```bash
+npm run test:e2e:ci
+```
+
 ## ☁️ Cloudflare Workers Deploy
 
 LifePage now includes an OpenNext + Wrangler path for Cloudflare Workers.
+
+For now, treat the Worker's `*.workers.dev` hostname as the only public/canonical host. GitHub Pages and parked custom domains are intentionally out of the serving path until custom-domain routing is reattached on purpose.
 
 ### Local preview
 
@@ -162,6 +198,8 @@ For the first production launch, set `AUTH_URL` to your Worker hostname, for exa
 https://lifepage-web.<your-subdomain>.workers.dev
 ```
 
+During this cleanup phase, keep `AUTH_URL` pointed at the Worker hostname and leave custom domains detached. `NEXTAUTH_URL` can remain local-only for development.
+
 ### Deploy
 
 ```bash
@@ -173,6 +211,8 @@ The initial launch target is the Worker's `*.workers.dev` hostname defined in `w
 ## Cloudflare for SaaS Domains
 
 LifePage supports customer-owned custom domains through Cloudflare for SaaS custom hostnames.
+
+Temporary operating mode: custom domains should stay detached until DNS is intentionally repointed to the Cloudflare-managed target. Do not leave GitHub Pages DNS records in place for production domains.
 
 ### Required SaaS hostnames
 

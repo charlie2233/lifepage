@@ -7,9 +7,12 @@
     "build": "prisma generate && next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ci": "playwright test --reporter=line,html --workers=1",
     "postinstall": "prisma generate",
     "cf:typegen": "wrangler types cloudflare-env.d.ts --env-interface CloudflareEnv",
-    "cf:build": "prisma generate && opennextjs-cloudflare build",
+    "cf:build": "node scripts/cf-build.mjs",
     "cf:preview": "npm run cf:build && wrangler dev --port 8787",
     "cf:deploy": "npm run cf:build && opennextjs-cloudflare deploy",
     "demo:project-videos": "node --env-file=.env.local node_modules/.bin/tsx scripts/generate-demo-project-videos.ts"
@@ -52,6 +55,7 @@
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.17.1",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

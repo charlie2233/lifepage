@@ -2,6 +2,7 @@ import {
   buildCustomDomainVerificationRecord,
   getManagedCustomDomainTargetHost,
 } from "@/lib/custom-domain-lifecycle";
+import { getE2ECnameValues, isFakeDnsEnabled } from "@/lib/e2e-mode";
 
 interface DnsResponse {
   Status?: number;
@@ -33,6 +34,11 @@ function normalizeDnsValue(value: string) {
 }
 
 async function resolveRecordValues(name: string, type: "CNAME") {
+  const targetHost = getManagedCustomDomainTargetHost();
+  if (type === "CNAME" && targetHost && isFakeDnsEnabled()) {
+    return getE2ECnameValues(name, targetHost).map(normalizeDnsValue);
+  }
+
   const result = await queryDns(name, type);
   return (result.Answer ?? [])
     .map((answer) => answer.data?.trim())

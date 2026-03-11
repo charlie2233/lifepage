@@ -15,3 +15,5 @@ tsconfig.tsbuildinfo
 .wrangler/
 cloudflare-env.d.ts
 tools/whatsapp-codex-bridge/
+playwright-report/
+test-results/

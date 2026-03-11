@@ -1,3 +1,8 @@
+import {
+  getE2ECustomDomainFixture,
+  isFakeCloudflareEnabled,
+} from "@/lib/e2e-mode";
+
 const CLOUDFLARE_API_ROOT = "https://api.cloudflare.com/client/v4";
 
 interface CloudflareApiError {
@@ -36,6 +41,11 @@ export interface CloudflareCustomHostname {
   } | null;
 }
 
+type FakeCloudflareState = {
+  nextId: number;
+  hostnames: Map<string, CloudflareCustomHostname>;
+};
+
 export class CloudflareSaasError extends Error {
   statusCode?: number;
   code?: number;
@@ -58,6 +68,50 @@ function normalizeHostname(value?: string | null) {
   return value?.trim().toLowerCase() || null;
 }
 
+function getFakeCloudflareState(): FakeCloudflareState {
+  const globalForFakeCloudflare = globalThis as typeof globalThis & {
+    __lifepageFakeCloudflare?: FakeCloudflareState;
+  };
+
+  if (!globalForFakeCloudflare.__lifepageFakeCloudflare) {
+    globalForFakeCloudflare.__lifepageFakeCloudflare = {
+      nextId: 1,
+      hostnames: new Map(),
+    };
+  }
+
+  return globalForFakeCloudflare.__lifepageFakeCloudflare;
+}
+
+function cloneCustomHostname(
+  hostname: CloudflareCustomHostname
+): CloudflareCustomHostname {
+  return JSON.parse(JSON.stringify(hostname)) as CloudflareCustomHostname;
+}
+
+function buildFakeCustomHostname(args: {
+  id: string;
+  hostname: string;
+  userId: string;
+  status?: string;
+  sslStatus?: string;
+}) {
+  return {
+    id: args.id,
+    hostname: args.hostname,
+    status: args.status ?? "pending",
+    custom_origin_server: getCloudflareSaasFallbackOrigin(),
+    custom_metadata: { userId: args.userId },
+    ssl: {
+      status: args.sslStatus ?? "initializing",
+      method: "http",
+      type: "dv",
+      validation_errors: null,
+    },
+    verification_errors: null,
+  } satisfies CloudflareCustomHostname;
+}
+
 export function getCloudflareSaasCnameTarget() {
   return normalizeHostname(process.env.CLOUDFLARE_SAAS_CNAME_TARGET);
 }
@@ -67,6 +121,10 @@ export function getCloudflareSaasFallbackOrigin() {
 }
 
 export function isCloudflareSaasConfigured() {
+  if (isFakeCloudflareEnabled()) {
+    return Boolean(getCloudflareSaasCnameTarget() && getCloudflareSaasFallbackOrigin());
+  }
+
   return Boolean(
     process.env.CLOUDFLARE_API_TOKEN &&
       process.env.CLOUDFLARE_SAAS_ZONE_ID &&
@@ -156,6 +214,46 @@ export async function createCloudflareCustomHostname(args: {
   hostname: string;
   userId: string;
 }) {
+  if (isFakeCloudflareEnabled()) {
+    const fixture = getE2ECustomDomainFixture(args.hostname);
+    if (fixture?.createConflict) {
+      throw new CloudflareSaasError(
+        "That custom domain is already connected in Cloudflare.",
+        {
+          statusCode: 409,
+          code: 1406,
+        }
+      );
+    }
+
+    const state = getFakeCloudflareState();
+    const existing = state.hostnames.get(args.hostname);
+    if (existing) {
+      const ownerUserId = existing.custom_metadata?.userId ?? null;
+      if (ownerUserId && ownerUserId !== args.userId) {
+        throw new CloudflareSaasError(
+          "That custom domain is already connected in Cloudflare.",
+          {
+            statusCode: 409,
+            code: 1406,
+          }
+        );
+      }
+
+      return cloneCustomHostname(existing);
+    }
+
+    const created = buildFakeCustomHostname({
+      id: `e2e-host-${state.nextId++}`,
+      hostname: args.hostname,
+      userId: args.userId,
+      status: "pending",
+      sslStatus: "initializing",
+    });
+    state.hostnames.set(args.hostname, created);
+    return cloneCustomHostname(created);
+  }
+
   return cloudflareRequest<CloudflareCustomHostname>(
     `/zones/${getCloudflareSaasConfig().zoneId}/custom_hostnames`,
     {
@@ -166,12 +264,50 @@ export async function createCloudflareCustomHostname(args: {
 }
 
 export async function getCloudflareCustomHostname(id: string) {
+  if (isFakeCloudflareEnabled()) {
+    const state = getFakeCloudflareState();
+    const matched = Array.from(state.hostnames.values()).find(
+      (hostname) => hostname.id === id
+    );
+    if (!matched) {
+      throw new CloudflareSaasError("Custom hostname not found.", {
+        statusCode: 404,
+      });
+    }
+
+    return cloneCustomHostname(matched);
+  }
+
   return cloudflareRequest<CloudflareCustomHostname>(
     `/zones/${getCloudflareSaasConfig().zoneId}/custom_hostnames/${id}`
   );
 }
 
 export async function refreshCloudflareCustomHostname(id: string) {
+  if (isFakeCloudflareEnabled()) {
+    const state = getFakeCloudflareState();
+    const matched = Array.from(state.hostnames.values()).find(
+      (hostname) => hostname.id === id
+    );
+    if (!matched) {
+      throw new CloudflareSaasError("Custom hostname not found.", {
+        statusCode: 404,
+      });
+    }
+
+    const fixture = getE2ECustomDomainFixture(matched.hostname);
+    matched.status = fixture?.refreshStatus ?? "active";
+    matched.ssl = {
+      status: fixture?.refreshSslStatus ?? "active",
+      method: "http",
+      type: "dv",
+      validation_errors: null,
+    };
+    matched.verification_errors = null;
+    state.hostnames.set(matched.hostname, matched);
+    return cloneCustomHostname(matched);
+  }
+
   return cloudflareRequest<CloudflareCustomHostname>(
     `/zones/${getCloudflareSaasConfig().zoneId}/custom_hostnames/${id}`,
     {
@@ -187,6 +323,12 @@ export async function refreshCloudflareCustomHostname(id: string) {
 }
 
 export async function findCloudflareCustomHostnameByHostname(hostname: string) {
+  if (isFakeCloudflareEnabled()) {
+    const state = getFakeCloudflareState();
+    const matched = state.hostnames.get(hostname.trim().toLowerCase()) ?? null;
+    return matched ? cloneCustomHostname(matched) : null;
+  }
+
   const result = await cloudflareRequest<CloudflareCustomHostname[]>(
     `/zones/${getCloudflareSaasConfig().zoneId}/custom_hostnames?hostname=${encodeURIComponent(
       hostname
@@ -201,6 +343,19 @@ export async function findCloudflareCustomHostnameByHostname(hostname: string) {
 }
 
 export async function deleteCloudflareCustomHostname(id: string) {
+  if (isFakeCloudflareEnabled()) {
+    const state = getFakeCloudflareState();
+    const matched = Array.from(state.hostnames.entries()).find(
+      ([, hostname]) => hostname.id === id
+    );
+    if (!matched) {
+      return;
+    }
+
+    state.hostnames.delete(matched[0]);
+    return;
+  }
+
   try {
     await cloudflareRequest<CloudflareCustomHostname | { id?: string }>(
       `/zones/${getCloudflareSaasConfig().zoneId}/custom_hostnames/${id}`,
