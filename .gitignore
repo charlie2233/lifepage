@@ -14,3 +14,4 @@ tsconfig.tsbuildinfo
 .open-next/
 .wrangler/
 cloudflare-env.d.ts
+tools/whatsapp-codex-bridge/
