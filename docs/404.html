@@ -2,10 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta http-equiv="refresh" content="0; url=/My_portforlio/" />
+    <script>
+      const base =
+        window.location.pathname.startsWith("/My_portforlio/") ? "/My_portforlio/" : "/";
+      window.location.replace(base);
+    </script>
     <title>Redirecting…</title>
   </head>
   <body>
-    <p><a href="/My_portforlio/">Redirecting…</a></p>
+    <p>
+      <a href="/">Redirecting…</a>
+    </p>
   </body>
 </html>
