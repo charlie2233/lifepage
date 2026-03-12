@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LifePage</title>
+    <meta
+      name="description"
+      content="LifePage is moving to a full Cloudflare-hosted app. This GitHub Pages site is a lightweight fallback landing page."
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #071018;
+        --panel: rgba(15, 24, 32, 0.82);
+        --line: rgba(255, 255, 255, 0.1);
+        --text: #f4f8fb;
+        --muted: #9cb0bd;
+        --accent: #79e5d2;
+        --accent-2: #f3b276;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+          radial-gradient(circle at top left, rgba(121, 229, 210, 0.14), transparent 34%),
+          radial-gradient(circle at bottom right, rgba(243, 178, 118, 0.12), transparent 28%),
+          linear-gradient(180deg, #081018 0%, #05090d 100%);
+        color: var(--text);
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+      }
+
+      .card {
+        width: min(720px, 100%);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        padding: 40px;
+        background: var(--panel);
+        backdrop-filter: blur(18px);
+        box-shadow: 0 32px 80px rgba(0, 0, 0, 0.35);
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--accent), #cffff6);
+        box-shadow: 0 0 24px rgba(121, 229, 210, 0.55);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2.4rem, 7vw, 4.5rem);
+        line-height: 0.95;
+        letter-spacing: -0.05em;
+      }
+
+      p {
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 1.02rem;
+        line-height: 1.7;
+      }
+
+      .status {
+        margin-top: 26px;
+        padding: 18px 20px;
+        border-radius: 18px;
+        border: 1px solid rgba(243, 178, 118, 0.22);
+        background: rgba(243, 178, 118, 0.08);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 0 18px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        color: var(--text);
+        text-decoration: none;
+        font-weight: 700;
+        transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+        border-color: rgba(121, 229, 210, 0.45);
+      }
+
+      .button-primary {
+        color: #051117;
+        border-color: transparent;
+        background: linear-gradient(135deg, var(--accent), #cffff6);
+      }
+
+      .button-secondary {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .small {
+        margin-top: 24px;
+        font-size: 0.9rem;
+      }
+
+      code {
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: rgba(121, 229, 210, 0.08);
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <div class="eyebrow"><span class="dot"></span> LifePage</div>
+      <h1>GitHub Pages fallback is live.</h1>
+      <p>
+        The full LifePage product is a dynamic Next.js app with auth, billing, APIs,
+        and Cloudflare deployment logic. GitHub Pages cannot host that runtime, so this
+        site is a lightweight landing page instead of the full app.
+      </p>
+      <div class="status">
+        <strong>Current status</strong>
+        <p>
+          This repository now has a valid Pages landing page. The full app deployment is
+          being served through Cloudflare Workers when the target account and bundle size
+          constraints are satisfied.
+        </p>
+      </div>
+      <div class="actions">
+        <a class="button button-primary" href="https://github.com/charlie2233/My_portforlio">Open Repository</a>
+        <a class="button button-secondary" href="https://github.com/charlie2233/My_portforlio/actions">View CI</a>
+      </div>
+      <p class="small">
+        Expected Pages URL:
+        <code>https://charlie2233.github.io/My_portforlio/</code>
+      </p>
+    </main>
+  </body>
+</html>
