@@ -5,13 +5,20 @@
     <script>
       const base =
         window.location.pathname.startsWith("/My_portforlio/") ? "/My_portforlio/" : "/";
+      window.__LIFEPAGE_BASE__ = base;
       window.location.replace(base);
     </script>
     <title>Redirecting…</title>
   </head>
   <body>
     <p>
-      <a href="/">Redirecting…</a>
+      <a id="fallback-link" href="/">Redirecting…</a>
     </p>
+    <script>
+      const link = document.getElementById("fallback-link");
+      if (link && window.__LIFEPAGE_BASE__) {
+        link.href = window.__LIFEPAGE_BASE__;
+      }
+    </script>
   </body>
 </html>
