@@ -226,7 +226,15 @@ https://lifepage.one
 npm run cf:deploy
 ```
 
-Use `*.workers.dev` for staging verification first. The production target remains `https://lifepage.one`.
+`npm run cf:deploy` now builds and deploys with `wrangler deploy --minify --keep-vars`, which is required to keep the OpenNext Worker under the Cloudflare Workers Free size limit.
+
+Current staging hostname:
+
+```text
+https://lifepage-web.charliehan-lifepage.workers.dev
+```
+
+Use `*.workers.dev` for staging verification first. The production target remains `https://lifepage.one`. The current staging validation report is in [STAGING_VALIDATION_REPORT.md](STAGING_VALIDATION_REPORT.md).
 
 ### GitHub Pages fallback
 

@@ -19,11 +19,16 @@ For the authoritative environment matrix, setup order, callback URLs, Stripe pro
   - `npm run cf:build`
   - `npm run cf:preview`
   - `npm run cf:deploy`
+- `npm run cf:deploy` now resolves to `wrangler deploy --minify --keep-vars`, which is required for Workers Free bundle limits.
+- Staging deploy is live at `https://lifepage-web.charliehan-lifepage.workers.dev`.
+- Current staging validation report: [STAGING_VALIDATION_REPORT.md](STAGING_VALIDATION_REPORT.md).
 - The repo fallback assets now describe Pages as fallback-only, and `docs/CNAME` is removed.
 - `wrangler.jsonc` targets the OpenNext Worker bundle, but production routes for `lifepage.one` are not declared yet.
-- CI validates the Cloudflare build path in `.github/workflows/ci.yml`.
+- CI validates the Next build, the Cloudflare build, the standard Playwright suite, and the Worker-preview smoke suite in `.github/workflows/ci.yml`.
+- GitHub branch protection on `main` now requires the `test-and-build` check before merge.
 - GitHub Pages still publishes `docs/` and is still configured with the custom domain `lifepage.one` in repository settings.
 - `lifepage.one` and `www.lifepage.one` still resolve to GitHub Pages today, which conflicts with the intended Cloudflare production path.
+- The current staging blocker is no longer bundle size. It is Cloudflare Worker access to the configured Postgres instance.
 
 ## Deployment policy
 
@@ -58,8 +63,8 @@ For the authoritative environment matrix, setup order, callback URLs, Stripe pro
 
 ## Next phase checklist
 
-- Resolve the current Cloudflare Worker deployment blocker on the target account
 - Provision the full Worker secret set from `SECRETS.md`
+- Fix the staging `DATABASE_URL` so Workers can reach Postgres
 - Create the Stripe catalog, Billing Portal config, and webhook endpoint
 - Add production Worker routes in `wrangler.jsonc`
 - Deploy and verify the Worker on `*.workers.dev`

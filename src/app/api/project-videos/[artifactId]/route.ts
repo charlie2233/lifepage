@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getBillingSnapshot } from "@/lib/billing";
-import { refreshProjectVideoArtifact } from "@/lib/project-videos";
 
 export const runtime = "nodejs";
 
@@ -20,6 +19,7 @@ export async function GET(
   }
 
   try {
+    const { refreshProjectVideoArtifact } = await import("@/lib/project-videos");
     const result = await refreshProjectVideoArtifact({
       artifactId,
       userId: session.user.id,

@@ -4,6 +4,10 @@ import { getE2EAppEnv, getE2EBaseUrl } from "./e2e/support/runtime";
 const baseURL = getE2EBaseUrl();
 const baseHost = new URL(baseURL).hostname;
 const basePort = new URL(baseURL).port || "3001";
+const serverCommand =
+  process.env.E2E_SERVER_COMMAND ??
+  `npx next dev --webpack --hostname ${baseHost} --port ${basePort}`;
+const serverTimeout = Number(process.env.E2E_SERVER_TIMEOUT ?? "120000");
 
 export default defineConfig({
   testDir: "./e2e",
@@ -24,10 +28,10 @@ export default defineConfig({
   },
   workers: process.env.CI ? 1 : undefined,
   webServer: {
-    command: `npx next dev --webpack --hostname ${baseHost} --port ${basePort}`,
+    command: serverCommand,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: serverTimeout,
     env: getE2EAppEnv(),
   },
 });

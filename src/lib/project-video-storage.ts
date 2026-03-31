@@ -1,6 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 export interface StoredProjectVideoAssets {
   posterStorageKey: string | null;
@@ -55,7 +54,8 @@ function sanitizeStorageSegment(value: string) {
   return normalized || "asset";
 }
 
-function getR2Client() {
+async function getR2Client() {
+  const { S3Client } = await import("@aws-sdk/client-s3");
   return new S3Client({
     region: "auto",
     endpoint: getR2Endpoint()!,
@@ -98,7 +98,10 @@ export async function storeProjectVideoAssets(args: {
     : null;
 
   if (canUseR2ProjectVideoStorage()) {
-    const client = getR2Client();
+    const [{ PutObjectCommand }, client] = await Promise.all([
+      import("@aws-sdk/client-s3"),
+      getR2Client(),
+    ]);
     await client.send(
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET!,
