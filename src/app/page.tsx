@@ -31,6 +31,7 @@ import {
   Search,
   Sparkles,
 } from "lucide-react";
+import { getSiteUrl } from "@/lib/site-metadata";
 
 const SITE_AUTHOR = "atrak.dev";
 const SITE_AUTHOR_URL = "https://atrak.dev";
@@ -39,6 +40,9 @@ const DEFAULT_METADATA: Metadata = {
   title: "LifePage",
   description:
     "AI-powered personal brand and life-story builder for creators, students, job seekers, and people documenting their life.",
+  alternates: {
+    canonical: "/",
+  },
 };
 
 const DEMO_PROFILES = [
@@ -209,8 +213,12 @@ export async function generateMetadata(): Promise<Metadata> {
     | undefined;
 
   return {
+    metadataBase: getSiteUrl(hostname),
     title: `${user.name ?? user.username ?? "Portfolio"} — LifePage`,
     description: profile?.headline ?? DEFAULT_METADATA.description,
+    alternates: {
+      canonical: "/",
+    },
   };
 }
 

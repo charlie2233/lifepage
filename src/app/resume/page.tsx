@@ -5,6 +5,7 @@ import { PublicResumePage } from "@/components/public-resume-page";
 import { getRequestHostname, isInternalAppHostname } from "@/lib/custom-domain";
 import { getPublicPageUserByCustomDomain } from "@/lib/public-page";
 import type { ProfileJSON } from "@/lib/schema";
+import { getSiteUrl } from "@/lib/site-metadata";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +28,14 @@ export async function generateMetadata(): Promise<Metadata> {
 
   if (!user) {
     return {
+      metadataBase: getSiteUrl(hostname),
       title: "Resume not found — LifePage",
       description: hostname
         ? `No public resume is connected to ${hostname}.`
         : "No public resume found.",
+      alternates: {
+        canonical: "/resume",
+      },
     };
   }
 
@@ -39,11 +44,15 @@ export async function generateMetadata(): Promise<Metadata> {
     | undefined;
 
   return {
+    metadataBase: getSiteUrl(hostname),
     title: `${user.name ?? user.username ?? "Portfolio"} Resume — LifePage`,
     description:
       profile?.resume.summary ??
       profile?.headline ??
       `Resume of ${user.name ?? user.username ?? "this user"}`,
+    alternates: {
+      canonical: "/resume",
+    },
   };
 }
 

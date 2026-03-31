@@ -153,11 +153,18 @@ LifePage's real application runtime is Cloudflare Workers via OpenNext.
 - Canonical production path: Cloudflare Workers on `https://lifepage.one`
 - Worker preview/staging host: `*.workers.dev`
 - GitHub Pages: fallback-only landing page at `https://charlie2233.github.io/My_portforlio/`
+- Production hostname policy: `https://www.lifepage.one` must redirect to `https://lifepage.one`
 
 GitHub Pages cannot host the real app runtime. It only serves the static fallback site under `docs/`.
 Before launch, remove any GitHub Pages custom-domain binding for `lifepage.one` and attach that domain to the Worker instead.
 
-See [DEPLOYMENT.md](DEPLOYMENT.md), [DEPLOYMENT_DECISION_REPORT.md](DEPLOYMENT_DECISION_REPORT.md), [OPERATIONS.md](OPERATIONS.md), and [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for the audited state and next deployment steps.
+See [DEPLOYMENT.md](DEPLOYMENT.md), [DEPLOYMENT_DECISION_REPORT.md](DEPLOYMENT_DECISION_REPORT.md), [OPERATIONS.md](OPERATIONS.md), [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md), and [CUTOVER_CHECKLIST.md](CUTOVER_CHECKLIST.md) for the audited state and next deployment steps.
+
+As of 2026-03-31, the live cutover blocker is external infrastructure:
+
+- `lifepage.one` is still on Porkbun nameservers, not Cloudflare
+- GitHub Pages still owns the active custom-domain binding
+- the current Cloudflare token cannot create the `lifepage.one` zone
 
 ### Local preview
 

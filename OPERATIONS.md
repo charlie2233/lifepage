@@ -8,6 +8,7 @@ Last updated: 2026-03-31
 - Canonical host: `https://lifepage.one`
 - Staging host: `*.workers.dev`
 - GitHub Pages: fallback-only on `https://charlie2233.github.io/My_portforlio/`
+- Redirect policy: `https://www.lifepage.one` -> `https://lifepage.one`
 
 Use [SECRETS.md](SECRETS.md) as the source of truth for service configuration, provider setup, and secret values.
 
@@ -97,6 +98,13 @@ Run these checks on staging before domain cutover:
 
 - Confirm `AUTH_URL` matches the external hostname for the active environment.
 - Use the Worker hostname for staging and `https://lifepage.one` for production.
+
+### Custom-domain cutover is blocked before it starts
+
+- Check authoritative nameservers with `dig +short NS lifepage.one`.
+- If the domain is still on Porkbun or another registrar DNS host, Cloudflare Worker custom domains for `lifepage.one` cannot be completed yet.
+- Confirm the `lifepage.one` zone exists in the target Cloudflare account before removing the GitHub Pages custom domain binding.
+- Follow [CUTOVER_CHECKLIST.md](CUTOVER_CHECKLIST.md) for the exact sequence and rollback plan.
 
 ### Auth or writes fail with `proxy request failed`
 

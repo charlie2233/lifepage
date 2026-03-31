@@ -30,6 +30,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       profile?.resume.summary ??
       profile?.headline ??
       `Resume of ${user.name ?? username}`,
+    alternates: {
+      canonical: `/u/${username}/resume`,
+    },
   };
 }
 

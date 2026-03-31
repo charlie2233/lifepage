@@ -27,6 +27,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${user.name ?? username} — LifePage`,
     description: profile?.headline ?? `Portfolio of ${username}`,
+    alternates: {
+      canonical: `/u/${username}`,
+    },
   };
 }
 
