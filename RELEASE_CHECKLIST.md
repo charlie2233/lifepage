@@ -31,8 +31,10 @@ Last updated: 2026-03-31
 ## Phase 3: domain cutover
 
 - [ ] Remove the GitHub Pages custom-domain setting for `lifepage.one`
+- [ ] Create or gain access to the `lifepage.one` Cloudflare zone
 - [ ] Point `lifepage.one` DNS at Cloudflare
 - [ ] Attach `lifepage.one` and `www.lifepage.one` to the Worker
+- [ ] Verify `www.lifepage.one` redirects to `https://lifepage.one`
 - [ ] Set `AUTH_URL=https://lifepage.one`
 - [ ] Verify the Pages fallback remains only on `github.io`
 
@@ -45,5 +47,7 @@ Last updated: 2026-03-31
 - [ ] Stripe webhook sync works
 - [ ] Public pages load
 - [ ] Resume export works
+- [ ] `/robots.txt` and `/sitemap.xml` work on production
+- [ ] Canonical metadata prefers apex over `www`
 - [ ] Monitoring is live
 - [ ] Smoke tests pass

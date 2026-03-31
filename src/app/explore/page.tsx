@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   title: "Explore Personal Brands — LifePage",
   description:
     "Browse public personal brand sites, proof-driven portfolios, and resume-ready launches built with LifePage.",
+  alternates: {
+    canonical: "/explore",
+  },
 };
 
 export const dynamic = "force-dynamic";

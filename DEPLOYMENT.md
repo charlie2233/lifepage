@@ -22,12 +22,16 @@ For the authoritative environment matrix, setup order, callback URLs, Stripe pro
 - `npm run cf:deploy` now resolves to `wrangler deploy --minify --keep-vars`, which is required for Workers Free bundle limits.
 - Staging deploy is live at `https://lifepage-web.charliehan-lifepage.workers.dev`.
 - Current staging validation report: [STAGING_VALIDATION_REPORT.md](STAGING_VALIDATION_REPORT.md).
+- Production cutover runbook: [CUTOVER_CHECKLIST.md](CUTOVER_CHECKLIST.md).
+- Production cutover status report: [PRODUCTION_CUTOVER_REPORT.md](PRODUCTION_CUTOVER_REPORT.md).
 - The repo fallback assets now describe Pages as fallback-only, and `docs/CNAME` is removed.
 - `wrangler.jsonc` targets the OpenNext Worker bundle, but production routes for `lifepage.one` are not declared yet.
 - CI validates the Next build, the Cloudflare build, the standard Playwright suite, and the Worker-preview smoke suite in `.github/workflows/ci.yml`.
 - GitHub branch protection on `main` now requires the `test-and-build` check before merge.
 - GitHub Pages still publishes `docs/` and is still configured with the custom domain `lifepage.one` in repository settings.
 - `lifepage.one` and `www.lifepage.one` still resolve to GitHub Pages today, which conflicts with the intended Cloudflare production path.
+- `lifepage.one` is not currently onboarded to Cloudflare DNS. Authoritative nameservers still point at Porkbun.
+- The active Cloudflare token cannot create the missing zone, so registrar and zone onboarding remain manual blockers.
 - The current staging blocker is no longer bundle size. It is Cloudflare Worker access to the configured Postgres instance.
 
 ## Deployment policy
@@ -36,6 +40,7 @@ For the authoritative environment matrix, setup order, callback URLs, Stripe pro
 
 - Workers is the only canonical production runtime.
 - `lifepage.one` and `www.lifepage.one` should route to the Worker after cutover.
+- `www.lifepage.one` should permanently redirect to `https://lifepage.one`.
 - `*.workers.dev` is for staging, preview, and emergency diagnosis.
 
 ### GitHub Pages
@@ -65,6 +70,8 @@ For the authoritative environment matrix, setup order, callback URLs, Stripe pro
 
 - Provision the full Worker secret set from `SECRETS.md`
 - Fix the staging `DATABASE_URL` so Workers can reach Postgres
+- Create or gain access to the `lifepage.one` Cloudflare zone
+- Update Porkbun nameservers to Cloudflare once the zone exists
 - Create the Stripe catalog, Billing Portal config, and webhook endpoint
 - Add production Worker routes in `wrangler.jsonc`
 - Deploy and verify the Worker on `*.workers.dev`

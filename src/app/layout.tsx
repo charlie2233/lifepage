@@ -8,6 +8,7 @@ import {
   Space_Grotesk,
 } from "next/font/google";
 import { assertCoreRuntimeConfig } from "@/lib/runtime-config";
+import { getSiteUrl } from "@/lib/site-metadata";
 import "./globals.css";
 
 assertCoreRuntimeConfig();
@@ -48,6 +49,18 @@ export const metadata: Metadata = {
   title: "LifePage — AI Personal Brand Builder",
   description:
     "Turn your work into a stunning portfolio in minutes. Powered by AI. Built by atrak.dev.",
+  metadataBase: getSiteUrl(),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "LifePage — AI Personal Brand Builder",
+    description:
+      "Turn your work into a stunning portfolio in minutes. Powered by AI. Built by atrak.dev.",
+    siteName: "LifePage",
+    type: "website",
+    url: "/",
+  },
 };
 
 export default function RootLayout({
