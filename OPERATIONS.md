@@ -21,6 +21,7 @@ Last updated: 2026-03-31
 ## Pre-launch operational checks
 
 - Wrangler auth works
+- Cloudflare account can accept the current Worker bundle size, or the app is split so it fits the deployed plan
 - Worker deployment succeeds
 - Production secrets are present
 - Database migrations/schema are aligned
@@ -73,6 +74,7 @@ Last updated: 2026-03-31
 - Release owner can inspect logs during and after cutover
 - Billing webhook failures are visible
 - Auth failures are visible
+- Worker deploy failures from size validation are visible and documented
 
 ## Incident handling
 
