@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowRight, ArrowUpRight, Compass, Globe, Sparkles } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
 import { prisma } from "@/lib/db";
 import { getDemoExploreProfiles } from "@/lib/demo-public-pages";
 import { resolvePortfolioTheme } from "@/lib/portfolio-themes";
@@ -101,9 +102,7 @@ export default async function ExplorePage() {
       <nav className="relative z-10 border-b border-white/8 bg-[#091015]/70 backdrop-blur-2xl">
         <div className="lp-shell flex items-center justify-between py-5">
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[11px] font-black tracking-[0.24em] text-[#041117]">
-              LP
-            </div>
+            <BrandMark className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[#041117]" />
             <div>
               <p className="brand-display text-[1.35rem] leading-none tracking-tight">
                 LifePage

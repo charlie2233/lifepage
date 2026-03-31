@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import type { LucideIcon } from "lucide-react";
 import type { ProfileJSON } from "@/lib/schema";
+import { BrandMark } from "@/components/brand-mark";
 import { PublicProfilePage } from "@/components/public-profile-page";
 import { ContactSection } from "@/components/contact-section";
 import { LandingPricing } from "@/components/landing-pricing";
@@ -229,9 +230,7 @@ function LandingPage() {
       <nav className="relative z-10 border-b border-white/8 bg-[#091015]/75 backdrop-blur-2xl">
         <div className="lp-shell flex items-center justify-between py-5">
           <div className="flex items-center gap-3">
-            <div className="animate-pulse-glow flex h-10 w-10 items-center justify-center rounded-2xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[11px] font-black tracking-[0.24em] text-[#041117]">
-              LP
-            </div>
+            <BrandMark className="animate-pulse-glow flex h-10 w-10 items-center justify-center rounded-2xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[#041117]" />
             <div>
               <p className="brand-display text-[1.35rem] leading-none tracking-tight">
                 LifePage
@@ -787,9 +786,7 @@ function LandingPage() {
       <footer className="relative z-10 border-t border-white/8 py-8">
         <div className="lp-shell flex flex-col gap-4 text-sm text-[#8f9ca6] sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[10px] font-black tracking-[0.2em] text-[#041117]">
-              LP
-            </div>
+            <BrandMark className="flex h-8 w-8 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[#041117]" />
             <div>
               <p className="brand-display text-lg leading-none text-[#f7f1e8]">
                 LifePage

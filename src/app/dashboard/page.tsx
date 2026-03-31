@@ -5,6 +5,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
 import {
   encodeAgentFocusValue,
   parseAgentFocusValue,
@@ -2812,9 +2813,7 @@ function DashboardPageContent() {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/8 bg-[#080d10]/80 px-6 py-4 backdrop-blur-2xl flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5 text-xl font-bold">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[linear-gradient(135deg,rgba(0,245,255,0.9),rgba(121,229,210,0.85))] text-xs font-black text-black shadow-[0_6px_20px_rgba(0,245,255,0.25)]">
-            LP
-          </span>
+          <BrandMark className="flex h-8 w-8 items-center justify-center rounded-xl bg-[linear-gradient(135deg,rgba(0,245,255,0.9),rgba(121,229,210,0.85))] text-black shadow-[0_6px_20px_rgba(0,245,255,0.25)]" />
           <span>
             Life<span className="text-[#00f5ff]">Page</span>
           </span>
