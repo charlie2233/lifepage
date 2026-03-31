@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowRight, ArrowUpRight, Compass, Globe, Sparkles } from "lucide-react";
-import { prisma } from "@/lib/db";
-import { getDemoExploreProfiles } from "@/lib/demo-public-pages";
+import { JsonLd } from "@/components/json-ld";
+import { getPublicLaunches } from "@/lib/public-launches";
 import { resolvePortfolioTheme } from "@/lib/portfolio-themes";
+import { getAbsoluteUrl } from "@/lib/site-metadata";
 
 export const metadata: Metadata = {
   title: "Explore Personal Brands — LifePage",
@@ -12,90 +13,46 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/explore",
   },
+  openGraph: {
+    title: "Explore Personal Brands — LifePage",
+    description:
+      "Browse public personal brand sites, proof-driven portfolios, and resume-ready launches built with LifePage.",
+    url: "/explore",
+    type: "website",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "LifePage explore",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Explore Personal Brands — LifePage",
+    description:
+      "Browse public personal brand sites, proof-driven portfolios, and resume-ready launches built with LifePage.",
+    images: ["/opengraph-image"],
+  },
 };
 
-export const dynamic = "force-dynamic";
-
-interface ProfileData {
-  headline?: string;
-  skills?: Array<{ tag: string }>;
-  stats?: {
-    projectsShipped?: number;
-    yearsBuilding?: number;
-    competitions?: number;
-  };
-}
-
 export default async function ExplorePage() {
-  let profiles: Array<{
-    username: string;
-    name: string;
-    avatar: string | null;
-    headline: string | null;
-    skills: string[];
-    stats: ProfileData["stats"];
-    theme: string;
-    screenshot: string | null;
-    joinedAt: Date;
-  }> = [];
-
-  try {
-    const users = await prisma.user.findMany({
-      where: {
-        publicPageSettings: { is: { isPublic: true } },
-        generatedProfiles: { some: { isActive: true } },
-      },
-      select: {
-        username: true,
-        name: true,
-        avatar: true,
-        createdAt: true,
-        generatedProfiles: {
-          where: { isActive: true },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          select: { data: true },
-        },
-        publicPageSettings: {
-          select: { theme: true },
-        },
-        evidenceItems: {
-          where: { visible: true },
-          orderBy: { createdAt: "asc" },
-          take: 1,
-          select: { screenshot: true, title: true },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 48,
-    });
-
-    profiles = users
-      .filter((user) => user.username)
-      .map((user) => {
-        const data = (user.generatedProfiles[0]?.data ?? {}) as ProfileData;
-        return {
-          username: user.username!,
-          name: user.name ?? user.username!,
-          avatar: user.avatar,
-          headline: data.headline ?? null,
-          skills: (data.skills ?? []).slice(0, 4).map((skill) => skill.tag),
-          stats: data.stats ?? {},
-          theme: user.publicPageSettings?.theme ?? "obsidian",
-          screenshot: user.evidenceItems[0]?.screenshot ?? null,
-          joinedAt: user.createdAt,
-        };
-      });
-  } catch (error) {
-    console.warn("Falling back from explore profile lookup:", error);
-  }
-
-  if (profiles.length === 0) {
-    profiles = getDemoExploreProfiles();
-  }
+  const profiles = await getPublicLaunches();
+  const siteUrl = getAbsoluteUrl("/explore")?.toString() ?? "https://lifepage.one/explore";
+  const structuredData: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "LifePage Explore",
+    url: siteUrl,
+    description:
+      "Browse public personal brand sites, proof-driven portfolios, and resume-ready launches built with LifePage.",
+    isPartOf: getAbsoluteUrl("/")?.toString() ?? "https://lifepage.one/",
+  };
 
   return (
     <div className="lp-page text-white">
+      <JsonLd data={structuredData} />
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <div className="absolute -top-24 left-[12%] h-[24rem] w-[24rem] rounded-full bg-[#79e5d2]/10 blur-[120px]" />
         <div className="absolute bottom-[8%] right-[10%] h-[22rem] w-[22rem] rounded-full bg-[#8fa9ff]/10 blur-[120px]" />
@@ -230,6 +187,8 @@ export default async function ExplorePage() {
                         <img
                           src={profile.screenshot}
                           alt={`${profile.name}'s portfolio`}
+                          loading="lazy"
+                          decoding="async"
                           className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]"
                         />
                       </div>

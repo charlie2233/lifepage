@@ -1,8 +1,30 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { BrandMark } from "@/components/brand-mark";
+import { trackClientEvent } from "@/lib/client-analytics";
+
+function getRegisterErrorMessage(error?: string) {
+  if (!error) {
+    return "Registration failed. Please try again.";
+  }
+
+  if (error.includes("already taken")) {
+    return "That email or username is already in use. Try signing in or choose a different public handle.";
+  }
+
+  if (error.toLowerCase().includes("validation")) {
+    return "Check the highlighted fields and try again.";
+  }
+
+  if (error.toLowerCase().includes("server")) {
+    return "LifePage could not create the account right now. Try again in a moment.";
+  }
+
+  return error;
+}
 
 function RegisterPageContent() {
   const router = useRouter();
@@ -20,10 +42,25 @@ function RegisterPageContent() {
     ? `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`
     : "/login";
 
+  useEffect(() => {
+    void trackClientEvent({
+      event: "signup_viewed",
+      source: "register_page",
+    });
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    void trackClientEvent({
+      event: "signup_submitted",
+      source: "register_page",
+      metadata: {
+        hasName: Boolean(form.name.trim()),
+        hasUsername: Boolean(form.username.trim()),
+      },
+    });
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -32,7 +69,7 @@ function RegisterPageContent() {
     const data = (await res.json()) as { error?: string };
     setLoading(false);
     if (!res.ok) {
-      setError(data.error || "Registration failed");
+      setError(getRegisterErrorMessage(data.error));
     } else {
       router.push(loginHref);
     }
@@ -63,8 +100,8 @@ function RegisterPageContent() {
         {/* Logo */}
         <div className="mb-8 text-center">
           <Link href="/" className="inline-flex items-center gap-2.5">
-            <div className="animate-pulse-glow flex h-9 w-9 items-center justify-center rounded-xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[10px] font-black tracking-[0.22em] text-[#041117]">
-              LP
+            <div className="animate-pulse-glow flex h-9 w-9 items-center justify-center rounded-xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[#041117]">
+              <BrandMark className="h-5 w-5" />
             </div>
             <span className="brand-display text-[1.4rem] leading-none tracking-tight text-white">
               LifePage
@@ -73,6 +110,16 @@ function RegisterPageContent() {
           <p className="mt-3 text-sm text-[#7a8d98]">
             Create your free account
           </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {["Free to start", "Edit before publishing", "Public or private later"].map((item) => (
+              <span
+                key={item}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#8ea0aa]"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* Card */}
@@ -95,6 +142,9 @@ function RegisterPageContent() {
           />
 
           <form onSubmit={handleSubmit} className="relative space-y-4">
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-[#8ea0aa]">
+              You will sign in next, import proof like a GitHub repo or personal site, and then generate the first portfolio draft.
+            </div>
             {error && (
               <div className="lp-fade-rise rounded-xl border border-red-500/25 bg-red-500/8 px-4 py-3 text-sm text-red-400">
                 {error}
@@ -141,6 +191,16 @@ function RegisterPageContent() {
                   className="input-fancy"
                   placeholder={f.placeholder}
                 />
+                {f.key === "username" && (
+                  <p className="mt-1.5 text-xs text-[#6e7e89]">
+                    This becomes your public URL: <span className="text-[#9db4c1]">lifepage.one/u/{form.username || "yourhandle"}</span>
+                  </p>
+                )}
+                {f.key === "password" && (
+                  <p className="mt-1.5 text-xs text-[#6e7e89]">
+                    Use at least 6 characters. You can refine the page and privacy settings after sign in.
+                  </p>
+                )}
               </div>
             ))}
 

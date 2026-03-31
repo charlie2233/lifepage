@@ -56,6 +56,7 @@ import {
   User,
   WandSparkles,
 } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
 
 interface EvidenceItem {
   id: string;
@@ -520,6 +521,62 @@ function splitCrawlInput(value: string) {
     .split(/[\n,]+/)
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+const SOURCE_EXAMPLES = [
+  {
+    label: "GitHub repo",
+    value: "https://github.com/yourname/project-name",
+    note: "Code, README, and release proof",
+  },
+  {
+    label: "Personal site",
+    value: "https://yourname.com",
+    note: "Your existing home base or case study",
+  },
+  {
+    label: "Google Sites page",
+    value: "https://sites.google.com/view/your-portfolio",
+    note: "LifePage can expand linked pages from the same site",
+  },
+  {
+    label: "YouTube channel",
+    value: "https://youtube.com/@yourname",
+    note: "Demo videos, talks, and tutorials",
+  },
+];
+
+function appendExampleUrl(currentValue: string, nextUrl: string) {
+  const currentUrls = splitCrawlInput(currentValue);
+  if (currentUrls.includes(nextUrl)) {
+    return currentValue;
+  }
+
+  return currentUrls.length > 0
+    ? `${currentValue.trim()}\n${nextUrl}`
+    : nextUrl;
+}
+
+function formatDashboardErrorMessage(error: unknown, fallback: string) {
+  const rawMessage =
+    error instanceof Error ? error.message : String(error ?? fallback);
+
+  if (rawMessage.includes("Unauthorized")) {
+    return "Your session expired. Sign in again, then retry the action.";
+  }
+
+  if (rawMessage.includes("No evidence or bio provided")) {
+    return "Add at least one source URL or a short bio before generating the first draft.";
+  }
+
+  if (
+    rawMessage.includes("Failed to fetch") ||
+    rawMessage.includes("NetworkError")
+  ) {
+    return "LifePage could not reach the server. Check your connection and retry.";
+  }
+
+  return rawMessage || fallback;
 }
 
 function normalizeOptionalFormValue(value: string) {
@@ -2578,12 +2635,15 @@ function DashboardPageContent() {
 
       setMessage({
         type: "success",
-        text: `${successText}.${failureText}`,
+        text: `${successText}.${failureText} Review the imported items below, hide anything noisy, then generate the first draft.`,
       });
       setUrlInput("");
       await fetchData();
     } catch (err) {
-      setMessage({ type: "error", text: String(err) });
+      setMessage({
+        type: "error",
+        text: formatDashboardErrorMessage(err, "Import failed."),
+      });
     } finally {
       setCrawling(false);
     }
@@ -2604,11 +2664,14 @@ function DashboardPageContent() {
       if (data.billing) setBilling(data.billing);
       setMessage({
         type: "success",
-        text: "Profile generated. Check your public page.",
+        text: "Profile generated. Review the draft, then open the public page and resume view to tighten the final details.",
       });
       setActiveTab("profile");
     } catch (err) {
-      setMessage({ type: "error", text: String(err) });
+      setMessage({
+        type: "error",
+        text: formatDashboardErrorMessage(err, "Generation failed."),
+      });
     } finally {
       setGenerating(false);
     }
@@ -2795,6 +2858,19 @@ function DashboardPageContent() {
       ? "Ask anything or say 'create a skills tree'…"
       : `Ask about ${activeFocusOption.label.toLowerCase()}…`;
   const activeTabCopy = TAB_COPY[activeTab];
+  const activeWorkflowStatus = crawling
+    ? {
+        title: "Importing proof",
+        detail:
+          "LifePage is crawling the URLs, collecting usable text, and capturing screenshots where possible.",
+      }
+    : generating
+      ? {
+          title: "Generating the first draft",
+          detail:
+            "The AI is turning your visible proof into a headline, about section, proof-backed projects, and a resume summary.",
+        }
+      : null;
   const publishStatusLabel =
     visibility === "public"
       ? "Public"
@@ -2806,6 +2882,10 @@ function DashboardPageContent() {
     : evidence.length > 0
       ? "Ready to generate"
       : "Waiting for proof";
+  const generateBlockedReason =
+    evidence.length === 0 && !userInfo.bio.trim()
+      ? "Add at least one source URL or a short bio to unlock the first draft."
+      : null;
 
   return (
     <div className="min-h-screen bg-[#080d10] text-white"
@@ -2816,8 +2896,8 @@ function DashboardPageContent() {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/8 bg-[#080d10]/80 px-6 py-4 backdrop-blur-2xl flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5 text-xl font-bold">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[linear-gradient(135deg,rgba(0,245,255,0.9),rgba(121,229,210,0.85))] text-xs font-black text-black shadow-[0_6px_20px_rgba(0,245,255,0.25)]">
-            LP
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[linear-gradient(135deg,rgba(0,245,255,0.9),rgba(121,229,210,0.85))] text-black shadow-[0_6px_20px_rgba(0,245,255,0.25)]">
+            <BrandMark className="h-5 w-5" />
           </span>
           <span>
             Life<span className="text-[#00f5ff]">Page</span>
@@ -2861,6 +2941,22 @@ function DashboardPageContent() {
             }`}
           >
             {message.text}
+          </div>
+        )}
+
+        {activeWorkflowStatus && (
+          <div className="mb-6 rounded-[1.5rem] border border-[#00f5ff]/20 bg-[#00f5ff]/8 px-4 py-4">
+            <div className="flex items-start gap-3">
+              <LoaderCircle className="mt-0.5 h-4 w-4 animate-spin text-[#00f5ff]" />
+              <div>
+                <p className="text-sm font-semibold text-white">
+                  {activeWorkflowStatus.title}
+                </p>
+                <p className="mt-1 text-sm leading-7 text-[#9ec5cf]">
+                  {activeWorkflowStatus.detail}
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -2961,11 +3057,9 @@ function DashboardPageContent() {
                 <h2 className="text-lg font-semibold">Import proof from the web</h2>
               </div>
               <p className="text-gray-400 text-sm mb-4">
-                Paste one or many URLs and LifePage will crawl each source,
-                capture screenshots, and turn the useful signal into portfolio-ready proof.
-                Google Sites roots also expand into linked pages from the same site.
+                Start with the most representative proof you already have: a GitHub repo, personal site, Google Site, YouTube channel, or project write-up. LifePage will crawl each source, capture screenshots, and turn the useful signal into portfolio-ready evidence.
               </p>
-              <div className="mb-3 flex flex-wrap gap-2">
+              <div className="mb-4 flex flex-wrap gap-2">
                 {["Multiple URLs", "GitHub + websites", "YouTube + docs", "Google Sites roots"].map((item) => (
                   <span
                     key={item}
@@ -3010,9 +3104,38 @@ function DashboardPageContent() {
                 </button>
               </div>
               <p className="mt-3 text-xs text-gray-500">
-                Use one URL per line or separate them with commas. Press Cmd/Ctrl + Enter to start.
+                Use one URL per line or separate them with commas. Press Cmd/Ctrl + Enter to start. Google Sites roots expand into linked pages from the same site.
               </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {SOURCE_EXAMPLES.map((example) => (
+                  <button
+                    key={example.label}
+                    type="button"
+                    onClick={() =>
+                      setUrlInput((currentValue) =>
+                        appendExampleUrl(currentValue, example.value)
+                      )
+                    }
+                    className="rounded-[1.1rem] border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:border-[#00f5ff]/25 hover:bg-[#00f5ff]/6"
+                  >
+                    <p className="text-sm font-medium text-white">{example.label}</p>
+                    <p className="mt-1 text-xs text-[#8fa0aa]">{example.note}</p>
+                    <p className="mt-2 truncate text-[11px] text-[#00f5ff]">
+                      {example.value}
+                    </p>
+                  </button>
+                ))}
+              </div>
             </div>
+
+            {evidence.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-6">
+                <p className="text-sm font-semibold text-white">Nothing imported yet</p>
+                <p className="mt-2 max-w-2xl text-sm leading-7 text-gray-400">
+                  Start with one strong source instead of everything at once. A single repo, portfolio page, or Google Site is enough to produce a useful first draft.
+                </p>
+              </div>
+            )}
 
             {/* Links */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
@@ -3069,6 +3192,9 @@ function DashboardPageContent() {
                 <User className="h-[18px] w-[18px] text-[#00f5ff]" />
                 <h2 className="text-lg font-semibold">About You</h2>
               </div>
+              <p className="mb-4 text-sm leading-7 text-gray-400">
+                Add only the context the evidence will not explain on its own. This helps the AI position the work without forcing you to write the whole story from scratch.
+              </p>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">
@@ -3096,6 +3222,9 @@ function DashboardPageContent() {
                     rows={3}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-[#00f5ff]/50 text-sm resize-none"
                   />
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    Example: &ldquo;Full-stack engineer shipping AI productivity tools for students and small teams.&rdquo;
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">
@@ -3109,6 +3238,9 @@ function DashboardPageContent() {
                     placeholder="Full-Stack Developer, ML Engineer, Designer..."
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-[#00f5ff]/50 text-sm"
                   />
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    A few keywords are enough. Think roles, specialties, or audience-facing labels.
+                  </p>
                 </div>
               </div>
             </div>
@@ -3219,9 +3351,7 @@ function DashboardPageContent() {
             <div className="flex justify-center pt-4">
               <button
                 onClick={handleGenerate}
-                disabled={
-                  generating || (evidence.length === 0 && !userInfo.bio)
-                }
+                disabled={generating || Boolean(generateBlockedReason)}
                 className="inline-flex items-center gap-2 bg-[#00f5ff] text-black px-12 py-4 rounded-full text-lg font-semibold hover:bg-[#00c8d4] transition-colors disabled:opacity-50"
               >
                 {generating
@@ -3233,15 +3363,18 @@ function DashboardPageContent() {
                   ) : (
                     <>
                       <WandSparkles className="h-5 w-5" />
-                      Generate My Profile
+                      Generate my first draft
                     </>
                   )}
               </button>
             </div>
-            {evidence.length === 0 && !userInfo.bio && (
+            {generateBlockedReason ? (
               <p className="text-center text-gray-500 text-sm">
-                Crawl at least one URL or fill in your bio to generate your
-                profile.
+                {generateBlockedReason}
+              </p>
+            ) : (
+              <p className="text-center text-gray-500 text-sm">
+                The first draft usually includes a headline, about section, proof stats, projects, and a separate resume view.
               </p>
             )}
           </div>
@@ -3510,7 +3643,7 @@ function DashboardPageContent() {
                   No profile generated yet
                 </h3>
                 <p className="text-gray-400 mb-6">
-                  Go to the Crawl tab, add some URLs, and click Generate.
+                  Import one or two representative sources, add optional context, and generate the first draft. You can refine the story after the AI gives you something concrete to edit.
                 </p>
                 <button
                   onClick={() => setActiveTab("crawl")}

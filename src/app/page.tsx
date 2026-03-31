@@ -4,9 +4,12 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import type { LucideIcon } from "lucide-react";
 import type { ProfileJSON } from "@/lib/schema";
+import { BrandMark } from "@/components/brand-mark";
 import { PublicProfilePage } from "@/components/public-profile-page";
 import { ContactSection } from "@/components/contact-section";
+import { JsonLd } from "@/components/json-ld";
 import { LandingPricing } from "@/components/landing-pricing";
+import { TrackedLink } from "@/components/tracked-link";
 import { isStripeBillingConfigured } from "@/lib/stripe-billing";
 import {
   getPublicPageUserByCustomDomain,
@@ -31,17 +34,38 @@ import {
   Search,
   Sparkles,
 } from "lucide-react";
-import { getSiteUrl } from "@/lib/site-metadata";
+import { getAbsoluteUrl, getSiteUrl } from "@/lib/site-metadata";
 
 const SITE_AUTHOR = "atrak.dev";
 const SITE_AUTHOR_URL = "https://atrak.dev";
+const SITE_DESCRIPTION =
+  "Turn proof from GitHub, websites, docs, and videos into a public portfolio, resume, and personal brand site people can verify.";
 
 const DEFAULT_METADATA: Metadata = {
   title: "LifePage",
-  description:
-    "AI-powered personal brand and life-story builder for creators, students, job seekers, and people documenting their life.",
+  description: SITE_DESCRIPTION,
   alternates: {
     canonical: "/",
+  },
+  openGraph: {
+    title: "LifePage",
+    description: SITE_DESCRIPTION,
+    type: "website",
+    url: "/",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "LifePage",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LifePage",
+    description: SITE_DESCRIPTION,
+    images: ["/opengraph-image"],
   },
 };
 
@@ -204,7 +228,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: "Portfolio not found — LifePage",
       description: hostname
         ? `No public portfolio is connected to ${hostname}.`
-        : DEFAULT_METADATA.description,
+        : SITE_DESCRIPTION,
     };
   }
 
@@ -215,18 +239,66 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase: getSiteUrl(hostname),
     title: `${user.name ?? user.username ?? "Portfolio"} — LifePage`,
-    description: profile?.headline ?? DEFAULT_METADATA.description,
+    description: profile?.headline ?? SITE_DESCRIPTION,
     alternates: {
       canonical: "/",
+    },
+    openGraph: {
+      title: `${user.name ?? user.username ?? "Portfolio"} — LifePage`,
+      description: profile?.headline ?? SITE_DESCRIPTION,
+      type: "website",
+      url: "/",
+      images: [
+        {
+          url: "/opengraph-image",
+          width: 1200,
+          height: 630,
+          alt: `${user.name ?? user.username ?? "Portfolio"} on LifePage`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${user.name ?? user.username ?? "Portfolio"} — LifePage`,
+      description: profile?.headline ?? SITE_DESCRIPTION,
+      images: ["/opengraph-image"],
     },
   };
 }
 
 function LandingPage() {
   const stripeConfigured = isStripeBillingConfigured();
+  const siteUrl = getAbsoluteUrl("/")?.toString() ?? "https://lifepage.one/";
+  const structuredData: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "LifePage",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url: siteUrl,
+    creator: {
+      "@type": "Organization",
+      name: SITE_AUTHOR,
+      url: SITE_AUTHOR_URL,
+    },
+    description:
+      SITE_DESCRIPTION,
+    featureList: [
+      "Import proof from websites, GitHub, docs, YouTube, and Google Sites",
+      "Generate a public portfolio and resume from real evidence",
+      "Publish on a public path or custom domain with access controls",
+    ],
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
+    },
+  };
 
   return (
     <div className="lp-page overflow-hidden text-white">
+      <JsonLd data={structuredData} />
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <div className="animate-orb-float absolute -top-32 left-[8%] h-[34rem] w-[34rem] rounded-full bg-[#79e5d2]/12 blur-[130px]" />
         <div className="animate-orb-float-alt absolute right-[4%] top-[16%] h-[28rem] w-[28rem] rounded-full bg-[#8fa9ff]/14 blur-[120px]" />
@@ -237,8 +309,8 @@ function LandingPage() {
       <nav className="relative z-10 border-b border-white/8 bg-[#091015]/75 backdrop-blur-2xl">
         <div className="lp-shell flex items-center justify-between py-5">
           <div className="flex items-center gap-3">
-            <div className="animate-pulse-glow flex h-10 w-10 items-center justify-center rounded-2xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[11px] font-black tracking-[0.24em] text-[#041117]">
-              LP
+            <div className="animate-pulse-glow flex h-10 w-10 items-center justify-center rounded-2xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[#041117]">
+              <BrandMark className="h-6 w-6" />
             </div>
             <div>
               <p className="brand-display text-[1.35rem] leading-none tracking-tight">
@@ -269,12 +341,15 @@ function LandingPage() {
             >
               Sign In
             </Link>
-            <Link
+            <TrackedLink
               href="/register"
               className="lp-button-primary btn-fancy px-4 py-2 text-sm"
+              event="signup_cta_clicked"
+              metadata={{ location: "top_nav" }}
+              source="landing"
             >
               Get Started
-            </Link>
+            </TrackedLink>
           </div>
         </div>
       </nav>
@@ -291,26 +366,29 @@ function LandingPage() {
             </div>
 
             <h1 className="brand-display mt-8 max-w-4xl text-[3.4rem] leading-[0.95] tracking-[-0.05em] text-[#f8f3ea] sm:text-[4.4rem] lg:text-[5.6rem]">
-              Build your personal brand.
+              Turn scattered proof into a brand people can trust.
               <span className="animate-gradient-text block bg-[linear-gradient(120deg,#79e5d2_0%,#b9fff1_30%,#8fa9ff_60%,#f3b276_100%)] bg-clip-text text-transparent">
-                Deploy it like a product.
+                Ship the site, resume, and story together.
               </span>
             </h1>
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-[#a4b1ba] sm:text-xl">
-              Turn scattered links, projects, and proof into a clear public
-              presence. LifePage imports your work, writes the story, builds the
-              page, and deploys it as a brand site and resume you can actually share.
+              Import GitHub, websites, docs, YouTube, or Google Sites. LifePage
+              reads the evidence, writes the story, and publishes a portfolio
+              and resume that recruiters, admissions teams, and collaborators can verify.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
+              <TrackedLink
                 href="/register"
                 className="lp-button-primary btn-fancy px-7 py-3.5 text-base"
+                event="signup_cta_clicked"
+                metadata={{ location: "hero_primary" }}
+                source="landing"
               >
-                Build my brand
+                Start with real proof
                 <ArrowRight className="h-4 w-4" />
-              </Link>
+              </TrackedLink>
               <Link
                 href="/explore"
                 className="lp-button-secondary px-7 py-3.5 text-base"
@@ -318,6 +396,40 @@ function LandingPage() {
                 <Search className="h-4 w-4" />
                 Explore brands
               </Link>
+            </div>
+
+            <p className="mt-4 text-sm text-[#8ea0aa]">
+              Start free. No card required. Good first sources:{" "}
+              <span className="text-[#d7e0e5]">GitHub repo</span>,{" "}
+              <span className="text-[#d7e0e5]">personal site</span>,{" "}
+              <span className="text-[#d7e0e5]">YouTube channel</span>, or{" "}
+              <span className="text-[#d7e0e5]">Google Sites project page</span>.
+            </p>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              {[
+                {
+                  label: "Proof-first input",
+                  value: "Websites, GitHub, docs, YouTube, Google Sites",
+                },
+                {
+                  label: "Readable output",
+                  value: "Public portfolio, clean resume, and shareable links",
+                },
+                {
+                  label: "Publishing control",
+                  value: "Public, link-only, private, or custom domain",
+                },
+              ].map((item) => (
+                <div key={item.label} className="lp-stat-tile p-4">
+                  <p className="lp-kicker text-[10px] text-[#79e5d2]">
+                    {item.label}
+                  </p>
+                  <p className="mt-3 text-sm leading-6 text-[#d4dce2]">
+                    {item.value}
+                  </p>
+                </div>
+              ))}
             </div>
 
             <div className="mt-7 flex flex-wrap gap-2.5 text-sm text-[#c9d2d9]">
@@ -372,6 +484,23 @@ function LandingPage() {
                       );
                     })}
                   </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {[
+                    { title: "Input clarity", value: "Paste sources, not prompts" },
+                    { title: "Trust signal", value: "Evidence stays visible on the page" },
+                    { title: "Shareability", value: "Portfolio + resume + public link" },
+                  ].map((item) => (
+                    <div key={item.title} className="lp-stat-tile p-4">
+                      <p className="lp-kicker text-[10px] text-[#79e5d2]">
+                        {item.title}
+                      </p>
+                      <p className="mt-3 text-sm leading-6 text-[#d3dbe0]">
+                        {item.value}
+                      </p>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="rounded-[1.75rem] border border-white/10 bg-[#0a1115]/90 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
@@ -449,22 +578,6 @@ function LandingPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {[
-                    { title: "Visibility", value: "Public, link-only, or private" },
-                    { title: "AI layer", value: "Credits, models, agent workflows" },
-                    { title: "Deploy", value: "Profile path, resume page, custom domain" },
-                  ].map((item) => (
-                    <div key={item.title} className="lp-stat-tile p-4">
-                      <p className="lp-kicker text-[10px] text-[#79e5d2]">
-                        {item.title}
-                      </p>
-                      <p className="mt-3 text-sm leading-6 text-[#d3dbe0]">
-                        {item.value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           </div>
@@ -766,13 +879,16 @@ function LandingPage() {
               walk away with a resume that actually matches the site.
             </p>
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-              <Link
+              <TrackedLink
                 href="/register"
                 className="lp-button-primary btn-fancy px-8 py-3.5 text-base"
+                event="signup_cta_clicked"
+                metadata={{ location: "final_cta" }}
+                source="landing"
               >
                 Build my brand
                 <ArrowRight className="h-4 w-4" />
-              </Link>
+              </TrackedLink>
               <Link
                 href="/login"
                 className="lp-button-secondary px-8 py-3.5 text-base"
@@ -795,8 +911,8 @@ function LandingPage() {
       <footer className="relative z-10 border-t border-white/8 py-8">
         <div className="lp-shell flex flex-col gap-4 text-sm text-[#8f9ca6] sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[10px] font-black tracking-[0.2em] text-[#041117]">
-              LP
+            <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[#041117]">
+              <BrandMark className="h-5 w-5" />
             </div>
             <div>
               <p className="brand-display text-lg leading-none text-[#f7f1e8]">
@@ -836,7 +952,7 @@ interface HomePageProps {
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const { mode } = await searchParams;
-  const { isCustomHost, user } = await getCustomDomainPageContext();
+  const { hostname, isCustomHost, user } = await getCustomDomainPageContext();
 
   if (isCustomHost) {
     if (!user?.username) {
@@ -847,6 +963,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <PublicProfilePage
         basePath="/"
         queryMode={mode}
+        shareUrl={
+          getAbsoluteUrl("/", hostname)?.toString() ?? "https://lifepage.one/"
+        }
         user={user}
         username={user.username}
       />

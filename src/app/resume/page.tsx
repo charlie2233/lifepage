@@ -5,7 +5,7 @@ import { PublicResumePage } from "@/components/public-resume-page";
 import { getRequestHostname, isInternalAppHostname } from "@/lib/custom-domain";
 import { getPublicPageUserByCustomDomain } from "@/lib/public-page";
 import type { ProfileJSON } from "@/lib/schema";
-import { getSiteUrl } from "@/lib/site-metadata";
+import { getAbsoluteUrl, getSiteUrl } from "@/lib/site-metadata";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +53,32 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: {
       canonical: "/resume",
     },
+    openGraph: {
+      title: `${user.name ?? user.username ?? "Portfolio"} Resume — LifePage`,
+      description:
+        profile?.resume.summary ??
+        profile?.headline ??
+        `Resume of ${user.name ?? user.username ?? "this user"}`,
+      type: "website",
+      url: "/resume",
+      images: [
+        {
+          url: "/opengraph-image",
+          width: 1200,
+          height: 630,
+          alt: `${user.name ?? user.username ?? "Portfolio"} resume`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${user.name ?? user.username ?? "Portfolio"} Resume — LifePage`,
+      description:
+        profile?.resume.summary ??
+        profile?.headline ??
+        `Resume of ${user.name ?? user.username ?? "this user"}`,
+      images: ["/opengraph-image"],
+    },
   };
 }
 
@@ -62,7 +88,7 @@ interface Props {
 
 export default async function CustomDomainResumePage({ searchParams }: Props) {
   const { mode } = await searchParams;
-  const { isCustomHost, user } = await getCustomDomainResumeContext();
+  const { hostname, isCustomHost, user } = await getCustomDomainResumeContext();
 
   if (!isCustomHost || !user?.username) {
     notFound();
@@ -72,6 +98,10 @@ export default async function CustomDomainResumePage({ searchParams }: Props) {
     <PublicResumePage
       basePath="/"
       queryMode={mode}
+      shareUrl={
+        getAbsoluteUrl("/resume", hostname)?.toString() ??
+        "https://lifepage.one/resume"
+      }
       user={user}
       username={user.username}
     />

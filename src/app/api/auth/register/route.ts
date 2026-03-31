@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { recordProductAnalyticsEvent } from "@/lib/product-analytics";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
@@ -45,6 +46,16 @@ export async function POST(req: Request) {
           },
         },
       },
+    });
+
+    await recordProductAnalyticsEvent({
+      event: "signup_completed",
+      metadata: {
+        hasName: Boolean(name),
+        hasUsername: Boolean(username),
+      },
+      source: "server",
+      userId: user.id,
     });
 
     return NextResponse.json({
