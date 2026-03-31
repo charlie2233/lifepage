@@ -1,5 +1,3 @@
-import { createElement, type ReactElement } from "react";
-import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -7,9 +5,6 @@ import { getDemoPublicPageUser } from "@/lib/demo-public-pages";
 import { normalizeVisibility } from "@/lib/page-visibility";
 import { buildResumeData, buildResumeFilename } from "@/lib/public-resume";
 import { ProfileJSONSchema } from "@/lib/schema";
-import {
-  ResumePdfDocument,
-} from "@/lib/resume-pdf";
 
 export const runtime = "nodejs";
 
@@ -130,10 +125,8 @@ export async function GET(req: Request) {
       username: resolvedUser.username,
     });
 
-    const document = createElement(ResumePdfDocument, {
-      resume: resumeData,
-    }) as unknown as ReactElement<DocumentProps>;
-    const buffer = await renderToBuffer(document);
+    const { renderResumePdfBuffer } = await import("@/lib/resume-pdf");
+    const buffer = await renderResumePdfBuffer(resumeData);
     const filename = buildResumeFilename(resumeData.name);
 
     return new NextResponse(new Uint8Array(buffer), {

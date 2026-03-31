@@ -80,6 +80,9 @@ jobs:
       - name: Run E2E suite
         run: npm run test:e2e:ci
 
+      - name: Run Worker preview smoke suite
+        run: npm run test:e2e:worker:ci
+
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4

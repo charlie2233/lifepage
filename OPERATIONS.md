@@ -29,17 +29,21 @@ The relevant checks live in:
 
 ## Production setup order
 
-1. Resolve the current Worker deploy blocker on the target Cloudflare account.
-2. Provision PostgreSQL and confirm the `DATABASE_URL` works from Cloudflare Workers.
-3. Generate `AUTH_SECRET` and `CRON_SECRET`.
-4. Set `AUTH_URL` to the staging Worker hostname.
-5. Provision `OPENAI_API_KEY`.
-6. Provision Stripe products, prices, Billing Portal, and webhook signing secret.
-7. Provision Cloudflare R2 and Cloudflare for SaaS settings.
-8. Upload the full Worker secret set from `SECRETS.md`.
-9. Deploy to `*.workers.dev`.
-10. Run auth, DB, billing, and public-page smoke checks.
-11. Attach `lifepage.one` to the Worker and move `AUTH_URL` to `https://lifepage.one`.
+1. Provision PostgreSQL and confirm the `DATABASE_URL` works from Cloudflare Workers.
+2. Generate `AUTH_SECRET` and `CRON_SECRET`.
+3. Set `AUTH_URL` to the staging Worker hostname.
+4. Provision `OPENAI_API_KEY`.
+5. Provision Stripe products, prices, Billing Portal, and webhook signing secret.
+6. Provision Cloudflare R2 and Cloudflare for SaaS settings.
+7. Upload the full Worker secret set from `SECRETS.md`.
+8. Deploy with `npm run cf:deploy` so Wrangler minifies the Worker bundle.
+9. Run auth, DB, billing, and public-page smoke checks on `*.workers.dev`.
+10. Attach `lifepage.one` to the Worker and move `AUTH_URL` to `https://lifepage.one`.
+
+Current staging note:
+
+- The bundle-size blocker is resolved.
+- The active staging failure is `DATABASE_URL` reachability from Cloudflare Workers.
 
 ## Provider-side requirements
 
@@ -93,6 +97,12 @@ Run these checks on staging before domain cutover:
 
 - Confirm `AUTH_URL` matches the external hostname for the active environment.
 - Use the Worker hostname for staging and `https://lifepage.one` for production.
+
+### Auth or writes fail with `proxy request failed`
+
+- Tail the deployed Worker with `npx wrangler tail lifepage-web`.
+- If register, sign-in, or public DB lookups log `proxy request failed, cannot connect to the specified address`, the Cloudflare `DATABASE_URL` secret is not reachable from Workers.
+- Fix the database host/network path first; application-level auth and Prisma flows will not recover until Workers can open the Postgres connection.
 
 ### Project videos fail after deploy
 
