@@ -14,6 +14,11 @@ import {
   isEntitledStripeStatus,
   syncStripeBillingState,
 } from "@/lib/billing";
+import {
+  getRequiredAppBaseUrl,
+  getRequiredEnvVar,
+  getStripeBillingConfigStatus,
+} from "@/lib/runtime-config";
 
 const PAID_PLAN_TIERS = PLAN_TIERS.filter((plan) => plan !== "free");
 type PaidPlanTier = Exclude<PlanTier, "free">;
@@ -76,26 +81,11 @@ function buildFakeBillingUrl(
 }
 
 export function isStripeBillingConfigured() {
-  if (isFakeStripeEnabled()) {
-    return true;
-  }
-
-  return Boolean(
-    process.env.STRIPE_SECRET_KEY &&
-      process.env.STRIPE_WEBHOOK_SECRET &&
-      process.env.STRIPE_PLUS_MONTHLY_PRICE_ID &&
-      process.env.STRIPE_PLUS_YEARLY_PRICE_ID &&
-      process.env.STRIPE_PRO_MONTHLY_PRICE_ID &&
-      process.env.STRIPE_PRO_YEARLY_PRICE_ID
-  );
+  return getStripeBillingConfigStatus().configured;
 }
 
 export function getStripe() {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
-  if (!secretKey) {
-    throw new Error("STRIPE_SECRET_KEY is not configured.");
-  }
-
+  const secretKey = getRequiredEnvVar("STRIPE_SECRET_KEY", "Stripe billing");
   return new Stripe(secretKey, {
     appInfo: {
       name: "LifePage",
@@ -109,16 +99,22 @@ function normalizeInterval(value?: string | null): BillingInterval | null {
 }
 
 function getPriceMap(): Record<PaidPlanTier, Record<BillingInterval, string>> {
-  const plusMonthly = process.env.STRIPE_PLUS_MONTHLY_PRICE_ID;
-  const plusYearly = process.env.STRIPE_PLUS_YEARLY_PRICE_ID;
-  const proMonthly = process.env.STRIPE_PRO_MONTHLY_PRICE_ID;
-  const proYearly = process.env.STRIPE_PRO_YEARLY_PRICE_ID;
-
-  if (!plusMonthly || !plusYearly || !proMonthly || !proYearly) {
-    throw new Error(
-      "Stripe price ids are not fully configured. Set STRIPE_PLUS_MONTHLY_PRICE_ID, STRIPE_PLUS_YEARLY_PRICE_ID, STRIPE_PRO_MONTHLY_PRICE_ID, and STRIPE_PRO_YEARLY_PRICE_ID."
-    );
-  }
+  const plusMonthly = getRequiredEnvVar(
+    "STRIPE_PLUS_MONTHLY_PRICE_ID",
+    "Stripe billing"
+  );
+  const plusYearly = getRequiredEnvVar(
+    "STRIPE_PLUS_YEARLY_PRICE_ID",
+    "Stripe billing"
+  );
+  const proMonthly = getRequiredEnvVar(
+    "STRIPE_PRO_MONTHLY_PRICE_ID",
+    "Stripe billing"
+  );
+  const proYearly = getRequiredEnvVar(
+    "STRIPE_PRO_YEARLY_PRICE_ID",
+    "Stripe billing"
+  );
 
   return {
     plus: { month: plusMonthly, year: plusYearly },
@@ -152,20 +148,10 @@ export function getPlanFromStripePriceId(priceId?: string | null): {
 }
 
 export function getAppBaseUrl(request?: Request) {
-  const configured =
-    process.env.AUTH_URL ??
-    process.env.NEXTAUTH_URL ??
-    process.env.APP_URL ??
-    null;
-  if (configured) {
-    return configured.replace(/\/$/, "");
-  }
-
-  if (request) {
-    return new URL(request.url).origin;
-  }
-
-  return "http://localhost:3000";
+  return getRequiredAppBaseUrl({
+    consumer: "Stripe billing",
+    request,
+  });
 }
 
 async function ensureStripeCustomer(userId: string) {
@@ -555,10 +541,10 @@ export async function syncStripeInvoiceToBilling(
 }
 
 export function constructStripeWebhookEvent(payload: string, signature: string) {
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    throw new Error("STRIPE_WEBHOOK_SECRET is not configured.");
-  }
+  const webhookSecret = getRequiredEnvVar(
+    "STRIPE_WEBHOOK_SECRET",
+    "Stripe webhook verification"
+  );
 
   if (isFakeStripeEnabled()) {
     verifyE2EStripeSignature(payload, signature, webhookSecret);

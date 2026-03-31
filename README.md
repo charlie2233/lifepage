@@ -48,6 +48,8 @@ npm install
 cp .env.example .env
 ```
 
+The authoritative secrets and service-configuration guide is [SECRETS.md](SECRETS.md).
+
 Edit `.env` with your values:
 
 ```env
@@ -155,7 +157,7 @@ LifePage's real application runtime is Cloudflare Workers via OpenNext.
 GitHub Pages cannot host the real app runtime. It only serves the static fallback site under `docs/`.
 Before launch, remove any GitHub Pages custom-domain binding for `lifepage.one` and attach that domain to the Worker instead.
 
-See [DEPLOYMENT.md](DEPLOYMENT.md), [DEPLOYMENT_DECISION_REPORT.md](DEPLOYMENT_DECISION_REPORT.md), and [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for the audited state and next deployment steps.
+See [DEPLOYMENT.md](DEPLOYMENT.md), [DEPLOYMENT_DECISION_REPORT.md](DEPLOYMENT_DECISION_REPORT.md), [OPERATIONS.md](OPERATIONS.md), and [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for the audited state and next deployment steps.
 
 ### Local preview
 
@@ -167,6 +169,9 @@ npm run cf:preview
 This builds the production Worker bundle and serves it through Wrangler on `http://127.0.0.1:8787`.
 
 ### Production secrets
+
+The source of truth for Worker secrets, setup order, callback URLs, Stripe provider config, and troubleshooting is [SECRETS.md](SECRETS.md).
+For production Workers, standardize R2 configuration on `R2_ACCOUNT_ID`. `R2_ENDPOINT` remains an optional local or diagnostic override only.
 
 Verify Wrangler auth before the first deploy:
 

@@ -11,6 +11,8 @@ Last updated: 2026-03-31
 
 GitHub Pages must not be treated as the runtime for auth, billing, database access, or API traffic.
 
+For the authoritative environment matrix, setup order, callback URLs, Stripe provider configuration, and troubleshooting steps, use [SECRETS.md](SECRETS.md).
+
 ## Current audited state
 
 - Cloudflare deployment is the real application path in repo code and scripts:
@@ -41,6 +43,7 @@ GitHub Pages must not be treated as the runtime for auth, billing, database acce
 
 - `docs/CNAME` removed
 - README and deployment docs describe Workers as canonical and Pages as fallback-only
+- `SECRETS.md` reflects the current Worker secret matrix and provider-side setup
 - Worker routes added for the real production domain
 - Production secrets provisioned in Cloudflare
 - Worker staging verified on `*.workers.dev`
@@ -56,6 +59,8 @@ GitHub Pages must not be treated as the runtime for auth, billing, database acce
 ## Next phase checklist
 
 - Resolve the current Cloudflare Worker deployment blocker on the target account
+- Provision the full Worker secret set from `SECRETS.md`
+- Create the Stripe catalog, Billing Portal config, and webhook endpoint
 - Add production Worker routes in `wrangler.jsonc`
 - Deploy and verify the Worker on `*.workers.dev`
 - Confirm auth and DB-backed flows

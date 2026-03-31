@@ -14,6 +14,11 @@ Last updated: 2026-03-31
 ## Phase 2: Worker staging
 
 - [ ] Resolve the current Cloudflare Worker deployment blocker on the target account
+- [ ] Install the full Worker secret set documented in `SECRETS.md`
+- [ ] Standardize production R2 config on `R2_ACCOUNT_ID`
+- [ ] Create the Stripe products and four recurring prices
+- [ ] Enable Stripe Billing Portal
+- [ ] Register the Stripe webhook endpoint at `/api/stripe/webhook`
 - [ ] Add `lifepage.one/*` and `www.lifepage.one/*` routes to `wrangler.jsonc`
 - [ ] Provision production Worker secrets
 - [ ] Run `npm run cf:build` in a clean environment
@@ -33,6 +38,7 @@ Last updated: 2026-03-31
 - [ ] Auth works on `lifepage.one`
 - [ ] DB-backed flows work on `lifepage.one`
 - [ ] Stripe checkout works
+- [ ] Stripe Billing Portal opens and returns to `/dashboard#settings-billing`
 - [ ] Stripe webhook sync works
 - [ ] Public pages load
 - [ ] Resume export works

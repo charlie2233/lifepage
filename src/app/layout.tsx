@@ -7,7 +7,10 @@ import {
   Sora,
   Space_Grotesk,
 } from "next/font/google";
+import { assertCoreRuntimeConfig } from "@/lib/runtime-config";
 import "./globals.css";
+
+assertCoreRuntimeConfig();
 
 const sans = Manrope({
   subsets: ["latin"],
