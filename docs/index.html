@@ -7,7 +7,7 @@
     <link rel="icon" href="favicon.ico" sizes="any" />
     <meta
       name="description"
-      content="LifePage is moving to a full Cloudflare-hosted app. This GitHub Pages site is a lightweight fallback landing page."
+      content="LifePage uses Cloudflare Workers for the real app. This GitHub Pages site is a lightweight fallback landing page only."
     />
     <style>
       :root {
@@ -152,9 +152,9 @@
       <div class="status">
         <strong>Current status</strong>
         <p>
-          This repository now has a valid Pages landing page. The full app deployment is
-          being served through Cloudflare Workers when the target account and bundle size
-          constraints are satisfied.
+          This repository keeps a valid Pages landing page on the <code>github.io</code>
+          URL. The real app is intended to run on Cloudflare Workers, with
+          <code>lifepage.one</code> reserved for the Worker cutover path.
         </p>
       </div>
       <div class="actions">
@@ -162,9 +162,7 @@
         <a class="button button-secondary" href="https://github.com/charlie2233/My_portforlio/actions">View CI</a>
       </div>
       <p class="small">
-        Public URLs:
-        <code>https://lifepage.one</code>
-        and
+        Fallback URL:
         <code>https://charlie2233.github.io/My_portforlio/</code>
       </p>
     </main>
