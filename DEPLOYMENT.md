@@ -19,6 +19,8 @@ Last updated: 2026-03-31
 - CI exists in `.github/workflows/ci.yml` and runs lint, Next build, Cloudflare build, and Playwright E2E.
 - No standalone deployment workflow exists yet.
 - `wrangler.jsonc` defines a Worker named `lifepage-web` with `workers_dev: true`, but no production routes.
+- A clean `npm run cf:build` succeeds with CI-style placeholder env values.
+- A clean `npm run cf:deploy` reaches Cloudflare upload, then fails validation on the current account because the Worker upload is `3792.86 KiB` gzip, above the Workers Free `3 MiB` limit.
 - GitHub Pages is still configured with:
   - source: `main:/docs`
   - custom domain: `lifepage.one`
@@ -85,9 +87,12 @@ Last updated: 2026-03-31
 1. Confirm `npx wrangler whoami`
 2. Confirm production DB connectivity from the Worker environment
 3. Populate all required Worker secrets
-4. Run `npm run cf:build`
-5. Deploy to Worker preview with `npm run cf:deploy`
-6. Smoke-test the `*.workers.dev` hostname
+4. Resolve the current Worker size-limit blocker:
+   - either upgrade the Cloudflare Workers plan so the deployment can use the paid `10 MiB` limit
+   - or refactor to a multi-worker/smaller-bundle deployment path
+5. Run `npm run cf:build`
+6. Deploy to Worker preview with `npm run cf:deploy`
+7. Smoke-test the `*.workers.dev` hostname
 
 ### Phase B: canonical domain cutover
 
@@ -113,6 +118,7 @@ Last updated: 2026-03-31
 - `lifepage.one` is still bound to GitHub Pages
 - Cloudflare is not yet authoritative for the domain
 - Worker production routing is not defined in `wrangler.jsonc`
+- The current Worker bundle exceeds the Workers Free compressed size limit during deploy validation (`3792.86 KiB` gzip vs `3 MiB` max)
 - Production Stripe secrets are not present in the local release environment
 - Production R2 and Cloudflare SaaS secrets are not present in the local release environment
 - No dedicated deployment/operations docs existed before this file
