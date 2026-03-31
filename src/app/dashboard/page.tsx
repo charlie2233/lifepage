@@ -383,6 +383,7 @@ interface ApiBillingResponse {
   providers?: BillingProvider[];
   usageRates?: BillingUsageRate[];
   stripeConfigured?: boolean;
+  stripeConfigMessage?: string | null;
   error?: string;
 }
 type CustomDomainStatus =
@@ -1622,6 +1623,7 @@ function DashboardPageContent() {
   const [selectedAiUsageRate, setSelectedAiUsageRate] = useState<BillingUsageRate["id"]>("auto");
   const [preferredAiModelInput, setPreferredAiModelInput] = useState("");
   const [stripeConfigured, setStripeConfigured] = useState(false);
+  const [stripeConfigMessage, setStripeConfigMessage] = useState<string | null>(null);
   const [updatingPlan, setUpdatingPlan] = useState(false);
   const [verifyingDomain, setVerifyingDomain] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>("crawl");
@@ -1744,6 +1746,7 @@ function DashboardPageContent() {
     setAvailableProviders(billingRes.providers ?? []);
     setAvailableUsageRates(billingRes.usageRates ?? []);
     setStripeConfigured(Boolean(billingRes.stripeConfigured));
+    setStripeConfigMessage(billingRes.stripeConfigMessage ?? null);
     setSelectedBillingInterval(billingRes.billing?.billingInterval ?? "month");
     setSelectedAiProvider(billingRes.billing?.aiProvider ?? "kimi");
     setSelectedAiUsageRate(billingRes.billing?.aiUsageRate ?? "auto");
@@ -1945,6 +1948,7 @@ function DashboardPageContent() {
       setStripeConfigured(
         data.stripeConfigured !== undefined ? data.stripeConfigured : stripeConfigured
       );
+      setStripeConfigMessage(data.stripeConfigMessage ?? stripeConfigMessage);
       setSelectedAiProvider(data.billing.aiProvider);
       setSelectedAiUsageRate(data.billing.aiUsageRate);
       setPreferredAiModelInput(data.billing.preferredAiModel ?? "");
@@ -4822,7 +4826,8 @@ function DashboardPageContent() {
                 </p>
                 {!stripeConfigured && (
                   <div className="mb-5 rounded-2xl border border-yellow-500/20 bg-yellow-500/8 p-4 text-sm text-yellow-100">
-                    Stripe billing is not configured in this environment yet. AI preferences still save normally, but paid upgrades and subscription changes stay disabled until the Stripe env vars are present.
+                    {stripeConfigMessage ??
+                      "Stripe billing is not configured in this environment yet. AI preferences still save normally, but paid upgrades and subscription changes stay disabled until the Stripe env vars are present."}
                   </div>
                 )}
                 {billing.subscriptionStatus === "past_due" && (

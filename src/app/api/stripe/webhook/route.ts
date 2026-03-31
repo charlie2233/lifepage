@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getStripeBillingConfigStatus } from "@/lib/runtime-config";
 import {
   constructStripeWebhookEvent,
   getStripeWebhookReferences,
@@ -16,7 +17,7 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   if (!isStripeBillingConfigured()) {
     return NextResponse.json(
-      { error: "Stripe billing is not configured." },
+      { error: getStripeBillingConfigStatus().message },
       { status: 503 }
     );
   }

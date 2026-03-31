@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
+import { getRequiredAppBaseUrl, getRequiredAuthSecret } from "@/lib/runtime-config";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
@@ -8,6 +9,9 @@ const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
 });
+
+const authSecret = getRequiredAuthSecret("Auth.js");
+getRequiredAppBaseUrl({ consumer: "Auth.js" });
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -52,5 +56,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   session: { strategy: "jwt" },
   trustHost: true,
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  secret: authSecret,
 });

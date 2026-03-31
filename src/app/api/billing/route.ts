@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { getStripeBillingConfigStatus } from "@/lib/runtime-config";
 import {
   AI_PROVIDER_DEFINITIONS,
   AI_PROVIDERS,
@@ -10,7 +11,6 @@ import {
   PLAN_DEFINITIONS,
   updateUserBillingPreferences,
 } from "@/lib/billing";
-import { isStripeBillingConfigured } from "@/lib/stripe-billing";
 import { z } from "zod";
 
 const PatchSchema = z.object({
@@ -25,6 +25,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const stripeConfig = getStripeBillingConfigStatus();
   const billing = await getBillingSnapshot(session.user.id);
   return NextResponse.json({
     billing,
@@ -32,7 +33,9 @@ export async function GET() {
     intervals: PLAN_INTERVALS,
     providers: Object.values(AI_PROVIDER_DEFINITIONS),
     usageRates: Object.values(AI_USAGE_RATE_DEFINITIONS),
-    stripeConfigured: isStripeBillingConfigured(),
+    stripeConfigured: stripeConfig.configured,
+    stripeConfigMessage: stripeConfig.configured ? null : stripeConfig.message,
+    stripeConfigMissing: stripeConfig.missing,
   });
 }
 
@@ -57,6 +60,7 @@ export async function PATCH(req: Request) {
   }
 
   try {
+    const stripeConfig = getStripeBillingConfigStatus();
     const billing = await updateUserBillingPreferences(session.user.id, {
       aiProvider: parsed.data.aiProvider,
       preferredAiModel: parsed.data.preferredAiModel,
@@ -68,7 +72,9 @@ export async function PATCH(req: Request) {
       intervals: PLAN_INTERVALS,
       providers: Object.values(AI_PROVIDER_DEFINITIONS),
       usageRates: Object.values(AI_USAGE_RATE_DEFINITIONS),
-      stripeConfigured: isStripeBillingConfigured(),
+      stripeConfigured: stripeConfig.configured,
+      stripeConfigMessage: stripeConfig.configured ? null : stripeConfig.message,
+      stripeConfigMissing: stripeConfig.missing,
     });
   } catch (error) {
     return NextResponse.json(

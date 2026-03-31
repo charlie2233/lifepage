@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { PLAN_INTERVALS } from "@/lib/billing";
+import { getStripeBillingConfigStatus } from "@/lib/runtime-config";
 import {
   getBillingRedirectUrl,
   isStripeBillingConfigured,
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
 
   if (!isStripeBillingConfigured()) {
     return NextResponse.json(
-      { error: "Stripe billing is not configured." },
+      { error: getStripeBillingConfigStatus().message },
       { status: 503 }
     );
   }

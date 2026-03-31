@@ -1,5 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import { getRequiredEnvVar } from "@/lib/runtime-config";
 
 function isCloudflareWorkersRuntime() {
   return (
@@ -9,7 +10,9 @@ function isCloudflareWorkersRuntime() {
 }
 
 function createPrismaClient() {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+  const adapter = new PrismaPg({
+    connectionString: getRequiredEnvVar("DATABASE_URL", "Prisma/Postgres"),
+  });
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["error"] : [],
