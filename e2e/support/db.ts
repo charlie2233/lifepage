@@ -7,6 +7,7 @@ const TABLES = [
   '"Automation"',
   '"GeneratedProfile"',
   '"EvidenceItem"',
+  '"ProductAnalyticsEvent"',
   '"PublicPageSettings"',
   '"UserProfile"',
   '"User"',

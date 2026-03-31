@@ -39,6 +39,7 @@ model User {
   publicPageSettings PublicPageSettings?
   automations   Automation[]
   agentArtifacts AgentArtifact[]
+  productAnalyticsEvents ProductAnalyticsEvent[]
 }
 
 model UserProfile {
@@ -176,4 +177,20 @@ model StripeWebhookEvent {
   @@index([userId])
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
+}
+
+model ProductAnalyticsEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  sessionId String?
+  event     String
+  path      String?
+  source    String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([event, createdAt])
+  @@index([userId, createdAt])
+  @@index([sessionId, createdAt])
 }

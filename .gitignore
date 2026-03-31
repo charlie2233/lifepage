@@ -9,6 +9,8 @@ output/
 prisma/migrations/*
 !prisma/migrations/20260309142000_add_public_contact_fields/
 !prisma/migrations/20260309142000_add_public_contact_fields/migration.sql
+!prisma/migrations/20260331123000_add_product_analytics_events/
+!prisma/migrations/20260331123000_add_product_analytics_events/migration.sql
 src/generated/
 tsconfig.tsbuildinfo
 .open-next/

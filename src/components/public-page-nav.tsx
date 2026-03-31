@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BriefcaseBusiness, FileText, GraduationCap } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
 import { buildPublicPageModeHref } from "@/lib/public-page";
 import { buildPublicResumeHref } from "@/lib/public-resume";
 import type { ResolvedPortfolioTheme } from "@/lib/portfolio-themes";
@@ -51,14 +52,14 @@ export function PublicPageNav({
       <div className="lp-shell flex items-center justify-between py-5">
         <Link href="/" className="flex items-center gap-3">
           <div
-            className="flex h-10 w-10 items-center justify-center rounded-2xl text-[11px] font-black tracking-[0.24em] shadow-lg transition-transform hover:scale-105"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl shadow-lg transition-transform hover:scale-105"
             style={{
               background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentSoft})`,
               color: theme.isDark ? "#041117" : "#24140a",
               boxShadow: `0 8px 24px ${theme.accent}35`,
             }}
           >
-            LP
+            <BrandMark className="h-6 w-6" />
           </div>
           <div>
             <p className="brand-display text-[1.35rem] leading-none tracking-tight">

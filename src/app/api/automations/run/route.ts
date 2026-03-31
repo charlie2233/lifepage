@@ -303,7 +303,15 @@ export async function POST(req: Request) {
 
   // Cron trigger — requires CRON_SECRET header
   const cronSecret = req.headers.get("x-cron-secret");
-  if (!cronSecret || cronSecret !== process.env.CRON_SECRET) {
+  const configuredCronSecret = process.env.CRON_SECRET?.trim();
+  if (!configuredCronSecret) {
+    return NextResponse.json(
+      { error: "Automation cron is misconfigured: missing CRON_SECRET. See SECRETS.md." },
+      { status: 503 }
+    );
+  }
+
+  if (!cronSecret || cronSecret !== configuredCronSecret) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

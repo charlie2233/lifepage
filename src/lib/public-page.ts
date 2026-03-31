@@ -1,4 +1,4 @@
-import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { normalizeCustomDomain } from "@/lib/custom-domain";
@@ -23,49 +23,57 @@ export type PublicPageUser = Prisma.UserGetPayload<{
   include: typeof publicPageInclude;
 }>;
 
-export const getPublicPageUserByUsername = cache(async (username: string) => {
-  try {
-    const user = await prisma.user.findFirst({
-      where: { username },
-      include: publicPageInclude,
-    });
+export const getPublicPageUserByUsername = unstable_cache(
+  async (username: string) => {
+    try {
+      const user = await prisma.user.findFirst({
+        where: { username },
+        include: publicPageInclude,
+      });
 
-    return user && canAccessPortfolio(user.publicPageSettings) ? user : null;
-  } catch (error) {
-    console.warn("Falling back from public page username lookup:", error);
-    return null;
-  }
-});
+      return user && canAccessPortfolio(user.publicPageSettings) ? user : null;
+    } catch (error) {
+      console.warn("Falling back from public page username lookup:", error);
+      return null;
+    }
+  },
+  ["public-page-by-username"],
+  { revalidate: 300 }
+);
 
-export const getPublicPageUserByCustomDomain = cache(async (hostname: string) => {
-  let normalizedHostname: string;
-  try {
-    normalizedHostname = normalizeCustomDomain(hostname);
-  } catch {
-    return null;
-  }
+export const getPublicPageUserByCustomDomain = unstable_cache(
+  async (hostname: string) => {
+    let normalizedHostname: string;
+    try {
+      normalizedHostname = normalizeCustomDomain(hostname);
+    } catch {
+      return null;
+    }
 
-  try {
-    const user = await prisma.user.findFirst({
-      where: {
-        publicPageSettings: {
-          is: {
-            customDomainNormalized: normalizedHostname,
-            customDomainStatus: "active",
+    try {
+      const user = await prisma.user.findFirst({
+        where: {
+          publicPageSettings: {
+            is: {
+              customDomainNormalized: normalizedHostname,
+              customDomainStatus: "active",
+            },
           },
         },
-      },
-      include: publicPageInclude,
-    });
+        include: publicPageInclude,
+      });
 
-    return user && canAccessCustomDomainPortfolio(user.publicPageSettings)
-      ? user
-      : null;
-  } catch (error) {
-    console.warn("Falling back from public page custom-domain lookup:", error);
-    return null;
-  }
-});
+      return user && canAccessCustomDomainPortfolio(user.publicPageSettings)
+        ? user
+        : null;
+    } catch (error) {
+      console.warn("Falling back from public page custom-domain lookup:", error);
+      return null;
+    }
+  },
+  ["public-page-by-custom-domain"],
+  { revalidate: 300 }
+);
 
 export function resolvePublicPageMode(
   queryMode: string | undefined,

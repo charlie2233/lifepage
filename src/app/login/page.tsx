@@ -4,6 +4,11 @@ import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { BrandMark } from "@/components/brand-mark";
+
+function getLoginErrorMessage() {
+  return "Invalid email or password. Use the same email you registered with, then continue in the dashboard.";
+}
 
 function LoginPageContent() {
   const router = useRouter();
@@ -29,7 +34,7 @@ function LoginPageContent() {
     });
     setLoading(false);
     if (res?.error) {
-      setError("Invalid email or password.");
+      setError(getLoginErrorMessage());
     } else {
       const nextUrl = res?.url ?? callbackUrl;
       if (nextUrl.startsWith("http")) {
@@ -65,8 +70,8 @@ function LoginPageContent() {
         {/* Logo */}
         <div className="mb-8 text-center">
           <Link href="/" className="inline-flex items-center gap-2.5">
-            <div className="animate-pulse-glow flex h-9 w-9 items-center justify-center rounded-xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[10px] font-black tracking-[0.22em] text-[#041117]">
-              LP
+            <div className="animate-pulse-glow flex h-9 w-9 items-center justify-center rounded-xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[#041117]">
+              <BrandMark className="h-5 w-5" />
             </div>
             <span className="brand-display text-[1.4rem] leading-none tracking-tight text-white">
               LifePage
@@ -75,6 +80,16 @@ function LoginPageContent() {
           <p className="mt-3 text-sm text-[#7a8d98]">
             Sign in to your account
           </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {["Dashboard access", "Public page controls", "Resume export"].map((item) => (
+              <span
+                key={item}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#8ea0aa]"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* Card */}
@@ -97,6 +112,9 @@ function LoginPageContent() {
           />
 
           <form onSubmit={handleSubmit} className="relative space-y-5">
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-[#8ea0aa]">
+              Sign in to keep importing proof, editing your public page, and exporting the recruiter-facing resume view.
+            </div>
             {error && (
               <div className="lp-fade-rise rounded-xl border border-red-500/25 bg-red-500/8 px-4 py-3 text-sm text-red-400">
                 {error}

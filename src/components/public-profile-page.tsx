@@ -4,7 +4,9 @@ import type {
   EvidenceItem as PrismaEvidenceItem,
   UserProfile,
 } from "@prisma/client";
+import { JsonLd } from "@/components/json-ld";
 import { PublicPageNav } from "@/components/public-page-nav";
+import { ShareActions } from "@/components/share-actions";
 import type { ProfileJSON } from "@/lib/schema";
 import type { PublicPageUser } from "@/lib/public-page";
 import { resolvePublicPageMode } from "@/lib/public-page";
@@ -27,6 +29,7 @@ import {
 interface PublicProfilePageProps {
   basePath: string;
   queryMode?: string;
+  shareUrl: string;
   user: PublicPageUser;
   username: string;
 }
@@ -42,6 +45,7 @@ function getVisibilityLabel(visibility: string) {
 export function PublicProfilePage({
   basePath,
   queryMode,
+  shareUrl,
   user,
   username,
 }: PublicProfilePageProps) {
@@ -54,6 +58,9 @@ export function PublicProfilePage({
   const profileData = user.generatedProfiles[0]?.data as unknown as
     | ProfileJSON
     | undefined;
+  if (!profileData) {
+    notFound();
+  }
   const resolvedTheme = resolvePortfolioTheme(
     settings?.theme ?? user.profile?.theme ?? "obsidian",
     settings?.themeConfig
@@ -145,6 +152,38 @@ export function PublicProfilePage({
       ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
       : "grid gap-4 sm:grid-cols-2 lg:grid-cols-3";
   const proofGallery = evidenceItems.filter((item) => item.screenshot);
+  const sameAs = [
+    userProfile?.website,
+    userProfile?.github,
+    userProfile?.linkedin,
+    userProfile?.youtube,
+  ].filter((value): value is string => Boolean(value));
+  const structuredData: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    url: shareUrl,
+    name: `${user.name ?? username} on LifePage`,
+    description: profileData.headline,
+    mainEntity: {
+      "@type": "Person",
+      name: user.name ?? username,
+      alternateName: `@${username}`,
+      description: profileData.about,
+      url: shareUrl,
+      image: proofGallery[0]?.screenshot ?? undefined,
+      sameAs,
+      email: userProfile?.contactEmail ?? undefined,
+      telephone: userProfile?.phone ?? undefined,
+      knowsAbout: profileData.skills?.map((skill) => skill.tag).slice(0, 12),
+      hasPart: profileData.projects.slice(0, 3).map((project) => ({
+        "@type": "CreativeWork",
+        headline: project.title,
+        description: project.impact ?? project.approach ?? project.problem ?? "",
+        keywords: project.tech.join(", "),
+        url: project.links[0]?.url ?? undefined,
+      })),
+    },
+  };
   const hasPublicContact =
     Boolean(userProfile?.contactNote) ||
     Boolean(userProfile?.contactEmail) ||
@@ -200,6 +239,7 @@ export function PublicProfilePage({
 
   return (
     <div className="portfolio-body min-h-screen" style={pageStyle}>
+      <JsonLd data={structuredData} />
       {resolvedTheme.isDark && (
         <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
           <div
@@ -325,6 +365,15 @@ export function PublicProfilePage({
                     Website
                   </a>
                 )}
+              </div>
+              <div className={`mt-4 ${heroActionsClass}`}>
+                <ShareActions
+                  shareText={profileData.headline}
+                  shareTitle={`${user.name ?? username} on LifePage`}
+                  shareUrl={shareUrl}
+                  source="public_profile"
+                  variant={resolvedTheme.isDark ? "dark" : "light"}
+                />
               </div>
             </div>
 
@@ -529,6 +578,8 @@ export function PublicProfilePage({
                         <img
                           src={evidence.screenshot}
                           alt={project.title}
+                          loading="lazy"
+                          decoding="async"
                           className={`w-full object-cover object-top ${
                             resolvedTheme.projectLayout === "feature"
                               ? "h-64"
@@ -597,6 +648,52 @@ export function PublicProfilePage({
                                 {tech}
                               </span>
                             ))}
+                          </div>
+                        )}
+
+                        {(evidence || projectVideo) && (
+                          <div className="mt-5 rounded-[1.25rem] border p-4" style={statTileStyle}>
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className="lp-kicker text-[11px]" style={accentStyle}>
+                                  Proof pack
+                                </p>
+                                <p className="mt-2 text-sm font-medium">
+                                  {projectVideo
+                                    ? "Includes a ready-to-share demo clip alongside source-backed evidence."
+                                    : "Backed by imported source material that visitors can inspect."}
+                                </p>
+                              </div>
+                              {evidence?.url && (
+                                <a
+                                  href={evidence.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 text-sm hover:underline"
+                                  style={accentStyle}
+                                >
+                                  View proof
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {evidence && (
+                                <span className="rounded-full border px-3 py-1 text-xs" style={chipStyle}>
+                                  Source linked
+                                </span>
+                              )}
+                              {projectVideo && (
+                                <span className="rounded-full border px-3 py-1 text-xs" style={chipStyle}>
+                                  Demo available
+                                </span>
+                              )}
+                              {project.links?.length > 0 && (
+                                <span className="rounded-full border px-3 py-1 text-xs" style={chipStyle}>
+                                  {project.links.length} external {project.links.length === 1 ? "link" : "links"}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         )}
 
@@ -987,6 +1084,8 @@ export function PublicProfilePage({
                     <img
                       src={item.screenshot!}
                       alt={item.title ?? "project screenshot"}
+                      loading="lazy"
+                      decoding="async"
                       className={`w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04] ${
                         resolvedTheme.proofLayout === "spotlight" && index === 0
                           ? "h-60"

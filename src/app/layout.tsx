@@ -7,7 +7,11 @@ import {
   Sora,
   Space_Grotesk,
 } from "next/font/google";
+import { assertCoreRuntimeConfig } from "@/lib/runtime-config";
+import { getSiteUrl } from "@/lib/site-metadata";
 import "./globals.css";
+
+assertCoreRuntimeConfig();
 
 const sans = Manrope({
   subsets: ["latin"],
@@ -44,7 +48,34 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "LifePage — AI Personal Brand Builder",
   description:
-    "Turn your work into a stunning portfolio in minutes. Powered by AI. Built by atrak.dev.",
+    "Turn proof from GitHub, websites, docs, and videos into a public portfolio, resume, and personal brand site people can verify.",
+  metadataBase: getSiteUrl(),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "LifePage — AI Personal Brand Builder",
+    description:
+      "Turn proof from GitHub, websites, docs, and videos into a public portfolio, resume, and personal brand site people can verify.",
+    siteName: "LifePage",
+    type: "website",
+    url: "/",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "LifePage",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LifePage — AI Personal Brand Builder",
+    description:
+      "Turn proof from GitHub, websites, docs, and videos into a public portfolio, resume, and personal brand site people can verify.",
+    images: ["/opengraph-image"],
+  },
 };
 
 export default function RootLayout({

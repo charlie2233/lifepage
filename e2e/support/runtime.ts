@@ -43,6 +43,8 @@ export function getE2EAppEnv() {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL ?? baseUrl,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "e2e-openai-key",
     CRON_SECRET: process.env.CRON_SECRET ?? "e2e-cron-secret",
+    STRIPE_SECRET_KEY:
+      process.env.STRIPE_SECRET_KEY ?? "sk_test_e2e_secret_key",
     STRIPE_WEBHOOK_SECRET:
       process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_e2e_secret",
     STRIPE_PLUS_MONTHLY_PRICE_ID:
@@ -56,8 +58,19 @@ export function getE2EAppEnv() {
     CLOUDFLARE_SAAS_CNAME_TARGET:
       process.env.CLOUDFLARE_SAAS_CNAME_TARGET ??
       "customers.e2e.lifepage.test",
+    CLOUDFLARE_API_TOKEN:
+      process.env.CLOUDFLARE_API_TOKEN ?? "e2e-cloudflare-token",
+    CLOUDFLARE_SAAS_ZONE_ID:
+      process.env.CLOUDFLARE_SAAS_ZONE_ID ?? "e2e-cloudflare-zone-id",
     CLOUDFLARE_SAAS_FALLBACK_ORIGIN:
       process.env.CLOUDFLARE_SAAS_FALLBACK_ORIGIN ??
       "origin.e2e.lifepage.test",
+    R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID ?? "e2e-r2-access-key",
+    R2_SECRET_ACCESS_KEY:
+      process.env.R2_SECRET_ACCESS_KEY ?? "e2e-r2-secret-key",
+    R2_BUCKET: process.env.R2_BUCKET ?? "lifepage-e2e-videos",
+    R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID ?? "e2er2accountid",
+    R2_PUBLIC_BASE_URL:
+      process.env.R2_PUBLIC_BASE_URL ?? "https://assets.e2e.lifepage.test",
   };
 }

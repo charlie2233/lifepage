@@ -4,6 +4,7 @@ import { getBillingSnapshot, reserveAiModel } from "@/lib/billing";
 import { prisma } from "@/lib/db";
 import { generateProfileFromCrawl, generateProfileFromText } from "@/lib/ai";
 import type { CrawlResult } from "@/lib/crawler";
+import { recordProductAnalyticsEvent } from "@/lib/product-analytics";
 
 interface RequestBody {
   links?: {
@@ -30,6 +31,16 @@ export async function POST(req: Request) {
 
     const evidenceItems = await prisma.evidenceItem.findMany({
       where: { userId: session.user.id, visible: true },
+    });
+
+    await recordProductAnalyticsEvent({
+      event: "generate_profile_requested",
+      metadata: {
+        evidenceCount: evidenceItems.length,
+        hasBio: Boolean(userInfo?.bio),
+      },
+      source: "server",
+      userId: session.user.id,
     });
 
     let profileData;
@@ -104,9 +115,36 @@ export async function POST(req: Request) {
 
     const billing = await getBillingSnapshot(session.user.id);
 
+    await recordProductAnalyticsEvent({
+      event: "generate_profile_succeeded",
+      metadata: {
+        evidenceCount: evidenceItems.length,
+        projectCount:
+          typeof profileData === "object" &&
+          profileData &&
+          "projects" in profileData &&
+          Array.isArray(profileData.projects)
+            ? profileData.projects.length
+            : 0,
+      },
+      source: "server",
+      userId: session.user.id,
+    });
+
     return NextResponse.json({ profile, billing });
   } catch (err) {
     console.error("Generate error:", err);
+    await recordProductAnalyticsEvent({
+      event: "generate_profile_failed",
+      metadata: {
+        error:
+          err instanceof Error
+            ? err.message.slice(0, 200)
+            : String(err).slice(0, 200),
+      },
+      source: "server",
+      userId: session.user.id,
+    });
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }

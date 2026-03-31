@@ -1,4 +1,3 @@
-import OpenAI from "openai";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { buildArtifactMeta } from "@/lib/agent-mutations";
@@ -18,7 +17,6 @@ import {
   type ProjectVideoStyle,
 } from "@/lib/project-video-types";
 import { ProfileJSONSchema, type ProfileJSON } from "@/lib/schema";
-import { storeProjectVideoAssets } from "@/lib/project-video-storage";
 
 interface ProjectVideoEvidenceItem {
   screenshot?: string | null;
@@ -26,7 +24,8 @@ interface ProjectVideoEvidenceItem {
   url?: string | null;
 }
 
-function getOpenAI(apiKey: string) {
+async function getOpenAI(apiKey: string) {
+  const { default: OpenAI } = await import("openai");
   return new OpenAI({ apiKey });
 }
 
@@ -187,9 +186,9 @@ async function buildReferenceUploadable(screenshotUrl?: string | null) {
   });
 }
 
-function getVideoDownloadVariantResponse(
-  response: Awaited<ReturnType<OpenAI["videos"]["downloadContent"]>>
-) {
+function getVideoDownloadVariantResponse(response: {
+  arrayBuffer(): Promise<ArrayBuffer>;
+}) {
   return response.arrayBuffer();
 }
 
@@ -333,7 +332,8 @@ export async function createProjectVideoArtifact(args: {
   });
   const screenshotUrl = chooseEvidenceScreenshot(project, args.evidenceItems);
   const inputReference = await buildReferenceUploadable(screenshotUrl);
-  const video = await getOpenAI(reservation.clientConfig.apiKey).videos.create({
+  const openai = await getOpenAI(reservation.clientConfig.apiKey);
+  const video = await openai.videos.create({
     model: process.env.OPENAI_SORA_MODEL ?? "sora-2",
     prompt,
     seconds: String(args.durationSeconds ?? 8) as "4" | "8" | "12",
@@ -437,7 +437,7 @@ export async function refreshProjectVideoArtifact(args: {
     };
   }
 
-  const openai = getOpenAI(process.env.OPENAI_API_KEY!);
+  const openai = await getOpenAI(process.env.OPENAI_API_KEY!);
   const latest = await openai.videos.retrieve(soraVideoId);
   const nextState = {
     ...state,
@@ -466,6 +466,7 @@ export async function refreshProjectVideoArtifact(args: {
       ),
     ]);
 
+    const { storeProjectVideoAssets } = await import("@/lib/project-video-storage");
     const storedAssets = await storeProjectVideoAssets({
       artifactId: artifact.id,
       projectTitle: nextState.projectTitle,

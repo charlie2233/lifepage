@@ -48,6 +48,8 @@ npm install
 cp .env.example .env
 ```
 
+The authoritative secrets and service-configuration guide is [SECRETS.md](SECRETS.md).
+
 Edit `.env` with your values:
 
 ```env
@@ -142,11 +144,27 @@ For CI-style reporting:
 npm run test:e2e:ci
 ```
 
-## ☁️ Cloudflare Workers Deploy
+## ☁️ Deployment
 
-LifePage now includes an OpenNext + Wrangler path for Cloudflare Workers.
+LifePage's real application runtime is Cloudflare Workers via OpenNext.
 
-For now, treat the Worker's `*.workers.dev` hostname as the only public/canonical host. GitHub Pages and parked custom domains are intentionally out of the serving path until custom-domain routing is reattached on purpose.
+### Hosting roles
+
+- Canonical production path: Cloudflare Workers on `https://lifepage.one`
+- Worker preview/staging host: `*.workers.dev`
+- GitHub Pages: fallback-only landing page at `https://charlie2233.github.io/My_portforlio/`
+- Production hostname policy: `https://www.lifepage.one` must redirect to `https://lifepage.one`
+
+GitHub Pages cannot host the real app runtime. It only serves the static fallback site under `docs/`.
+Before launch, remove any GitHub Pages custom-domain binding for `lifepage.one` and attach that domain to the Worker instead.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md), [DEPLOYMENT_DECISION_REPORT.md](DEPLOYMENT_DECISION_REPORT.md), [OPERATIONS.md](OPERATIONS.md), [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md), and [CUTOVER_CHECKLIST.md](CUTOVER_CHECKLIST.md) for the audited state and next deployment steps.
+
+As of 2026-03-31, the live cutover blocker is external infrastructure:
+
+- `lifepage.one` is still on Porkbun nameservers, not Cloudflare
+- GitHub Pages still owns the active custom-domain binding
+- the current Cloudflare token cannot create the `lifepage.one` zone
 
 ### Local preview
 
@@ -158,6 +176,9 @@ npm run cf:preview
 This builds the production Worker bundle and serves it through Wrangler on `http://127.0.0.1:8787`.
 
 ### Production secrets
+
+The source of truth for Worker secrets, setup order, callback URLs, Stripe provider config, and troubleshooting is [SECRETS.md](SECRETS.md).
+For production Workers, standardize R2 configuration on `R2_ACCOUNT_ID`. `R2_ENDPOINT` remains an optional local or diagnostic override only.
 
 Verify Wrangler auth before the first deploy:
 
@@ -192,13 +213,19 @@ If you want Auth.js to use a fixed canonical hostname instead of trusting forwar
 npx wrangler secret put AUTH_URL
 ```
 
-For the first production launch, set `AUTH_URL` to your Worker hostname, for example:
+Before production cutover, set `AUTH_URL` to the Worker staging hostname, for example:
 
 ```text
 https://lifepage-web.<your-subdomain>.workers.dev
 ```
 
-During this cleanup phase, keep `AUTH_URL` pointed at the Worker hostname and leave custom domains detached. `NEXTAUTH_URL` can remain local-only for development.
+After `lifepage.one` is attached to the Worker, update `AUTH_URL` to:
+
+```text
+https://lifepage.one
+```
+
+`NEXTAUTH_URL` can remain local-only for development.
 
 ### Deploy
 
@@ -206,13 +233,31 @@ During this cleanup phase, keep `AUTH_URL` pointed at the Worker hostname and le
 npm run cf:deploy
 ```
 
-The initial launch target is the Worker's `*.workers.dev` hostname defined in `wrangler.jsonc`.
+`npm run cf:deploy` now builds and deploys with `wrangler deploy --minify --keep-vars`, which is required to keep the OpenNext Worker under the Cloudflare Workers Free size limit.
+
+Current staging hostname:
+
+```text
+https://lifepage-web.charliehan-lifepage.workers.dev
+```
+
+Use `*.workers.dev` for staging verification first. The production target remains `https://lifepage.one`. The current staging validation report is in [STAGING_VALIDATION_REPORT.md](STAGING_VALIDATION_REPORT.md).
+
+### GitHub Pages fallback
+
+The repo still keeps a static fallback landing page in `docs/`, but it should only be served from:
+
+```text
+https://charlie2233.github.io/My_portforlio/
+```
+
+Do not treat GitHub Pages as the production host for the app, and do not bind `lifepage.one` to Pages.
 
 ## Cloudflare for SaaS Domains
 
 LifePage supports customer-owned custom domains through Cloudflare for SaaS custom hostnames.
 
-Temporary operating mode: custom domains should stay detached until DNS is intentionally repointed to the Cloudflare-managed target. Do not leave GitHub Pages DNS records in place for production domains.
+Do not leave GitHub Pages DNS or custom-domain bindings in place for production domains.
 
 ### Required SaaS hostnames
 

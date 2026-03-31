@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import type { UserProfile } from "@prisma/client";
+import { JsonLd } from "@/components/json-ld";
 import { PublicPageNav } from "@/components/public-page-nav";
+import { ShareActions } from "@/components/share-actions";
 import type { PublicPageUser } from "@/lib/public-page";
 import { buildPublicPageModeHref, resolvePublicPageMode } from "@/lib/public-page";
 import { buildResumeData } from "@/lib/public-resume";
@@ -21,6 +23,7 @@ import {
 interface PublicResumePageProps {
   basePath: string;
   queryMode?: string;
+  shareUrl: string;
   user: PublicPageUser;
   username: string;
 }
@@ -232,6 +235,7 @@ function ResumeDocumentHeader({
 export function PublicResumePage({
   basePath,
   queryMode,
+  shareUrl,
   user,
   username,
 }: PublicResumePageProps) {
@@ -346,6 +350,29 @@ export function PublicResumePage({
     `${resolvedResumeModel.label} model`,
   ].filter(Boolean) as string[];
   const reviewLabel = mode === "admissions" ? "admissions review" : "hiring review";
+  const structuredData: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    url: shareUrl,
+    name: `${resume.name} resume`,
+    description: resume.summary,
+    mainEntity: {
+      "@type": "Person",
+      name: resume.name,
+      alternateName: resume.username ? `@${resume.username}` : undefined,
+      description: resume.summary,
+      url: shareUrl,
+      sameAs: resume.links.map((link) => link.url),
+      knowsAbout: resume.skills.slice(0, 12),
+      hasPart: resume.projects.slice(0, 3).map((project) => ({
+        "@type": "CreativeWork",
+        headline: project.title,
+        description: project.impact ?? project.approach ?? project.problem ?? "",
+        keywords: project.tech.join(", "),
+        url: project.links[0]?.url ?? undefined,
+      })),
+    },
+  };
 
   const metaBlock = (
     <>
@@ -684,6 +711,7 @@ export function PublicResumePage({
 
   return (
     <div className="portfolio-body min-h-screen" style={pageStyle}>
+      <JsonLd data={structuredData} />
       {resolvedTheme.isDark && (
         <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
           <div
@@ -759,6 +787,21 @@ export function PublicResumePage({
                     View portfolio
                     <ArrowUpRight className="h-4 w-4" />
                   </Link>
+                  <ShareActions
+                    shareText={`${resume.name} · ${resume.headline}`}
+                    shareTitle={`${resume.name} resume`}
+                    shareUrl={shareUrl}
+                    source="public_resume"
+                    variant={resolvedTheme.isDark ? "dark" : "light"}
+                  />
+                </div>
+                <div className="mt-4 rounded-[1.25rem] border p-4" style={sideTileStyle}>
+                  <p className="text-xs uppercase tracking-[0.14em]" style={mutedStyle}>
+                    Share-ready
+                  </p>
+                  <p className="mt-2 text-sm leading-7" style={mutedStyle}>
+                    Use this view when someone needs a clean PDF or a fast recruiter-facing link. The portfolio page keeps the deeper proof and visual context.
+                  </p>
                 </div>
               </div>
 

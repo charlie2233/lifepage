@@ -6,7 +6,6 @@ import {
   ProjectVideoDurationSchema,
   ProjectVideoStyleSchema,
 } from "@/lib/project-video-types";
-import { createProjectVideoArtifact } from "@/lib/project-videos";
 import { ProfileJSONSchema } from "@/lib/schema";
 
 export const runtime = "nodejs";
@@ -75,6 +74,7 @@ export async function POST(req: Request) {
   }
 
   try {
+    const { createProjectVideoArtifact } = await import("@/lib/project-videos");
     const created = await createProjectVideoArtifact({
       userId: session.user.id,
       userName: userRecord?.name ?? session.user.name,

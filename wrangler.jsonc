@@ -4,6 +4,30 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-03-08",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "secrets": {
+    "required": [
+      "DATABASE_URL",
+      "AUTH_SECRET",
+      "AUTH_URL",
+      "OPENAI_API_KEY",
+      "CRON_SECRET",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "STRIPE_PLUS_MONTHLY_PRICE_ID",
+      "STRIPE_PLUS_YEARLY_PRICE_ID",
+      "STRIPE_PRO_MONTHLY_PRICE_ID",
+      "STRIPE_PRO_YEARLY_PRICE_ID",
+      "CLOUDFLARE_API_TOKEN",
+      "CLOUDFLARE_SAAS_ZONE_ID",
+      "CLOUDFLARE_SAAS_CNAME_TARGET",
+      "CLOUDFLARE_SAAS_FALLBACK_ORIGIN",
+      "R2_ACCESS_KEY_ID",
+      "R2_SECRET_ACCESS_KEY",
+      "R2_BUCKET",
+      "R2_PUBLIC_BASE_URL",
+      "R2_ACCOUNT_ID"
+    ]
+  },
   "workers_dev": true,
   "assets": {
     "directory": ".open-next/assets",

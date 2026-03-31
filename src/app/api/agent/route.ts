@@ -55,7 +55,6 @@ import {
   type ResumeModelOutput,
 } from "@/lib/agent-tools";
 import { ProfileJSONSchema } from "@/lib/schema";
-import { createProjectVideoArtifact } from "@/lib/project-videos";
 import { z } from "zod";
 
 const MAX_STORED_INPUT_LENGTH = 500;
@@ -392,6 +391,7 @@ async function executeAgentTool(args: {
       );
     }
 
+    const { createProjectVideoArtifact } = await import("@/lib/project-videos");
     const created = await createProjectVideoArtifact({
       userId,
       userName,
