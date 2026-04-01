@@ -103,13 +103,14 @@ No functional exclusions from PR #17, PR #18, or PR #19 remain on the release br
 The release branch intentionally does **not** do a deep internal rename. Still excluded on purpose:
 
 - env var renames
-- package name changes
 - Prisma model/database identifier renames
 - bucket or storage identifier renames
 - API route path renames
 - broad e2e fixture renames
 - provider-side cutover actions
 - apex custom-domain support
+
+The only low-risk exception is the private npm package display name, which can move to `atrak-pages` without affecting imports or deploy wiring.
 
 This keeps the launch branch focused on user-facing release work and avoids schema/runtime churn.
 

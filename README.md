@@ -1,6 +1,7 @@
 # Atrak Pages — AI Personal Brand Builder
 
 > Built with ❤️ by [atrak.dev](https://atrak.dev)
+> Atrak Pages is the public product name for the app formerly called LifePage.
 
 Turn your work into a stunning portfolio in minutes. Give Atrak Pages a URL — your website, GitHub, YouTube channel, or any project page — and the AI **crawls it, screenshots it, and builds a world-class portfolio page** for you automatically.
 
@@ -208,10 +209,10 @@ npx wrangler secret put AUTH_URL
 If you are validating the Workers path directly, set `AUTH_URL` to your Worker hostname, for example:
 
 ```text
-https://lifepage-web.<your-subdomain>.workers.dev
+https://<existing-worker-name>.<your-subdomain>.workers.dev
 ```
 
-For the real launch, set `AUTH_URL` to `https://pages.atrak.dev`. `NEXTAUTH_URL` can remain local-only for development.
+For the real launch, set `AUTH_URL` to `https://pages.atrak.dev`. `NEXTAUTH_URL` can remain local-only for development. If your fallback Worker still uses a legacy service id, keep that hostname until a separate post-launch cleanup renames it.
 
 ### Deploy
 
