@@ -10,7 +10,7 @@ Release branch: `release/atrak-pages-launch`
 - Legacy transition domain: `lifepage.one`
 - GitHub Pages: fallback-only static landing page
 - Preferred runtime host for launch: **Vercel**
-- Cloudflare remains in the stack for DNS, R2, and Cloudflare for SaaS custom domains
+- Cloudflare remains in the stack for R2 and Cloudflare for SaaS custom domains; current DNS changes for launch are handled in Porkbun
 
 ## Integrated work
 
