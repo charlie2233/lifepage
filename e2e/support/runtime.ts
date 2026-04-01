@@ -39,8 +39,8 @@ export function getE2EAppEnv() {
     E2E_FAKE_CRAWL: process.env.E2E_FAKE_CRAWL ?? "1",
     AUTH_SECRET: process.env.AUTH_SECRET ?? "e2e-auth-secret",
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ?? "e2e-nextauth-secret",
-    AUTH_URL: process.env.AUTH_URL ?? baseUrl,
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL ?? baseUrl,
+    AUTH_URL: baseUrl,
+    NEXTAUTH_URL: baseUrl,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "e2e-openai-key",
     CRON_SECRET: process.env.CRON_SECRET ?? "e2e-cron-secret",
     STRIPE_WEBHOOK_SECRET:

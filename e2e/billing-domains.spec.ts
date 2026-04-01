@@ -11,6 +11,7 @@ const WRONG_DNS_DOMAIN = "wrong-dns.e2e.lifepage.test";
 const PENDING_SSL_DOMAIN = "pending-ssl.e2e.lifepage.test";
 const ACTIVE_DOMAIN = "active-domain.e2e.lifepage.test";
 const DUPLICATE_DOMAIN = "duplicate-domain.e2e.lifepage.test";
+const PAUSED_PROVIDER_DOMAIN = "paused-provider.e2e.lifepage.test";
 
 test("keeps free billing preferences local, syncs Stripe fixtures, and enforces custom-domain activation", async ({
   page,
@@ -127,6 +128,46 @@ test("keeps free billing preferences local, syncs Stripe fixtures, and enforces 
   });
   expect(generateRes.ok()).toBeTruthy();
 
+  const pausedDomainSave = await request.patch("/api/settings", {
+    headers: {
+      "x-e2e-cloudflare-saas": "missing",
+    },
+    data: { customDomain: PAUSED_PROVIDER_DOMAIN },
+  });
+  expect(pausedDomainSave.ok()).toBeTruthy();
+  const pausedDomainData = (await pausedDomainSave.json()) as {
+    settings?: { customDomainStatus?: string };
+    warning?: string | null;
+  };
+  expect(pausedDomainData.settings?.customDomainStatus).toBe(
+    "configuration_required"
+  );
+  expect(pausedDomainData.warning).toContain("saved locally");
+
+  const pausedVerifyRes = await request.post("/api/settings/domain/verify", {
+    headers: {
+      "x-e2e-cloudflare-saas": "missing",
+    },
+  });
+  expect(pausedVerifyRes.ok()).toBeTruthy();
+  const pausedVerifyData = (await pausedVerifyRes.json()) as {
+    settings?: { customDomainStatus?: string };
+    warning?: string | null;
+    verified?: boolean;
+  };
+  expect(pausedVerifyData.verified).toBe(false);
+  expect(pausedVerifyData.settings?.customDomainStatus).toBe(
+    "configuration_required"
+  );
+  expect(pausedVerifyData.warning).toContain("Verification is paused");
+
+  const apexDomainRes = await request.patch("/api/settings", {
+    data: { customDomain: "example.com" },
+  });
+  expect(apexDomainRes.status()).toBe(400);
+  const apexDomainData = (await apexDomainRes.json()) as { error?: string };
+  expect(apexDomainData.error).toContain("Use a subdomain");
+
   const wrongDomainSave = await request.patch("/api/settings", {
     data: { customDomain: WRONG_DNS_DOMAIN },
   });
@@ -136,10 +177,10 @@ test("keeps free billing preferences local, syncs Stripe fixtures, and enforces 
   expect(wrongDomainVerify.ok()).toBeTruthy();
   const wrongDomainData = (await wrongDomainVerify.json()) as {
     settings?: { customDomainStatus?: string };
-    error?: string | null;
+    warning?: string | null;
   };
   expect(wrongDomainData.settings?.customDomainStatus).toBe("error");
-  expect(wrongDomainData.error).toContain("required CNAME target");
+  expect(wrongDomainData.warning).toContain("required CNAME target");
 
   const pendingDomainSave = await request.patch("/api/settings", {
     data: { customDomain: PENDING_SSL_DOMAIN },

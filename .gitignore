@@ -11,6 +11,8 @@ prisma/migrations/*
 !prisma/migrations/20260309142000_add_public_contact_fields/migration.sql
 !prisma/migrations/20260331184500_add_product_events/
 !prisma/migrations/20260331184500_add_product_events/migration.sql
+!prisma/migrations/20260331193000_harden_custom_domain_launch/
+!prisma/migrations/20260331193000_harden_custom_domain_launch/migration.sql
 src/generated/
 tsconfig.tsbuildinfo
 .open-next/
