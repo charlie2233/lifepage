@@ -12,8 +12,11 @@ interface PublicShareActionsProps {
   copyEvent: ProductEventName;
   currentViewLabel: string;
   downloadHref?: string;
+  helperText?: string;
   mutedColor: string;
   outlineButtonStyle: CSSProperties;
+  shareLabel?: string;
+  shareText?: string;
   shareEvent: ProductEventName;
 }
 
@@ -23,8 +26,11 @@ export function PublicShareActions({
   copyEvent,
   currentViewLabel,
   downloadHref,
+  helperText,
   mutedColor,
   outlineButtonStyle,
+  shareLabel,
+  shareText,
   shareEvent,
 }: PublicShareActionsProps) {
   const [copied, setCopied] = useState(false);
@@ -36,7 +42,9 @@ export function PublicShareActions({
       try {
         await navigator.share({
           title: document.title,
-          text: `Check out this Atrak Pages ${currentViewLabel}.`,
+          text:
+            shareText ??
+            `Check out this Atrak Pages ${currentViewLabel} built from real work and proof.`,
           url: window.location.href,
         });
         return;
@@ -68,7 +76,7 @@ export function PublicShareActions({
         style={outlineButtonStyle}
       >
         <Share2 className="h-4 w-4" />
-        Share
+        {shareLabel ?? `Share ${currentViewLabel}`}
       </button>
       <button
         type="button"
@@ -105,8 +113,8 @@ export function PublicShareActions({
         </a>
       ) : null}
       <p className="basis-full text-xs" style={{ color: mutedColor }}>
-        Share the live page, copy a clean link, or jump straight to the companion
-        {` ${alternateLabel.toLowerCase()}.`}
+        {helperText ??
+          `Share the live ${currentViewLabel}, copy a clean link, or jump straight to the companion ${alternateLabel.toLowerCase()}.`}
       </p>
     </div>
   );

@@ -4,8 +4,11 @@ import { prisma } from "@/lib/db";
 export type ProductEventName =
   | "landing_page_viewed"
   | "signup_page_viewed"
+  | "signup_submitted"
   | "signup_completed"
+  | "signup_failed"
   | "dashboard_onboarding_viewed"
+  | "crawl_example_set_used"
   | "crawl_started"
   | "crawl_completed"
   | "crawl_failed"

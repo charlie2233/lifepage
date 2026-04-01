@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, CheckCircle2, Link2, Search, Sparkles } from "lucide-react";
 import { TrackPageView } from "@/components/track-page-view";
+import { trackProductEvent } from "@/lib/analytics-client";
 
 function RegisterPageContent() {
   const router = useRouter();
@@ -28,6 +29,10 @@ function RegisterPageContent() {
     setLoading(true);
     setError("");
     setSubmitted(true);
+    trackProductEvent("signup_submitted", {
+      hasName: Boolean(form.name.trim()),
+      hasUsername: Boolean(form.username.trim()),
+    });
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -36,6 +41,9 @@ function RegisterPageContent() {
     const data = (await res.json()) as { error?: string };
     setLoading(false);
     if (!res.ok) {
+      trackProductEvent("signup_failed", {
+        reason: data.error ?? "Registration failed",
+      });
       setError(data.error || "Registration failed");
     } else {
       router.push(loginHref);
@@ -184,15 +192,15 @@ function RegisterPageContent() {
                 Create your account
               </h2>
               <p className="mt-2 text-sm leading-7 text-[#81929d]">
-                You will land in the import flow next. No credit card is needed
-                to publish the first version.
+                Takes about 30 seconds. You will land in the import flow next,
+                and no credit card is needed to publish the first version.
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="relative space-y-4">
               {error && (
                 <div className="lp-fade-rise rounded-xl border border-red-500/25 bg-red-500/8 px-4 py-3 text-sm text-red-400">
-                  {error}
+                  We could not create the account yet. {error}
                 </div>
               )}
 
@@ -202,6 +210,7 @@ function RegisterPageContent() {
                     label: "Full Name",
                     key: "name",
                     type: "text",
+                    autoComplete: "name",
                     placeholder: "Your Name",
                     help: "This becomes the public name on your portfolio.",
                   },
@@ -209,15 +218,17 @@ function RegisterPageContent() {
                     label: "Username",
                     key: "username",
                     type: "text",
+                    autoComplete: "username",
                     placeholder: "yourhandle",
                     help: submitted
                       ? `Public path preview: /u/${form.username || "yourhandle"}`
-                      : "Choose the clean public URL you want people to share.",
+                      : "This becomes /u/yourhandle on the public page. You can update it later in settings.",
                   },
                   {
                     label: "Email",
                     key: "email",
                     type: "email",
+                    autoComplete: "email",
                     placeholder: "you@example.com",
                     help: "Use the inbox where you want product updates and password resets.",
                   },
@@ -225,6 +236,7 @@ function RegisterPageContent() {
                     label: "Password",
                     key: "password",
                     type: "password",
+                    autoComplete: "new-password",
                     placeholder: "••••••••",
                     help: "Use at least 6 characters. You can change it later.",
                   },
@@ -239,6 +251,7 @@ function RegisterPageContent() {
                     value={form[f.key]}
                     onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
                     required
+                    autoComplete={f.autoComplete}
                     className="input-fancy"
                     placeholder={f.placeholder}
                   />
@@ -262,6 +275,10 @@ function RegisterPageContent() {
                     </div>
                   ))}
                 </div>
+                <p className="mt-3 text-xs leading-6 text-[#94a2ad]">
+                  Best first run: one homepage, one project page, and one proof-heavy
+                  link like a demo, docs, or video walkthrough.
+                </p>
               </div>
 
               <button
@@ -272,7 +289,7 @@ function RegisterPageContent() {
                 {loading ? (
                   <span className="inline-flex items-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#041117]/30 border-t-[#041117]" />
-                    Creating account…
+                    Creating account and preparing your workspace…
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-2">
