@@ -17,6 +17,7 @@ import {
   type ProjectVideoState,
   type ProjectVideoStyle,
 } from "@/lib/project-video-types";
+import { getAppBaseUrl } from "@/lib/runtime-env";
 import { ProfileJSONSchema, type ProfileJSON } from "@/lib/schema";
 import { storeProjectVideoAssets } from "@/lib/project-video-storage";
 
@@ -155,12 +156,7 @@ async function buildReferenceUploadable(screenshotUrl?: string | null) {
 
   let absoluteUrl: URL;
   try {
-    absoluteUrl = new URL(
-      screenshotUrl,
-      process.env.AUTH_URL ??
-        process.env.NEXTAUTH_URL ??
-        "http://localhost:3000"
-    );
+    absoluteUrl = new URL(screenshotUrl, getAppBaseUrl() ?? "http://localhost:3000");
   } catch {
     return undefined;
   }

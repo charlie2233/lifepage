@@ -52,6 +52,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         },
       ],
     },
+    twitter: {
+      card: "summary_large_image",
+      title: `${user.name ?? username} Resume — ${SITE_NAME}`,
+      description:
+        profile?.resume.summary ??
+        profile?.headline ??
+        `Resume of ${user.name ?? username}`,
+      images: [absoluteUrl("/og-atrak-pages.svg")],
+    },
   };
 }
 

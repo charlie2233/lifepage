@@ -155,6 +155,7 @@ Recommended release posture:
 - Cloudflare Workers: secondary/contingency runtime path retained in-repo
 
 Release runbook: [`notes/atrak-pages-launch-checklist.md`](notes/atrak-pages-launch-checklist.md)
+Domain transition plan: [`notes/domain-transition-plan.md`](notes/domain-transition-plan.md)
 
 ## ☁️ Cloudflare Workers Deploy
 

@@ -18,6 +18,8 @@ Release branch: `release/atrak-pages-launch`
 - PR #18: custom-domain hardening
 - PR #19: hosting contingency memo
 
+See also: [`notes/domain-transition-plan.md`](./domain-transition-plan.md)
+
 ## Current provider state
 
 - GitHub Pages is currently enabled for this repo and still attached to `lifepage.one`
@@ -90,7 +92,9 @@ Run this before touching DNS:
 
 Launch-safe option:
 
-- point or forward `lifepage.one` and `www.lifepage.one` to `https://pages.atrak.dev`
+- use Porkbun URL forwarding to send `lifepage.one` and `www.lifepage.one` to `https://pages.atrak.dev`
+- keep path forwarding on if Porkbun supports it for the chosen record type
+- if you need a stricter platform-managed redirect, attach the legacy domains to Vercel and let the runtime issue the permanent redirect instead
 
 Optional follow-up after the main launch is stable:
 

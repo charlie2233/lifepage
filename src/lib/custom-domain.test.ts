@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getCloudflareSaasCapability } from "@/lib/cloudflare-saas";
-import { normalizeCustomDomain } from "@/lib/custom-domain";
+import {
+  isInternalAppHostname,
+  normalizeCustomDomain,
+  shouldRedirectToPrimaryAppHostname,
+} from "@/lib/custom-domain";
 import {
   buildManagedCustomDomainState,
 } from "@/lib/custom-domain-state";
@@ -115,6 +119,25 @@ test("managed custom-domain state separates provider-setup and DNS readiness", (
       assert.equal(waitingOnSsl.customDomainStatus, "verified");
       assert.equal(waitingOnSsl.customDomainDnsStatus, "verified");
       assert.match(waitingDiagnostics.nextAction, /certificate/i);
+    }
+  );
+});
+
+test("legacy and alias hosts redirect to the primary app hostname", () => {
+  withEnv(
+    {
+      AUTH_URL: "https://pages.atrak.dev",
+      NEXTAUTH_URL: undefined,
+      NEXT_PUBLIC_SITE_URL: undefined,
+      NEXT_PUBLIC_APP_URL: undefined,
+      APP_URL: undefined,
+    },
+    () => {
+      assert.equal(shouldRedirectToPrimaryAppHostname("lifepage.one"), true);
+      assert.equal(shouldRedirectToPrimaryAppHostname("www.lifepage.one"), true);
+      assert.equal(shouldRedirectToPrimaryAppHostname("www.pages.atrak.dev"), true);
+      assert.equal(shouldRedirectToPrimaryAppHostname("pages.atrak.dev"), false);
+      assert.equal(isInternalAppHostname("lifepage.one"), true);
     }
   );
 });

@@ -266,13 +266,33 @@ export async function generateMetadata(): Promise<Metadata> {
   const profile = user.generatedProfiles[0]?.data as unknown as
     | ProfileJSON
     | undefined;
+  const currentOrigin = hostname ? `https://${hostname}` : absoluteUrl("/");
 
   return {
     title: `${user.name ?? user.username ?? "Portfolio"} — Atrak Pages`,
     description: profile?.headline ?? DEFAULT_METADATA.description,
+    alternates: {
+      canonical: currentOrigin,
+    },
     openGraph: {
+      type: "website",
       title: `${user.name ?? user.username ?? "Portfolio"} — ${SITE_NAME}`,
       description: profile?.headline ?? SITE_DESCRIPTION,
+      url: currentOrigin,
+      images: [
+        {
+          url: new URL("/og-atrak-pages.svg", currentOrigin).toString(),
+          width: 1200,
+          height: 630,
+          alt: `${user.name ?? user.username ?? "Portfolio"} preview`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${user.name ?? user.username ?? "Portfolio"} — ${SITE_NAME}`,
+      description: profile?.headline ?? SITE_DESCRIPTION,
+      images: [new URL("/og-atrak-pages.svg", currentOrigin).toString()],
     },
   };
 }

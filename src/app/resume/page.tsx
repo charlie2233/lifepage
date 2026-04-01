@@ -41,6 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const profile = user.generatedProfiles[0]?.data as unknown as
     | ProfileJSON
     | undefined;
+  const currentOrigin = hostname ? `https://${hostname}` : null;
 
   return {
     title: `${user.name ?? user.username ?? "Portfolio"} Resume`,
@@ -48,6 +49,41 @@ export async function generateMetadata(): Promise<Metadata> {
       profile?.resume.summary ??
       profile?.headline ??
       `Resume of ${user.name ?? user.username ?? "this user"}`,
+    alternates: currentOrigin
+      ? {
+          canonical: new URL("/resume", currentOrigin).toString(),
+        }
+      : undefined,
+    openGraph: currentOrigin
+      ? {
+          type: "website",
+          title: `${user.name ?? user.username ?? "Portfolio"} Resume — Atrak Pages`,
+          description:
+            profile?.resume.summary ??
+            profile?.headline ??
+            `Resume of ${user.name ?? user.username ?? "this user"}`,
+          url: new URL("/resume", currentOrigin).toString(),
+          images: [
+            {
+              url: new URL("/og-atrak-pages.svg", currentOrigin).toString(),
+              width: 1200,
+              height: 630,
+              alt: `${user.name ?? user.username ?? "Portfolio"} resume preview`,
+            },
+          ],
+        }
+      : undefined,
+    twitter: currentOrigin
+      ? {
+          card: "summary_large_image",
+          title: `${user.name ?? user.username ?? "Portfolio"} Resume — Atrak Pages`,
+          description:
+            profile?.resume.summary ??
+            profile?.headline ??
+            `Resume of ${user.name ?? user.username ?? "this user"}`,
+          images: [new URL("/og-atrak-pages.svg", currentOrigin).toString()],
+        }
+      : undefined,
   };
 }
 

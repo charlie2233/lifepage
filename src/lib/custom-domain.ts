@@ -2,6 +2,11 @@ import { getAppBaseUrl } from "@/lib/runtime-env";
 
 const HOST_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+const CANONICAL_REDIRECT_HOSTS = new Set([
+  "lifepage.one",
+  "www.lifepage.one",
+  "www.pages.atrak.dev",
+]);
 
 function stripTrailingDot(value: string) {
   return value.replace(/\.+$/, "");
@@ -33,10 +38,23 @@ export function getPrimaryAppHostname() {
   }
 }
 
+export function shouldRedirectToPrimaryAppHostname(hostname: string) {
+  const normalized = stripTrailingDot(hostname.trim().toLowerCase());
+  if (!normalized) return false;
+
+  const primaryHost = getPrimaryAppHostname();
+  if (primaryHost && normalized === primaryHost) {
+    return false;
+  }
+
+  return CANONICAL_REDIRECT_HOSTS.has(normalized);
+}
+
 export function isInternalAppHostname(hostname: string) {
   const normalized = stripTrailingDot(hostname.trim().toLowerCase());
   if (!normalized) return false;
   if (LOOPBACK_HOSTS.has(normalized)) return true;
+  if (shouldRedirectToPrimaryAppHostname(normalized)) return true;
   if (normalized.endsWith(".workers.dev")) return true;
 
   const primaryHost = getPrimaryAppHostname();

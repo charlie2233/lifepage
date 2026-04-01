@@ -36,8 +36,11 @@
 ## Legacy and fallback paths
 
 - Confirm `https://lifepage.one` redirects to `https://pages.atrak.dev`
+- Confirm `https://www.lifepage.one` redirects to `https://pages.atrak.dev`
+- If configured, confirm `https://www.pages.atrak.dev` redirects to `https://pages.atrak.dev`
 - Confirm `https://charlie2233.github.io/My_portforlio/` serves the static fallback page
 - Confirm GitHub Pages is not serving the real app runtime
+- Confirm `https://pages.atrak.dev/robots.txt` and `https://pages.atrak.dev/sitemap.xml` resolve cleanly
 
 ## Monitoring after cutover
 
