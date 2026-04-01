@@ -49,6 +49,7 @@ Record the final successful timestamps and operator initials here before launch.
 - `lifepage.one` redirect active: `TBD`
 - Stripe production webhook verified: `TBD`
 - Cloudflare for SaaS env configured in production: `TBD`
+- Cloudflare Worker contingency deploy accepted by account plan: `TBD`
 - Existing Cloudflare Worker service `lifepage-web` has all required secret names configured, but those values are not readable from this session
 - Existing `workers.dev` host is still serving a stale LifePage build, not the current Atrak Pages release branch
 
@@ -62,6 +63,9 @@ Record the final successful timestamps and operator initials here before launch.
 
 ## Open blocker
 
+- Resolve the Vercel production-host blocker before launch. The current Codex environment is not authenticated to a Vercel project, so the preferred production path cannot be completed from here yet.
+- Resolve the DNS blocker before launch. `pages.atrak.dev` does not resolve yet, and GitHub Pages still owns `lifepage.one`.
+- Resolve the contingency-host blocker before launch. The current OpenNext Worker bundle exceeds the free-plan 3 MiB Worker size limit, so the Cloudflare Worker fallback cannot be redeployed on the current plan without slimming the bundle or upgrading the account.
 - Resolve the Playwright release-gate failure before launch. The unauthenticated redirect spec passes, but authenticated flows currently fail after sign-in with `ERR_CONNECTION_REFUSED`, which implies the local Next dev server drops during the authenticated E2E run.
 - Provision a remotely reachable production Postgres for Vercel or export the existing Worker `DATABASE_URL` into Vercel manually.
 - Provide readable Stripe, R2, and Cloudflare for SaaS production env values for Vercel, or keep launch off Vercel.

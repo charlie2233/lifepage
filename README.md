@@ -156,12 +156,21 @@ Recommended release posture:
 
 Release runbook: [`notes/atrak-pages-launch-checklist.md`](notes/atrak-pages-launch-checklist.md)
 Domain transition plan: [`notes/domain-transition-plan.md`](notes/domain-transition-plan.md)
+Production env matrix: [`notes/production-env-matrix.md`](notes/production-env-matrix.md)
+Incident checklist: [`notes/incident-checklist.md`](notes/incident-checklist.md)
+
+Current launch blockers from the repo environment:
+
+- Vercel is still the preferred production host, but this Codex environment is not authenticated to a Vercel project yet.
+- The Cloudflare Worker path is authenticated and already has production secrets, but the current OpenNext bundle exceeds the free-plan 3 MiB Worker size limit, so redeploying the release build there requires a paid Workers plan or bundle slimming.
+- `pages.atrak.dev` does not resolve yet, and `lifepage.one` is still attached to GitHub Pages in provider state.
 
 ## ☁️ Cloudflare Workers Deploy
 
 Atrak Pages still includes an OpenNext + Wrangler path for Cloudflare Workers.
 
 Treat this as a contingency runtime for now, not the preferred public launch target.
+For this repo specifically, the current release build exceeds the free-plan Worker size limit, so the contingency path requires a paid Workers plan or a smaller bundle before it can be redeployed.
 
 ### Local preview
 

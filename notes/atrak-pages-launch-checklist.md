@@ -26,17 +26,20 @@ See also: [`notes/incident-checklist.md`](./incident-checklist.md)
 
 - GitHub Pages is currently enabled for this repo and still attached to `lifepage.one`
 - Repo Pages source is `main:/docs`
-- DNS for `pages.atrak.dev` and `lifepage.one` is currently managed at Porkbun
-- Vercel account access is present for team `charlie2233s-projects`
-- No Vercel project exists yet for this repo
+- DNS for `pages.atrak.dev` and `lifepage.one` is currently managed at Porkbun, not Cloudflare
+- `pages.atrak.dev` does not resolve yet
+- No Vercel project exists yet for this repo from the current Codex environment
+- Vercel CLI and Vercel MCP are not authenticated in the current Codex environment
+- The existing Cloudflare Worker `lifepage-web` has a production secret set, but the current release build exceeds the free-plan 3 MiB Worker size limit, so the fallback deploy path requires a paid Workers plan or further bundle reduction
+- The existing `workers.dev` host is still serving a stale LifePage build, not the current Atrak Pages release branch
 
 ## Manual actions before launch
 
 ### 1. Create the Vercel project
 
 1. In Vercel, create a new project from `charlie2233/My_portforlio`.
-2. Put it under team `charlie2233s-projects`.
-3. Set the production branch to `release/atrak-pages-launch` for the cutover window, or merge first and deploy `main`.
+2. Put it under the intended production Vercel account or team.
+3. Set the production branch to `release/atrak-pages-launch` for the cutover window.
 
 ### 2. Add production environment variables in Vercel
 
@@ -53,6 +56,8 @@ Required:
 - `CLOUDFLARE_SAAS_ZONE_ID`
 - `CLOUDFLARE_SAAS_CNAME_TARGET`
 - `CLOUDFLARE_SAAS_FALLBACK_ORIGIN`
+
+Reference: [`notes/production-env-matrix.md`](./production-env-matrix.md)
 
 Optional but recommended:
 
@@ -128,6 +133,7 @@ Run before announcing launch:
 - `npm run build`
 - `npm run test:e2e:ci`
 - optional contingency validation: `npm run cf:build`
+- if using the Workers fallback, confirm the account is on a paid Workers plan or the bundle is below the free-plan limit before you treat it as a real rollback path
 
 ## Rollback
 
@@ -137,7 +143,7 @@ If the Vercel cutover fails:
 2. Keep the GitHub Pages fallback reachable at `https://charlie2233.github.io/My_portforlio/`.
 3. If you already moved `lifepage.one`, point or forward it back to the fallback page or temporarily leave it detached while the app issue is corrected.
 4. Redeploy the last known-good Vercel deployment or pause the custom-domain announcement.
-5. If needed, fall back to the in-repo Cloudflare Workers contingency path after env validation.
+5. If needed, fall back to the in-repo Cloudflare Workers contingency path only after confirming the account can accept the current Worker bundle size.
 
 Current contingency blocker:
 

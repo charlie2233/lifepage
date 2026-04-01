@@ -3,109 +3,76 @@
 Date: 2026-04-01
 Branch: `release/atrak-pages-launch`
 
-## Summary
+## Purpose
 
-- The repo does not contain a production-ready Vercel environment bundle.
-- The original checkout includes local development secrets for auth, local Postgres, and OpenAI only.
-- The existing Cloudflare Worker service already has the full production secret surface configured, but those values are not readable from this session.
-- The `DATABASE_URL` available in `/Users/hanfei/My_portforlio/.env.local` points at `localhost:5432`, so it is not usable from Vercel or any remote host.
+This is the repo-specific environment matrix for the first real Atrak Pages launch.
 
-## Staging vs production
+Rules:
 
-| Variable | Staging | Production | Notes |
-|---|---|---|---|
-| `DATABASE_URL` | Required | Required | Must point at a remotely reachable Postgres. The local repo only has `localhost`, which is a hard blocker for Vercel. |
-| `AUTH_SECRET` | Required | Required | Used by Auth.js. Existing local source: `/Users/hanfei/My_portforlio/.dev.vars`. |
-| `NEXTAUTH_SECRET` | Optional | Optional | Current code prefers `AUTH_SECRET`, but keeping both aligned is safer. |
-| `AUTH_URL` | Required | Required | Canonical host. Use preview URL for staging and `https://pages.atrak.dev` for production. |
-| `NEXTAUTH_URL` | Optional | Optional | Can mirror `AUTH_URL`, but production should treat `AUTH_URL` as the source of truth. |
-| `OPENAI_API_KEY` | Required | Required | Needed for profile generation and project videos. Present locally. |
-| `OPENAI_SORA_MODEL` | Optional | Recommended | Defaults to `sora-2` if omitted. |
-| `STRIPE_SECRET_KEY` | Optional for non-billing staging, required for billing staging | Required | Missing from local repo/env. Present on the existing Worker service only as a non-readable secret. |
-| `STRIPE_WEBHOOK_SECRET` | Optional for non-billing staging, required for billing staging | Required | Same blocker as `STRIPE_SECRET_KEY`. |
-| `STRIPE_PLUS_MONTHLY_PRICE_ID` | Optional for non-billing staging, required for billing staging | Required | Missing locally. |
-| `STRIPE_PLUS_YEARLY_PRICE_ID` | Optional for non-billing staging, required for billing staging | Required | Missing locally. |
-| `STRIPE_PRO_MONTHLY_PRICE_ID` | Optional for non-billing staging, required for billing staging | Required | Missing locally. |
-| `STRIPE_PRO_YEARLY_PRICE_ID` | Optional for non-billing staging, required for billing staging | Required | Missing locally. |
-| `R2_ACCESS_KEY_ID` | Optional if project videos are disabled in staging | Required for production video generation | Missing locally. Present on the Worker service only as a non-readable secret. |
-| `R2_SECRET_ACCESS_KEY` | Optional if project videos are disabled in staging | Required for production video generation | Missing locally. |
-| `R2_BUCKET` | Optional if project videos are disabled in staging | Required for production video generation | Missing locally. |
-| `R2_PUBLIC_BASE_URL` | Optional if project videos are disabled in staging | Required for production video generation | Missing locally. |
-| `R2_ACCOUNT_ID` or `R2_ENDPOINT` | Optional if project videos are disabled in staging | Required for production video generation | Missing locally. |
-| `CLOUDFLARE_API_TOKEN` | Optional if custom domains stay in graceful paused mode | Required for live custom-domain provisioning | Missing locally. |
-| `CLOUDFLARE_SAAS_ZONE_ID` | Optional if custom domains stay in graceful paused mode | Required for live custom-domain provisioning | Missing locally. |
-| `CLOUDFLARE_SAAS_CNAME_TARGET` | Optional if custom domains stay in graceful paused mode | Required for live custom-domain provisioning | Missing locally. |
-| `CLOUDFLARE_SAAS_FALLBACK_ORIGIN` | Optional if custom domains stay in graceful paused mode | Required for live custom-domain provisioning | Missing locally. |
-| `CLOUDFLARE_ACCOUNT_ID` | Optional | Recommended | Only needed for Browser Rendering screenshots on Workers. |
-| `CLOUDFLARE_BROWSER_RENDERING_TOKEN` | Optional | Recommended | Only needed for Browser Rendering screenshots on Workers. |
-| `CRON_SECRET` | Optional unless automations are live | Recommended | Missing locally. Present on the Worker service only as a non-readable secret. |
-| `KIMI_API_KEY` | Optional | Optional | Present locally. Only required if you want that provider available. |
-| `QWEN_API_KEY` | Optional | Optional | Present locally. Only required if you want that provider available. |
-| `DASHSCOPE_API_KEY` | Optional | Optional | Present locally. Only required if you want that provider available. |
+- Vercel is the preferred production host.
+- `AUTH_URL` is the production source of truth for canonical URLs.
+- `pages.atrak.dev` is the only canonical app host.
+- `lifepage.one` is redirect-only and must never be used as the app host, auth callback host, or billing return host.
 
-## Source-of-truth inventory found in this session
+## Required For Preview And Production
 
-### Local original checkout
+| Variable | Preview | Production | Purpose | Notes |
+|---|---|---|---|---|
+| `DATABASE_URL` | required | required | Prisma/Postgres runtime | Must point at a hosted database, not localhost |
+| `AUTH_SECRET` | required | required | Auth.js signing secret | `NEXTAUTH_SECRET` can stay unset if `AUTH_SECRET` is used |
+| `AUTH_URL` | required | required | Canonical host and billing return base | Preview should use its preview host. Production must be `https://pages.atrak.dev` |
+| `OPENAI_API_KEY` | required | required | AI generation, profile synthesis, project videos | Required for real crawl/generate flows |
 
-Found in `/Users/hanfei/My_portforlio/.env.local`:
+## Usually Required For Production
 
-- `DATABASE_URL`
-- `NEXTAUTH_SECRET`
-- `NEXTAUTH_URL`
-- `OPENAI_API_KEY`
-- `KIMI_API_KEY`
-- `QWEN_API_KEY`
-- `DASHSCOPE_API_KEY`
+| Variable | Preview | Production | Purpose | Notes |
+|---|---|---|---|---|
+| `OPENAI_SORA_MODEL` | optional | recommended | Project demo video model selection | Defaults to `sora-2` if omitted |
+| `CRON_SECRET` | optional | recommended | Protects automation run endpoint | Needed if cron/automation entrypoints are enabled |
+| `CLOUDFLARE_ACCOUNT_ID` | optional | recommended | Cloudflare Browser Rendering | Only needed if you use Browser Rendering on the deployed host |
+| `CLOUDFLARE_BROWSER_RENDERING_TOKEN` | optional | recommended | Cloudflare Browser Rendering | Same as above |
 
-Found in `/Users/hanfei/My_portforlio/.dev.vars`:
+## Required For Stripe Billing
 
-- `DATABASE_URL`
-- `AUTH_SECRET`
-- `AUTH_URL`
-- `OPENAI_API_KEY`
+| Variable | Preview | Production | Purpose | Notes |
+|---|---|---|---|---|
+| `STRIPE_SECRET_KEY` | required for billing smoke | required | Stripe API access | Use test key in preview, live key in production |
+| `STRIPE_WEBHOOK_SECRET` | required for billing smoke | required | Stripe webhook validation | Must match the deployed webhook destination |
+| `STRIPE_PLUS_MONTHLY_PRICE_ID` | required for billing smoke | required | Price map | |
+| `STRIPE_PLUS_YEARLY_PRICE_ID` | required for billing smoke | required | Price map | |
+| `STRIPE_PRO_MONTHLY_PRICE_ID` | required for billing smoke | required | Price map | |
+| `STRIPE_PRO_YEARLY_PRICE_ID` | required for billing smoke | required | Price map | |
 
-Critical note:
+## Required For R2 Project Video Storage
 
-- The local `DATABASE_URL` resolves to `postgresql://...@localhost:5432/lifepage`.
-- That database cannot be reached from Vercel or any remote production runtime.
+| Variable | Preview | Production | Purpose | Notes |
+|---|---|---|---|---|
+| `R2_ACCESS_KEY_ID` | optional | required if using hosted video storage | R2 API access | |
+| `R2_SECRET_ACCESS_KEY` | optional | required if using hosted video storage | R2 API access | |
+| `R2_BUCKET` | optional | required if using hosted video storage | Bucket name | |
+| `R2_ACCOUNT_ID` | optional | required if using hosted video storage | R2 endpoint derivation | |
+| `R2_PUBLIC_BASE_URL` | optional | required if using hosted video storage | Public asset base URL | |
 
-### Existing Cloudflare Worker service
+## Required For Customer Custom Domains
 
-`wrangler secret list --name lifepage-web` confirms these names exist remotely:
+| Variable | Preview | Production | Purpose | Notes |
+|---|---|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | optional | required for live provider operations | Cloudflare for SaaS API | Dashboard should degrade gracefully if missing |
+| `CLOUDFLARE_SAAS_ZONE_ID` | optional | required for live provider operations | Cloudflare zone id | |
+| `CLOUDFLARE_SAAS_CNAME_TARGET` | optional | required for live provider operations | Customer-facing CNAME target | Launch scope is subdomains only |
+| `CLOUDFLARE_SAAS_FALLBACK_ORIGIN` | optional | required for live provider operations | Fallback origin | Must front the deployed runtime |
 
-- `AUTH_SECRET`
-- `AUTH_URL`
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_SAAS_CNAME_TARGET`
-- `CLOUDFLARE_SAAS_FALLBACK_ORIGIN`
-- `CLOUDFLARE_SAAS_ZONE_ID`
-- `CRON_SECRET`
-- `DATABASE_URL`
-- `OPENAI_API_KEY`
-- `R2_ACCESS_KEY_ID`
-- `R2_ACCOUNT_ID`
-- `R2_BUCKET`
-- `R2_PUBLIC_BASE_URL`
-- `R2_SECRET_ACCESS_KEY`
-- `STRIPE_PLUS_MONTHLY_PRICE_ID`
-- `STRIPE_PLUS_YEARLY_PRICE_ID`
-- `STRIPE_PRO_MONTHLY_PRICE_ID`
-- `STRIPE_PRO_YEARLY_PRICE_ID`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
+## Launch Notes
 
-Critical note:
+- No production secrets live in the repo.
+- The current Cloudflare Worker already has a populated production secret set, but that does not automatically provision Vercel.
+- A real Vercel launch still requires creating or linking the Vercel project and entering these env vars there.
+- If preview and production use different Stripe modes, keep webhook URLs and secrets separated cleanly.
 
-- The values behind those Worker secrets are not readable from this session, so they cannot be copied into Vercel from here.
+## Current Operator Findings
 
-## Hard blockers
-
-1. No remotely reachable Postgres URL is available in the repo or current shell environment.
-2. No readable Stripe production keys or price ids are available in the repo or current shell environment.
-3. No readable R2 or Cloudflare for SaaS production credentials are available in the repo or current shell environment.
-4. Vercel project creation and env injection are not possible from the current local CLI because `vercel` is unauthenticated.
-
-## Launch decision
-
-- A real Vercel launch is blocked until the production env values are exported from the existing infrastructure or re-entered manually into a new Vercel project.
-- A real Workers launch is blocked until the Cloudflare account is upgraded past the 3 MiB Worker size limit or the bundle is significantly reduced.
+- The current Codex environment is not authenticated to a Vercel project yet.
+- `pages.atrak.dev` does not resolve yet, so canonical-domain production is not cut over.
+- The existing Cloudflare Worker `lifepage-web` has all required secret names populated, but those values are not readable from this session.
+- The currently live `workers.dev` host is still serving an older LifePage build.
+- A fresh deploy of the current release bundle to Cloudflare fails on the free-plan 3 MiB Worker size limit, so the Worker fallback requires a paid plan or bundle reduction before it can be treated as a real rollout path.
