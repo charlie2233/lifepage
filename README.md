@@ -212,6 +212,8 @@ The initial launch target is the Worker's `*.workers.dev` hostname defined in `w
 
 LifePage supports customer-owned custom domains through Cloudflare for SaaS custom hostnames.
 
+Detailed launch and operator guidance lives in [`docs/custom-domains.md`](docs/custom-domains.md).
+
 Temporary operating mode: custom domains should stay detached until DNS is intentionally repointed to the Cloudflare-managed target. Do not leave GitHub Pages DNS records in place for production domains.
 
 ### Required SaaS hostnames
@@ -226,7 +228,7 @@ Do not use `*.workers.dev` as the customer-facing CNAME target in production.
 ### Launch scope
 
 - Subdomain custom domains only
-- Apex domains are intentionally out of scope for now
+- Apex domains are intentionally out of scope for now and should not be promised in product copy
 
 ### How verification works
 
@@ -234,6 +236,12 @@ Do not use `*.workers.dev` as the customer-facing CNAME target in production.
 2. The dashboard shows the required customer CNAME target.
 3. `Verify DNS` confirms the customer CNAME is in place and refreshes Cloudflare hostname validation.
 4. The domain becomes active only when both the Cloudflare hostname status and SSL status are active.
+
+### Graceful fallback when provider config is incomplete
+
+- The dashboard should never hard-error just because Cloudflare SaaS is incomplete in an environment.
+- A requested hostname can still be saved locally while provider setup is paused.
+- Verification remains paused with actionable copy until the Cloudflare SaaS configuration is finished.
 
 ## Stripe Billing Runbook
 
@@ -307,7 +315,7 @@ Cloudflare keeps prior Worker versions. Roll back from the dashboard or redeploy
 
 ### Current limitation
 
-Customer-owned custom domains require a Cloudflare-managed SaaS zone and the four Cloudflare SaaS environment variables listed above. Without them, the dashboard returns a hard error instead of simulating activation.
+Customer-owned custom domains still require a Cloudflare-managed SaaS zone and the four Cloudflare SaaS environment variables listed above for full provisioning. When those values are incomplete, the dashboard now falls back to a paused/config-required state instead of hard-failing the user flow.
 
 ## 🎬 Project Demo Videos
 

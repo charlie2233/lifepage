@@ -29,6 +29,6 @@ export async function registerAndLogin(page: Page, user: E2ETestUser) {
   await page.locator('input[placeholder="you@example.com"]').fill(user.email);
   await page.locator('input[placeholder="••••••••"]').fill(user.password);
   await page.getByRole("button", { name: "Sign In" }).click();
-  await page.waitForURL(/\/dashboard/);
+  await page.waitForURL(/\/dashboard/, { waitUntil: "domcontentloaded" });
   await expect(page.getByText("Import sources")).toBeVisible();
 }

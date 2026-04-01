@@ -387,10 +387,42 @@ interface ApiBillingResponse {
 }
 type CustomDomainStatus =
   | "none"
+  | "configuration_required"
   | "pending_verification"
   | "verified"
   | "active"
   | "error";
+type CustomDomainDnsStatus =
+  | "not_started"
+  | "configuration_required"
+  | "pending"
+  | "verified"
+  | "error";
+interface CustomDomainDiagnosticsSnapshot {
+  launchScope?: "subdomain_only";
+  requestedHostname?: string;
+  providerConfigured?: boolean;
+  lifecycleStatus?: CustomDomainStatus;
+  dnsStatus?: CustomDomainDnsStatus;
+  verification?: {
+    type?: "CNAME";
+    name?: string;
+    value?: string | null;
+  } | null;
+  dns?: {
+    checkedAt?: string | null;
+    observedValues?: string[];
+  } | null;
+  provider?: {
+    id?: string | null;
+    status?: string | null;
+    error?: string | null;
+  } | null;
+  ssl?: {
+    status?: string | null;
+  } | null;
+  nextAction?: string;
+}
 interface DashboardSettingsSnapshot {
   isPublic: boolean;
   visibility?: PublicPageVisibility | null;
@@ -401,6 +433,7 @@ interface DashboardSettingsSnapshot {
   mode: string;
   customDomain?: string | null;
   customDomainStatus?: CustomDomainStatus | null;
+  customDomainDnsStatus?: CustomDomainDnsStatus | null;
   customDomainVerificationName?: string | null;
   customDomainVerificationValue?: string | null;
   customDomainProviderId?: string | null;
@@ -409,12 +442,14 @@ interface DashboardSettingsSnapshot {
   customDomainProviderError?: string | null;
   customDomainLastCheckedAt?: string | null;
   customDomainError?: string | null;
+  customDomainDiagnostics?: CustomDomainDiagnosticsSnapshot | null;
 }
 interface ApiSettingsResponse {
   settings?: DashboardSettingsSnapshot | null;
   verified?: boolean;
   cloudflareSaasConfigured?: boolean;
   cloudflareSaasCnameTarget?: string | null;
+  warning?: string | null;
   error?: string | null;
 }
 interface ApiProjectVideoResponse {
@@ -568,6 +603,8 @@ function getPlanSavingsCopy(plan: BillingPlan, interval: BillingInterval) {
 
 function formatCustomDomainStatus(status: CustomDomainStatus) {
   switch (status) {
+    case "configuration_required":
+      return "Provider setup required";
     case "pending_verification":
       return "Pending verification";
     case "verified":
@@ -583,6 +620,8 @@ function formatCustomDomainStatus(status: CustomDomainStatus) {
 
 function getCustomDomainStatusCopy(status: CustomDomainStatus) {
   switch (status) {
+    case "configuration_required":
+      return "The hostname is saved, but LifePage cannot provision or verify it from this environment until the Cloudflare SaaS provider setup is completed.";
     case "pending_verification":
       return "Cloudflare has the hostname provisioned, but DNS is not pointing at the required CNAME target yet.";
     case "verified":
@@ -594,6 +633,105 @@ function getCustomDomainStatusCopy(status: CustomDomainStatus) {
     default:
       return "Add a hostname to start the managed domain flow.";
   }
+}
+
+function formatCustomDomainDnsStatus(status: CustomDomainDnsStatus) {
+  switch (status) {
+    case "configuration_required":
+      return "Provider setup required";
+    case "pending":
+      return "Waiting on DNS";
+    case "verified":
+      return "DNS verified";
+    case "error":
+      return "DNS needs attention";
+    default:
+      return "Not checked";
+  }
+}
+
+function getDomainStatusTone(status: CustomDomainStatus | CustomDomainDnsStatus) {
+  if (status === "active" || status === "verified") {
+    return "border-green-500/30 bg-green-500/10 text-green-300";
+  }
+  if (status === "configuration_required") {
+    return "border-amber-500/30 bg-amber-500/10 text-amber-200";
+  }
+  if (status === "error") {
+    return "border-red-500/30 bg-red-500/10 text-red-300";
+  }
+  return "border-white/10 bg-white/5 text-gray-300";
+}
+
+function getCustomDomainTroubleshootingItems(args: {
+  cloudflareSaasConfigured: boolean;
+  customDomain: string;
+  customDomainTargetHost: string;
+  customDomainStatus: CustomDomainStatus;
+  customDomainDnsStatus: CustomDomainDnsStatus;
+  customDomainProviderStatus?: string | null;
+  customDomainSslStatus?: string | null;
+  customDomainError?: string | null;
+  diagnostics?: CustomDomainDiagnosticsSnapshot | null;
+}) {
+  const items: string[] = [];
+
+  if (!args.cloudflareSaasConfigured) {
+    items.push(
+      "LifePage is missing part of its Cloudflare SaaS setup in this environment. The hostname is stored locally, but provisioning and verification are paused."
+    );
+    if (!args.customDomainTargetHost) {
+      items.push(
+        "Do not change customer DNS yet. Wait until the dashboard shows a required CNAME target."
+      );
+    }
+  }
+
+  if (args.customDomain) {
+    items.push(
+      "Launch scope is subdomain-only. Use a hostname like portfolio.example.com. Root/apex domains like example.com are queued for a future milestone."
+    );
+  }
+
+  if (
+    args.customDomainTargetHost &&
+    (args.customDomainDnsStatus === "pending" ||
+      args.customDomainDnsStatus === "error" ||
+      args.customDomainStatus === "pending_verification")
+  ) {
+    items.push(
+      `Create exactly one CNAME for ${args.customDomain} pointing to ${args.customDomainTargetHost}, and remove conflicting A, AAAA, or old CNAME records.`
+    );
+  }
+
+  const observedValues = args.diagnostics?.dns?.observedValues ?? [];
+  if (observedValues.length > 0 && !observedValues.includes(args.customDomainTargetHost)) {
+    items.push(
+      `DNS currently resolves to ${observedValues.join(", ")} instead of ${args.customDomainTargetHost}. Update the DNS record before verifying again.`
+    );
+  }
+
+  if (args.customDomainDnsStatus === "verified" && args.customDomainSslStatus !== "active") {
+    items.push(
+      "DNS is correct. Cloudflare is still issuing or validating the certificate. Leave the CNAME in place and retry verification later if it does not update."
+    );
+  }
+
+  if (args.customDomainProviderStatus && args.customDomainProviderStatus !== "active") {
+    items.push(
+      `Cloudflare reports the hostname status as ${formatExternalStatusLabel(args.customDomainProviderStatus)}. Keep the DNS record in place and re-run verification after propagation.`
+    );
+  }
+
+  if (args.customDomainError) {
+    items.push(args.customDomainError);
+  }
+
+  if (args.diagnostics?.nextAction) {
+    items.push(args.diagnostics.nextAction);
+  }
+
+  return Array.from(new Set(items)).filter(Boolean);
 }
 
 function formatExternalStatusLabel(status?: string | null) {
@@ -1582,6 +1720,8 @@ function DashboardPageContent() {
   const [customDomainInput, setCustomDomainInput] = useState("");
   const [customDomainStatus, setCustomDomainStatus] =
     useState<CustomDomainStatus>("none");
+  const [customDomainDnsStatus, setCustomDomainDnsStatus] =
+    useState<CustomDomainDnsStatus>("not_started");
   const [customDomainVerificationName, setCustomDomainVerificationName] =
     useState("");
   const [customDomainVerificationValue, setCustomDomainVerificationValue] =
@@ -1596,6 +1736,8 @@ function DashboardPageContent() {
   const [customDomainLastCheckedAt, setCustomDomainLastCheckedAt] =
     useState<string | null>(null);
   const [customDomainError, setCustomDomainError] = useState<string | null>(null);
+  const [customDomainDiagnostics, setCustomDomainDiagnostics] =
+    useState<CustomDomainDiagnosticsSnapshot | null>(null);
   const [cloudflareSaasConfigured, setCloudflareSaasConfigured] =
     useState(true);
   const [cloudflareSaasCnameTarget, setCloudflareSaasCnameTarget] =
@@ -1626,7 +1768,7 @@ function DashboardPageContent() {
   const [verifyingDomain, setVerifyingDomain] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>("crawl");
   const [message, setMessage] = useState<{
-    type: "success" | "error";
+    type: "success" | "error" | "warning";
     text: string;
   } | null>(null);
 
@@ -1705,6 +1847,7 @@ function DashboardPageContent() {
       setCustomDomain(settings.customDomain ?? "");
       setCustomDomainInput(settings.customDomain ?? "");
       setCustomDomainStatus(settings.customDomainStatus ?? "none");
+      setCustomDomainDnsStatus(settings.customDomainDnsStatus ?? "not_started");
       setCustomDomainVerificationName(
         settings.customDomainVerificationName ?? ""
       );
@@ -1717,6 +1860,7 @@ function DashboardPageContent() {
       setCustomDomainProviderError(settings.customDomainProviderError ?? null);
       setCustomDomainLastCheckedAt(settings.customDomainLastCheckedAt ?? null);
       setCustomDomainError(settings.customDomainError ?? null);
+      setCustomDomainDiagnostics(settings.customDomainDiagnostics ?? null);
     },
     []
   );
@@ -1812,8 +1956,11 @@ function DashboardPageContent() {
         throw new Error(data.error ?? "Failed to save settings.");
       }
       applySettingsSnapshot(data.settings);
-      setMessage({ type: "success", text: "Settings saved." });
-      return data.settings ?? null;
+      setMessage({
+        type: data.warning ? "warning" : "success",
+        text: data.warning ?? "Settings saved.",
+      });
+      return data;
     } catch (error) {
       setMessage({
         type: "error",
@@ -1966,11 +2113,11 @@ function DashboardPageContent() {
   };
 
   const handleSaveCustomDomain = async () => {
-    const settings = await saveSettings({
+    const result = await saveSettings({
       customDomain: customDomainInput.trim() || null,
     });
 
-    if (settings?.customDomain) {
+    if (result?.settings?.customDomain && !result.warning) {
       setMessage({
         type: "success",
         text:
@@ -1997,12 +2144,12 @@ function DashboardPageContent() {
       }
       applySettingsSnapshot(data.settings);
       setMessage({
-        type: data.verified ? "success" : "error",
+        type: data.verified ? "success" : data.warning ? "warning" : "error",
         text: data.verified
           ? data.settings.customDomainStatus === "active"
             ? "DNS and Cloudflare certificate validation are complete. The domain is active."
             : "DNS looks correct. Cloudflare validation was refreshed and the domain is waiting on certificate activation."
-          : data.error ?? "DNS does not match the required target yet.",
+          : data.warning ?? data.error ?? "DNS does not match the required target yet.",
       });
     } catch (error) {
       setMessage({
@@ -2687,14 +2834,38 @@ function DashboardPageContent() {
     customDomainVerificationValue || cloudflareSaasCnameTarget || "";
   const hasSavedCustomDomain = customDomain.length > 0;
   const hasActiveCustomDomain = customDomainStatus === "active";
+  const customDomainLabelCount = normalizedCustomDomainInput
+    .split(".")
+    .filter(Boolean).length;
+  const inputLooksLikeApexCandidate =
+    normalizedCustomDomainInput.length > 0 &&
+    !normalizedCustomDomainInput.includes("/") &&
+    customDomainLabelCount === 2;
   const canVerifyCustomDomain =
     hasSavedCustomDomain &&
     !hasCustomDomainChanges &&
     customDomainStatus !== "active" &&
-    cloudflareSaasConfigured;
+    cloudflareSaasConfigured &&
+    Boolean(customDomainTargetHost);
+  const customDomainVerifyLabel = !cloudflareSaasConfigured
+    ? "Provider setup required"
+    : verifyingDomain
+      ? "Verifying…"
+      : "Verify DNS";
   const customDomainLastCheckedLabel = customDomainLastCheckedAt
     ? new Date(customDomainLastCheckedAt).toLocaleString()
     : null;
+  const customDomainTroubleshootingItems = getCustomDomainTroubleshootingItems({
+    cloudflareSaasConfigured,
+    customDomain: normalizedCustomDomainInput || customDomain,
+    customDomainTargetHost,
+    customDomainStatus,
+    customDomainDnsStatus,
+    customDomainProviderStatus,
+    customDomainSslStatus,
+    customDomainError,
+    diagnostics: customDomainDiagnostics,
+  });
   const billingIntervalForCards = selectedBillingInterval;
   const hasYearlyBillingOption = availableIntervals.includes("year");
   const activePlanPriceSuffix = formatPlanIntervalSuffix(billingIntervalForCards);
@@ -2853,7 +3024,9 @@ function DashboardPageContent() {
             className={`mb-6 rounded-xl border px-4 py-3 text-sm ${
               message.type === "success"
                 ? "border-emerald-500/25 bg-emerald-500/8 text-emerald-400"
-                : "border-red-500/25 bg-red-500/8 text-red-400"
+                : message.type === "warning"
+                  ? "border-amber-500/25 bg-amber-500/8 text-amber-200"
+                  : "border-red-500/25 bg-red-500/8 text-red-400"
             }`}
           >
             {message.text}
@@ -5626,13 +5799,55 @@ function DashboardPageContent() {
                 <h2 className="text-lg font-semibold">Deploy</h2>
               </div>
               <p className="text-sm text-gray-400 mb-5">
-                Customer-owned domains are provisioned through Cloudflare for SaaS. Save the hostname to create the custom hostname, point DNS at the CNAME target below, then verify until Cloudflare reports both hostname and SSL as active.
+                Launch scope is intentionally narrow for safety: users can connect subdomains like <code className="rounded bg-white/5 px-1.5 py-0.5 text-[#8ef6ff]">portfolio.example.com</code>. Root/apex domains stay behind a later milestone until they are fully implemented.
               </p>
+
+              <div className="mb-5 grid gap-3 md:grid-cols-4">
+                {[
+                  {
+                    step: "01",
+                    title: "Choose a subdomain",
+                    desc: "Use a hostname you control, not the root domain.",
+                  },
+                  {
+                    step: "02",
+                    title: "Save the request",
+                    desc: "LifePage provisions the managed hostname when Cloudflare SaaS is ready.",
+                  },
+                  {
+                    step: "03",
+                    title: "Add the CNAME",
+                    desc: "Point the requested hostname at the target shown below.",
+                  },
+                  {
+                    step: "04",
+                    title: "Verify and wait for SSL",
+                    desc: "DNS must match first. The domain only goes live after SSL is active too.",
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.step}
+                    className="rounded-xl border border-white/10 bg-white/[0.03] p-4"
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#00f5ff]">
+                      Step {item.step}
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-white">{item.title}</p>
+                    <p className="mt-2 text-xs leading-6 text-gray-400">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+
+              {!cloudflareSaasConfigured && (
+                <div className="mb-5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                  Managed domain provisioning is paused in this environment because the Cloudflare SaaS setup is incomplete. You can still save the requested hostname now; verification will stay paused until provider setup is finished.
+                </div>
+              )}
 
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-end">
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">
-                    Custom domain
+                    Requested subdomain
                   </label>
                   <input
                     value={customDomainInput}
@@ -5643,18 +5858,24 @@ function DashboardPageContent() {
                     spellCheck={false}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-[#00f5ff]/50 text-sm"
                   />
+                  <p className="mt-2 text-xs leading-6 text-gray-500">
+                    Example: <span className="text-[#8ef6ff]">portfolio.example.com</span>. Root domains like <span className="text-gray-300">example.com</span> are not part of this launch.
+                  </p>
+                  {inputLooksLikeApexCandidate && (
+                    <p className="mt-2 text-xs text-amber-200">
+                      That looks like an apex/root domain. Use a subdomain such as <span className="text-[#8ef6ff]">portfolio.{normalizedCustomDomainInput}</span> instead.
+                    </p>
+                  )}
                 </div>
 
                 <button
                   onClick={handleSaveCustomDomain}
                   disabled={
-                    savingSettings ||
-                    !hasCustomDomainChanges ||
-                    !cloudflareSaasConfigured
+                    savingSettings || !hasCustomDomainChanges
                   }
                   className="inline-flex items-center justify-center gap-2 bg-[#00f5ff] text-black px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#00e5ef] transition-colors disabled:opacity-50"
                 >
-                  Save Domain
+                  Save Hostname
                 </button>
 
                 <button
@@ -5662,7 +5883,7 @@ function DashboardPageContent() {
                   disabled={savingSettings || verifyingDomain || !canVerifyCustomDomain}
                   className="inline-flex items-center justify-center gap-2 border border-white/10 px-4 py-2.5 rounded-lg text-sm text-gray-200 hover:border-white/20 hover:bg-white/5 transition-colors disabled:opacity-50"
                 >
-                  {verifyingDomain ? "Verifying…" : "Verify DNS"}
+                  {customDomainVerifyLabel}
                 </button>
 
                 <button
@@ -5674,98 +5895,87 @@ function DashboardPageContent() {
                 </button>
               </div>
 
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="mt-5 grid gap-4 xl:grid-cols-2">
                 <div className="rounded-xl border border-white/10 bg-white/3 p-4 text-sm text-gray-400">
-                  <p className="font-medium text-white mb-2">Domain status</p>
+                  <p className="font-medium text-white mb-2">Requested domain</p>
+                  <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white">
+                    {normalizedCustomDomainInput || customDomain || "portfolio.example.com"}
+                  </p>
                   <div className="flex flex-wrap items-center gap-2">
                     <span
-                      className={`rounded-full border px-2.5 py-1 text-xs ${
-                        customDomainStatus === "active"
-                          ? "border-green-500/30 bg-green-500/10 text-green-300"
-                          : customDomainStatus === "verified"
-                            ? "border-[#00f5ff]/30 bg-[#00f5ff]/10 text-[#7ef4ff]"
-                            : customDomainStatus === "error"
-                              ? "border-red-500/30 bg-red-500/10 text-red-300"
-                              : "border-white/10 bg-white/5 text-gray-300"
-                      }`}
+                      className={`mt-3 rounded-full border px-2.5 py-1 text-xs ${getDomainStatusTone(customDomainStatus)}`}
                     >
                       {formatCustomDomainStatus(customDomainStatus)}
                     </span>
+                    <span
+                      className={`mt-3 rounded-full border px-2.5 py-1 text-xs ${getDomainStatusTone(customDomainDnsStatus)}`}
+                    >
+                      {formatCustomDomainDnsStatus(customDomainDnsStatus)}
+                    </span>
                     {customDomainLastCheckedLabel && (
-                      <span className="text-xs text-gray-500">
+                      <span className="mt-3 text-xs text-gray-500">
                         Last checked: {customDomainLastCheckedLabel}
-                      </span>
-                    )}
-                    {customDomainProviderId && (
-                      <span className="text-xs text-gray-500">
-                        Cloudflare ID: {customDomainProviderId}
                       </span>
                     )}
                   </div>
                   <p className="mt-3 leading-relaxed">
                     {getCustomDomainStatusCopy(customDomainStatus)}
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    {customDomainProviderStatus && (
+                  <p className="mt-3 text-xs leading-6 text-gray-500">
+                    Public traffic only switches over after both the Cloudflare hostname status and SSL status are active.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/3 p-4 text-sm text-gray-400">
+                  <p className="font-medium text-white mb-2">Required CNAME</p>
+                  <p className="leading-relaxed">
+                    Add a single CNAME for <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1.5 py-0.5 rounded">{customDomainVerificationName || normalizedCustomDomainInput || customDomain || "portfolio.example.com"}</code> that points to{" "}
+                    <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1.5 py-0.5 rounded">{customDomainTargetHost || "waiting for provider setup"}</code>.
+                  </p>
+                  <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-gray-300">
+                    <p>
+                      Record name:{" "}
+                      <code className="text-[#7ef4ff]">
+                        {customDomainVerificationName || normalizedCustomDomainInput || customDomain || "portfolio.example.com"}
+                      </code>
+                    </p>
+                    <p className="mt-1">
+                      Target value:{" "}
+                      <code className="text-[#7ef4ff]">
+                        {customDomainVerificationValue || customDomainTargetHost || "waiting for provider setup"}
+                      </code>
+                    </p>
+                  </div>
+                  {customDomainDiagnostics?.dns?.observedValues?.length ? (
+                    <p className="mt-3 text-xs leading-6 text-amber-100">
+                      DNS currently resolves to{" "}
+                      <span className="text-[#8ef6ff]">
+                        {customDomainDiagnostics.dns.observedValues.join(", ")}
+                      </span>.
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/3 p-4 text-sm text-gray-400">
+                  <p className="font-medium text-white mb-2">Verification and SSL</p>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-gray-300">
+                      Hostname {formatExternalStatusLabel(customDomainProviderStatus)}
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-gray-300">
+                      SSL {formatExternalStatusLabel(customDomainSslStatus)}
+                    </span>
+                    {customDomainProviderId && (
                       <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-gray-300">
-                        Hostname {formatExternalStatusLabel(customDomainProviderStatus)}
-                      </span>
-                    )}
-                    {customDomainSslStatus && (
-                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-gray-300">
-                        SSL {formatExternalStatusLabel(customDomainSslStatus)}
+                        Cloudflare ID {customDomainProviderId}
                       </span>
                     )}
                   </div>
-                  {customDomainError && (
-                    <p className="mt-3 text-xs text-red-300">
-                      {customDomainError}
+                  {customDomainProviderError && (
+                    <p className="mt-3 text-xs text-yellow-300">
+                      Cloudflare: {customDomainProviderError}
                     </p>
                   )}
-                  {customDomainProviderError &&
-                    customDomainProviderError !== customDomainError && (
-                      <p className="mt-2 text-xs text-yellow-300">
-                        Cloudflare: {customDomainProviderError}
-                      </p>
-                    )}
-                </div>
-
-                <div className="rounded-xl border border-white/10 bg-white/3 p-4 text-sm text-gray-400">
-                  <p className="font-medium text-white mb-2">DNS setup</p>
-                  {!cloudflareSaasConfigured && (
-                    <p className="mb-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-                      Cloudflare for SaaS is not configured in this environment yet. Set the Cloudflare SaaS env vars before saving or verifying customer domains.
-                    </p>
-                  )}
-                  <p className="leading-relaxed">
-                    Point <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1.5 py-0.5 rounded">{normalizedCustomDomainInput || customDomain || "portfolio.example.com"}</code> to
-                    {" "}
-                    <code className="text-[#00f5ff] bg-[#00f5ff]/10 px-1.5 py-0.5 rounded">{customDomainTargetHost || "not configured"}</code>.
-                    Use a CNAME record. Apex domains are intentionally out of scope for now.
-                  </p>
-                  {customDomainVerificationName && (
-                    <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-gray-300">
-                      <p>
-                        Record name:{" "}
-                        <code className="text-[#7ef4ff]">
-                          {customDomainVerificationName}
-                        </code>
-                      </p>
-                      <p className="mt-1">
-                        Target value:{" "}
-                        <code className="text-[#7ef4ff]">
-                          {customDomainVerificationValue || customDomainTargetHost}
-                        </code>
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-xl border border-white/10 bg-white/3 p-4 text-sm text-gray-400">
-                  <p className="font-medium text-white mb-2">Behavior</p>
-                  <p className="leading-relaxed">
-                    Public resolution stays blocked until both the Cloudflare hostname status and SSL status are active. Verification refreshes Cloudflare validation after DNS is in place.
-                  </p>
                   {hasActiveCustomDomain && (
                     <a
                       href={`https://${customDomain}`}
@@ -5778,8 +5988,35 @@ function DashboardPageContent() {
                     </a>
                   )}
                   {hasSavedCustomDomain && !hasActiveCustomDomain && (
-                    <p className="mt-3 text-xs text-gray-500">
-                      The hostname is saved, but it will not resolve publicly until verification succeeds and activation completes.
+                    <p className="mt-3 text-xs text-gray-500 leading-6">
+                      The hostname is saved, but it will not resolve publicly until DNS is verified and SSL activation completes.
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/3 p-4 text-sm text-gray-400">
+                  <p className="font-medium text-white mb-2">Troubleshooting</p>
+                  <ul className="space-y-2 text-xs leading-6 text-gray-300">
+                    {customDomainTroubleshootingItems.map((item) => (
+                      <li key={item} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                        {item}
+                      </li>
+                    ))}
+                    {!customDomainTroubleshootingItems.length && (
+                      <li className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                        Save a subdomain to begin the launch-safe custom-domain flow.
+                      </li>
+                    )}
+                  </ul>
+                  {customDomainError && (
+                    <p
+                      className={`mt-3 text-xs ${
+                        customDomainStatus === "error"
+                          ? "text-red-300"
+                          : "text-amber-200"
+                      }`}
+                    >
+                      {customDomainError}
                     </p>
                   )}
                 </div>

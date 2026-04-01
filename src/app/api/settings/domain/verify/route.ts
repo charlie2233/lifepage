@@ -3,21 +3,18 @@ import { auth } from "@/lib/auth";
 import {
   CloudflareSaasError,
   createCloudflareCustomHostname,
-  extractCloudflareHostnameError,
   findCloudflareCustomHostnameByHostname,
-  getCloudflareSaasCnameTarget,
+  getCloudflareSaasCapability,
   getCloudflareCustomHostname,
-  isCloudflareSaasConfigured,
   refreshCloudflareCustomHostname,
   type CloudflareCustomHostname,
 } from "@/lib/cloudflare-saas";
-import {
-  buildCustomDomainVerificationRecord,
-  deriveCustomDomainLifecycleState,
-  normalizeCustomDomainProviderStatus,
-  normalizeCustomDomainSslStatus,
-} from "@/lib/custom-domain-lifecycle";
 import { prisma } from "@/lib/db";
+import {
+  buildManagedCustomDomainState,
+} from "@/lib/custom-domain-state";
+import { isE2ETestMode } from "@/lib/e2e-mode";
+import { logCustomDomainEvent } from "@/lib/custom-domain-observability";
 import { verifyCustomDomainDns } from "@/lib/domain-verification";
 
 function isProviderNotFound(error: unknown) {
@@ -41,40 +38,42 @@ function toVerifyErrorMessage(error: unknown) {
   };
 }
 
-function buildManagedCustomDomainUpdate(args: {
-  hostname: string;
-  providerHostname?: CloudflareCustomHostname | null;
-  dnsVerified: boolean;
-  customDomainError?: string | null;
-  lastCheckedAt: Date;
-  forceError?: boolean;
-}) {
-  const verification = buildCustomDomainVerificationRecord(args.hostname);
-  const providerError = extractCloudflareHostnameError(args.providerHostname);
-  const providerStatus = normalizeCustomDomainProviderStatus(
-    args.providerHostname?.status
+function shouldSimulateMissingCloudflareSetup(req: Request) {
+  return (
+    isE2ETestMode() &&
+    req.headers.get("x-e2e-cloudflare-saas")?.trim().toLowerCase() === "missing"
   );
-  const sslStatus = normalizeCustomDomainSslStatus(
-    args.providerHostname?.ssl?.status
-  );
+}
+
+function toVerifyUpdateData(
+  data: ReturnType<typeof buildManagedCustomDomainState>
+) {
+  return {
+    ...data,
+    customDomainDiagnostics: data.customDomainDiagnostics,
+  };
+}
+
+function buildStoredProviderHostname(
+  hostname: string,
+  settings?: {
+    customDomainProviderId?: string | null;
+    customDomainProviderStatus?: string | null;
+    customDomainSslStatus?: string | null;
+  } | null
+) {
+  if (!settings?.customDomainProviderId && !settings?.customDomainProviderStatus) {
+    return null;
+  }
 
   return {
-    customDomainStatus: deriveCustomDomainLifecycleState({
-      dnsVerified: args.dnsVerified,
-      providerStatus,
-      sslStatus,
-      providerError,
-      forceError: args.forceError,
-    }),
-    customDomainVerificationName: verification.name,
-    customDomainVerificationValue: verification.value,
-    customDomainProviderId: args.providerHostname?.id ?? null,
-    customDomainProviderStatus: providerStatus,
-    customDomainSslStatus: sslStatus,
-    customDomainProviderError: providerError,
-    customDomainLastCheckedAt: args.lastCheckedAt,
-    customDomainError: args.customDomainError ?? providerError ?? null,
-  };
+    id: settings.customDomainProviderId ?? "stored-provider-id",
+    hostname,
+    status: settings.customDomainProviderStatus ?? null,
+    ssl: {
+      status: settings.customDomainSslStatus ?? null,
+    },
+  } as CloudflareCustomHostname;
 }
 
 async function resolveProviderHostname(args: {
@@ -118,23 +117,14 @@ async function resolveProviderHostname(args: {
   return providerHostname;
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  if (!isCloudflareSaasConfigured()) {
-    return NextResponse.json(
-      {
-        error:
-          "Custom domains are unavailable until Cloudflare for SaaS is configured.",
-        cloudflareSaasConfigured: false,
-        cloudflareSaasCnameTarget: getCloudflareSaasCnameTarget(),
-      },
-      { status: 503 }
-    );
-  }
+  const cloudflareCapability = getCloudflareSaasCapability({
+    forceMissing: shouldSimulateMissingCloudflareSetup(req),
+  });
 
   const settings = await prisma.publicPageSettings.findUnique({
     where: { userId: session.user.id },
@@ -148,6 +138,43 @@ export async function POST() {
   }
 
   const verifiedAt = new Date();
+
+  if (!cloudflareCapability.configured) {
+    const warning =
+      "Verification is paused because Cloudflare for SaaS is not fully configured in this environment yet. The requested hostname is still saved locally.";
+    const storedProviderHostname = buildStoredProviderHostname(
+      settings.customDomainNormalized,
+      settings
+    );
+    const updated = await prisma.publicPageSettings.update({
+      where: { userId: session.user.id },
+      data: toVerifyUpdateData(
+        buildManagedCustomDomainState({
+          hostname: settings.customDomainNormalized,
+          providerHostname: storedProviderHostname,
+          dnsVerified: false,
+          dnsChecked: true,
+          cloudflareConfigured: false,
+          customDomainError: warning,
+          lastCheckedAt: verifiedAt,
+        })
+      ),
+    });
+
+    logCustomDomainEvent("verify-paused", {
+      userId: session.user.id,
+      hostname: settings.customDomainNormalized,
+      missingCloudflareConfig: cloudflareCapability.missing,
+    });
+
+    return NextResponse.json({
+      settings: updated,
+      verified: false,
+      warning,
+      cloudflareSaasConfigured: cloudflareCapability.configured,
+      cloudflareSaasCnameTarget: cloudflareCapability.cnameTarget,
+    });
+  }
 
   try {
     let providerHostname = await resolveProviderHostname({
@@ -166,16 +193,26 @@ export async function POST() {
         );
       } catch (error) {
         const { message, status } = toVerifyErrorMessage(error);
+        logCustomDomainEvent("verify-provider-refresh-failed", {
+          userId: session.user.id,
+          hostname: settings.customDomainNormalized,
+          providerId: providerHostname.id,
+          message,
+        });
         const updated = await prisma.publicPageSettings.update({
           where: { userId: session.user.id },
-          data: buildManagedCustomDomainUpdate({
-            hostname: settings.customDomainNormalized,
-            providerHostname,
-            dnsVerified: true,
-            customDomainError: message,
-            lastCheckedAt: verifiedAt,
-            forceError: true,
-          }),
+          data: toVerifyUpdateData(
+            buildManagedCustomDomainState({
+              hostname: settings.customDomainNormalized,
+              providerHostname,
+              dnsVerified: true,
+              dnsChecked: true,
+              cloudflareConfigured: cloudflareCapability.configured,
+              customDomainError: message,
+              lastCheckedAt: verifiedAt,
+              forceError: true,
+            })
+          ),
         });
 
         return NextResponse.json(
@@ -183,8 +220,8 @@ export async function POST() {
             settings: updated,
             verified: false,
             error: message,
-            cloudflareSaasConfigured: isCloudflareSaasConfigured(),
-            cloudflareSaasCnameTarget: getCloudflareSaasCnameTarget(),
+            cloudflareSaasConfigured: cloudflareCapability.configured,
+            cloudflareSaasCnameTarget: cloudflareCapability.cnameTarget,
           },
           { status }
         );
@@ -193,34 +230,58 @@ export async function POST() {
 
     const updated = await prisma.publicPageSettings.update({
       where: { userId: session.user.id },
-      data: buildManagedCustomDomainUpdate({
-        hostname: settings.customDomainNormalized,
-        providerHostname,
-        dnsVerified: dnsVerification.ok,
-        customDomainError: dnsVerification.ok ? null : dnsVerification.error,
-        lastCheckedAt: verifiedAt,
-        forceError: !dnsVerification.ok,
-      }),
+      data: toVerifyUpdateData(
+        buildManagedCustomDomainState({
+          hostname: settings.customDomainNormalized,
+          providerHostname,
+          dnsVerified: dnsVerification.ok,
+          dnsChecked: true,
+          dnsObservedValues: dnsVerification.observedValues,
+          cloudflareConfigured: cloudflareCapability.configured,
+          customDomainError: dnsVerification.ok ? null : dnsVerification.error,
+          lastCheckedAt: verifiedAt,
+          forceError: !dnsVerification.ok,
+        })
+      ),
+    });
+
+    logCustomDomainEvent(dnsVerification.ok ? "verify-completed" : "verify-dns-mismatch", {
+      userId: session.user.id,
+      hostname: settings.customDomainNormalized,
+      providerId: providerHostname.id,
+      dnsVerified: dnsVerification.ok,
+      observedValues: dnsVerification.observedValues,
+      providerStatus: providerHostname.status ?? null,
+      sslStatus: providerHostname.ssl?.status ?? null,
     });
 
     return NextResponse.json({
       settings: updated,
       verified: dnsVerification.ok,
-      error: dnsVerification.ok ? null : dnsVerification.error,
-      cloudflareSaasConfigured: isCloudflareSaasConfigured(),
-      cloudflareSaasCnameTarget: getCloudflareSaasCnameTarget(),
+      warning: dnsVerification.ok ? null : dnsVerification.error,
+      cloudflareSaasConfigured: cloudflareCapability.configured,
+      cloudflareSaasCnameTarget: cloudflareCapability.cnameTarget,
     });
   } catch (error) {
     const { message, status } = toVerifyErrorMessage(error);
+    logCustomDomainEvent("verify-failed", {
+      userId: session.user.id,
+      hostname: settings.customDomainNormalized,
+      message,
+    });
     const updated = await prisma.publicPageSettings.update({
       where: { userId: session.user.id },
-      data: buildManagedCustomDomainUpdate({
-        hostname: settings.customDomainNormalized,
-        dnsVerified: false,
-        customDomainError: message,
-        lastCheckedAt: verifiedAt,
-        forceError: true,
-      }),
+      data: toVerifyUpdateData(
+        buildManagedCustomDomainState({
+          hostname: settings.customDomainNormalized,
+          dnsVerified: false,
+          dnsChecked: true,
+          cloudflareConfigured: cloudflareCapability.configured,
+          customDomainError: message,
+          lastCheckedAt: verifiedAt,
+          forceError: true,
+        })
+      ),
     });
 
     return NextResponse.json(
@@ -228,8 +289,8 @@ export async function POST() {
         settings: updated,
         verified: false,
         error: message,
-        cloudflareSaasConfigured: isCloudflareSaasConfigured(),
-        cloudflareSaasCnameTarget: getCloudflareSaasCnameTarget(),
+        cloudflareSaasConfigured: cloudflareCapability.configured,
+        cloudflareSaasCnameTarget: cloudflareCapability.cnameTarget,
       },
       { status }
     );
