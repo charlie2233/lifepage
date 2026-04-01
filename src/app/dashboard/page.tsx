@@ -5,11 +5,13 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
+import { TrackPageView } from "@/components/track-page-view";
 import {
   encodeAgentFocusValue,
   parseAgentFocusValue,
   type AgentFocusSelection,
 } from "@/lib/agent-focus";
+import { trackProductEvent } from "@/lib/analytics-client";
 import type { PublicPageVisibility } from "@/lib/page-visibility";
 import { normalizeVisibility } from "@/lib/page-visibility";
 import {
@@ -31,6 +33,7 @@ import {
   Bot,
   BriefcaseBusiness,
   ChartColumn,
+  CheckCircle2,
   Clapperboard,
   Clock3,
   ExternalLink,
@@ -519,6 +522,45 @@ function splitCrawlInput(value: string) {
     .split(/[\n,]+/)
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+const CRAWL_EXAMPLE_GROUPS = [
+  {
+    label: "Student / admissions",
+    urls: [
+      "https://your-site.com",
+      "https://github.com/yourname",
+      "https://drive.google.com/...",
+    ],
+  },
+  {
+    label: "Builder / job search",
+    urls: [
+      "https://portfolio.example.com",
+      "https://github.com/yourname",
+      "https://www.youtube.com/@yourname",
+    ],
+  },
+  {
+    label: "Creator / founder",
+    urls: [
+      "https://yourname.com",
+      "https://docs.example.com/case-study",
+      "https://youtube.com/@yourbrand",
+    ],
+  },
+] as const;
+
+function formatUiError(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  return fallback;
 }
 
 function normalizeOptionalFormValue(value: string) {
@@ -2545,7 +2587,13 @@ function DashboardPageContent() {
 
   const handleCrawl = async () => {
     const requestedUrls = splitCrawlInput(urlInput);
-    if (requestedUrls.length === 0) return;
+    if (requestedUrls.length === 0) {
+      setMessage({
+        type: "error",
+        text: "Paste at least one URL to import. A homepage, GitHub profile, or project page is the best first step.",
+      });
+      return;
+    }
 
     setCrawling(true);
     setMessage(null);
@@ -2565,21 +2613,27 @@ function DashboardPageContent() {
 
       const successText =
         crawledItems.length === 1
-          ? `Crawled ${crawledItems[0]?.title ?? requestedUrls[0]}`
-          : `Crawled ${crawledItems.length} sources`;
+          ? `Imported ${crawledItems[0]?.title ?? requestedUrls[0]}`
+          : `Imported ${crawledItems.length} sources`;
       const failureText =
         failedResults.length > 0
-          ? ` ${failedResults.length} failed.`
+          ? ` ${failedResults.length} source${failedResults.length === 1 ? "" : "s"} still need attention.`
           : "";
 
       setMessage({
         type: "success",
-        text: `${successText}.${failureText}`,
+        text: `${successText}.${failureText} Review the imported proof below, then generate the profile.`,
       });
       setUrlInput("");
       await fetchData();
     } catch (err) {
-      setMessage({ type: "error", text: String(err) });
+      setMessage({
+        type: "error",
+        text: formatUiError(
+          err,
+          "LifePage could not import those sources yet. Check that the URLs are public and try again."
+        ),
+      });
     } finally {
       setCrawling(false);
     }
@@ -2600,11 +2654,17 @@ function DashboardPageContent() {
       if (data.billing) setBilling(data.billing);
       setMessage({
         type: "success",
-        text: "Profile generated. Check your public page.",
+        text: "Profile generated. Review the public page and resume view next.",
       });
       setActiveTab("profile");
     } catch (err) {
-      setMessage({ type: "error", text: String(err) });
+      setMessage({
+        type: "error",
+        text: formatUiError(
+          err,
+          "Profile generation failed. Check your evidence and try again."
+        ),
+      });
     } finally {
       setGenerating(false);
     }
@@ -2668,10 +2728,19 @@ function DashboardPageContent() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen bg-[#080d10] flex items-center justify-center">
-        <div className="inline-flex items-center gap-3 text-white/80">
-          <LoaderCircle className="h-5 w-5 animate-spin text-[#00f5ff]" />
-          <span className="animate-pulse">Loading dashboard...</span>
+      <div className="min-h-screen bg-[#080d10] px-6 py-10 text-white">
+        <div className="mx-auto max-w-5xl animate-pulse space-y-6">
+          <div className="h-8 w-48 rounded-full bg-white/8" />
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.12fr)_minmax(280px,0.88fr)]">
+            <div className="h-40 rounded-[1.75rem] border border-white/10 bg-white/5" />
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              <div className="h-28 rounded-[1.5rem] border border-white/10 bg-white/5" />
+              <div className="h-28 rounded-[1.5rem] border border-white/10 bg-white/5" />
+              <div className="h-28 rounded-[1.5rem] border border-white/10 bg-white/5" />
+            </div>
+          </div>
+          <div className="h-12 w-96 rounded-xl bg-white/5" />
+          <div className="h-72 rounded-[1.75rem] border border-white/10 bg-white/5" />
         </div>
       </div>
     );
@@ -2802,6 +2871,25 @@ function DashboardPageContent() {
     : evidence.length > 0
       ? "Ready to generate"
       : "Waiting for proof";
+  const isFirstRun = evidence.length === 0 && !profile;
+  const canGenerateProfile = generating || evidence.length > 0 || Boolean(userInfo.bio.trim());
+  const onboardingSteps = [
+    {
+      title: "Add 2-3 strong URLs",
+      description: "Start with a homepage, repo, or proof-heavy project page.",
+      done: evidence.length > 0 || urlInput.trim().length > 0,
+    },
+    {
+      title: "Review imported evidence",
+      description: "Keep what is useful, hide the noise, and make sure screenshots landed.",
+      done: evidence.length > 0,
+    },
+    {
+      title: "Generate the public page",
+      description: "LifePage turns the evidence into a headline, projects, and resume view.",
+      done: Boolean(profile),
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-[#080d10] text-white"
@@ -2809,6 +2897,10 @@ function DashboardPageContent() {
         backgroundImage: "radial-gradient(circle at 15% 15%, rgba(0,245,255,0.06), transparent 35%), radial-gradient(circle at 85% 80%, rgba(121,229,210,0.05), transparent 30%)",
       }}
     >
+      <TrackPageView
+        event="dashboard_onboarding_viewed"
+        metadata={{ firstRun: isFirstRun }}
+      />
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/8 bg-[#080d10]/80 px-6 py-4 backdrop-blur-2xl flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5 text-xl font-bold">
@@ -2950,6 +3042,53 @@ function DashboardPageContent() {
         {/* CRAWL TAB */}
         {activeTab === "crawl" && (
           <div className="space-y-8">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
+                <p className="text-xs uppercase tracking-[0.18em] text-[#00f5ff]">
+                  First-run checklist
+                </p>
+                <div className="mt-4 space-y-3">
+                  {onboardingSteps.map((step) => (
+                    <div
+                      key={step.title}
+                      className="flex items-start gap-3 rounded-xl border border-white/10 bg-black/10 px-4 py-3"
+                    >
+                      <CheckCircle2
+                        className={`mt-0.5 h-4 w-4 ${step.done ? "text-[#79e5d2]" : "text-gray-600"}`}
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-white">{step.title}</p>
+                        <p className="mt-1 text-xs leading-6 text-gray-400">
+                          {step.description}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
+                <p className="text-xs uppercase tracking-[0.18em] text-[#00f5ff]">
+                  What the first version includes
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  {[
+                    "A sharper headline and about section",
+                    "Project cards with proof and screenshots",
+                    "A public profile page you can share",
+                    "A separate resume view with PDF export",
+                  ].map((item) => (
+                    <div
+                      key={item}
+                      className="rounded-xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-gray-200"
+                    >
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             {/* URL Crawler */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
               <div className="mb-2 flex items-center gap-2">
@@ -2957,9 +3096,10 @@ function DashboardPageContent() {
                 <h2 className="text-lg font-semibold">Import proof from the web</h2>
               </div>
               <p className="text-gray-400 text-sm mb-4">
-                Paste one or many URLs and LifePage will crawl each source,
-                capture screenshots, and turn the useful signal into portfolio-ready proof.
-                Google Sites roots also expand into linked pages from the same site.
+                Paste the URLs that best prove your work. LifePage crawls each
+                source, captures screenshots, and turns the useful signal into
+                portfolio-ready evidence. Google Sites roots also expand into
+                linked pages from the same site.
               </p>
               <div className="mb-3 flex flex-wrap gap-2">
                 {["Multiple URLs", "GitHub + websites", "YouTube + docs", "Google Sites roots"].map((item) => (
@@ -2969,6 +3109,24 @@ function DashboardPageContent() {
                   >
                     {item}
                   </span>
+                ))}
+              </div>
+              <div className="mb-4 flex flex-wrap gap-2">
+                {CRAWL_EXAMPLE_GROUPS.map((group) => (
+                  <button
+                    key={group.label}
+                    type="button"
+                    onClick={() => {
+                      setUrlInput(group.urls.join("\n"));
+                      trackProductEvent("dashboard_onboarding_viewed", {
+                        firstRun: isFirstRun,
+                        exampleSet: group.label,
+                      });
+                    }}
+                    className="rounded-full border border-[#00f5ff]/15 bg-[#00f5ff]/8 px-3 py-1.5 text-xs text-[#9ceeff] transition-colors hover:bg-[#00f5ff]/12"
+                  >
+                    Use {group.label} examples
+                  </button>
                 ))}
               </div>
               <div className="flex flex-col gap-3 md:flex-row">
@@ -3008,6 +3166,25 @@ function DashboardPageContent() {
               <p className="mt-3 text-xs text-gray-500">
                 Use one URL per line or separate them with commas. Press Cmd/Ctrl + Enter to start.
               </p>
+              {crawling && (
+                <div className="mt-4 rounded-2xl border border-[#00f5ff]/15 bg-[#00f5ff]/6 p-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-white">
+                    <LoaderCircle className="h-4 w-4 animate-spin text-[#00f5ff]" />
+                    Importing your proof
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-gray-300 sm:grid-cols-3">
+                    <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
+                      Fetching the page
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
+                      Capturing screenshots
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
+                      Saving evidence cards
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Links */}
@@ -3110,7 +3287,7 @@ function DashboardPageContent() {
             </div>
 
             {/* Evidence Items */}
-            {evidence.length > 0 && (
+            {evidence.length > 0 ? (
               <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
                 <div className="mb-4 flex items-center gap-2">
                   <FolderOpen className="h-[18px] w-[18px] text-[#00f5ff]" />
@@ -3133,6 +3310,8 @@ function DashboardPageContent() {
                         <img
                           src={item.screenshot}
                           alt={item.title ?? "screenshot"}
+                          loading="lazy"
+                          decoding="async"
                           className="w-24 h-16 object-cover rounded-lg border border-white/10 flex-shrink-0"
                         />
                       )}
@@ -3209,19 +3388,57 @@ function DashboardPageContent() {
                   ))}
                 </div>
               </div>
+            ) : (
+              <div className="bg-white/5 border border-dashed border-white/10 rounded-2xl p-6 backdrop-blur-sm">
+                <div className="mx-auto max-w-2xl text-center">
+                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                    <FolderOpen className="h-6 w-6 text-[#00f5ff]" />
+                  </div>
+                  <h2 className="text-lg font-semibold text-white">No imported proof yet</h2>
+                  <p className="mt-2 text-sm leading-7 text-gray-400">
+                    Start with the pages that show the strongest signal. A personal
+                    site, GitHub profile, project write-up, or demo page is usually enough
+                    to generate the first version.
+                  </p>
+                </div>
+              </div>
             )}
 
             {/* Generate Button */}
-            <div className="flex justify-center pt-4">
-              <button
-                onClick={handleGenerate}
-                disabled={
-                  generating || (evidence.length === 0 && !userInfo.bio)
-                }
-                className="inline-flex items-center gap-2 bg-[#00f5ff] text-black px-12 py-4 rounded-full text-lg font-semibold hover:bg-[#00c8d4] transition-colors disabled:opacity-50"
-              >
-                {generating
-                  ? (
+            <div className="rounded-[1.75rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] p-6 text-center backdrop-blur-sm">
+              <p className="text-xs uppercase tracking-[0.18em] text-[#00f5ff]">
+                Step 3
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold text-white">
+                Generate the first public version
+              </h2>
+              <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-gray-400">
+                LifePage will synthesize the imported proof into a headline, about
+                section, projects, and resume framing you can refine from there.
+              </p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {[
+                  "Headline",
+                  "About section",
+                  "Project cards",
+                  "Resume bullets",
+                  "Public page",
+                ].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-gray-300"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={handleGenerate}
+                  disabled={generating || !canGenerateProfile}
+                  className="inline-flex items-center gap-2 bg-[#00f5ff] text-black px-12 py-4 rounded-full text-lg font-semibold hover:bg-[#00c8d4] transition-colors disabled:opacity-50"
+                >
+                  {generating ? (
                     <>
                       <LoaderCircle className="h-5 w-5 animate-spin" />
                       Generating your profile...
@@ -3232,14 +3449,27 @@ function DashboardPageContent() {
                       Generate My Profile
                     </>
                   )}
-              </button>
+                </button>
+              </div>
+              {!canGenerateProfile && (
+                <p className="mt-4 text-sm text-gray-500">
+                  Crawl at least one URL or add a short bio before generating.
+                </p>
+              )}
+              {generating && (
+                <div className="mt-5 grid gap-2 text-xs text-gray-300 sm:grid-cols-3">
+                  <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
+                    Writing the headline
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
+                    Structuring case studies
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
+                    Preparing the resume view
+                  </div>
+                </div>
+              )}
             </div>
-            {evidence.length === 0 && !userInfo.bio && (
-              <p className="text-center text-gray-500 text-sm">
-                Crawl at least one URL or fill in your bio to generate your
-                profile.
-              </p>
-            )}
           </div>
         )}
 
@@ -3506,13 +3736,13 @@ function DashboardPageContent() {
                   No profile generated yet
                 </h3>
                 <p className="text-gray-400 mb-6">
-                  Go to the Crawl tab, add some URLs, and click Generate.
+                  Import a few strong URLs first, then generate the first public version from that evidence.
                 </p>
                 <button
                   onClick={() => setActiveTab("crawl")}
                   className="inline-flex items-center gap-2 bg-[#00f5ff] text-black px-6 py-2.5 rounded-full font-medium"
                 >
-                  Start crawling
+                  Start onboarding
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { getBillingSnapshot, reserveAiModel } from "@/lib/billing";
 import { prisma } from "@/lib/db";
 import { generateProfileFromCrawl, generateProfileFromText } from "@/lib/ai";
+import { recordProductEvent } from "@/lib/product-analytics";
 import type { CrawlResult } from "@/lib/crawler";
 
 interface RequestBody {
@@ -30,6 +31,15 @@ export async function POST(req: Request) {
 
     const evidenceItems = await prisma.evidenceItem.findMany({
       where: { userId: session.user.id, visible: true },
+    });
+    await recordProductEvent({
+      event: "generate_profile_started",
+      path: "/dashboard",
+      userId: session.user.id,
+      metadata: {
+        evidenceCount: evidenceItems.length,
+        hasBio: Boolean(userInfo?.bio?.trim()),
+      },
     });
 
     let profileData;
@@ -66,8 +76,20 @@ export async function POST(req: Request) {
         name: userInfo?.name,
       }, aiReservation.model, aiReservation.clientConfig, aiReservation.maxTokens);
     } else {
+      await recordProductEvent({
+        event: "generate_profile_failed",
+        path: "/dashboard",
+        userId: session.user.id,
+        metadata: {
+          evidenceCount: evidenceItems.length,
+          reason: "no_input",
+        },
+      });
       return NextResponse.json(
-        { error: "No evidence or bio provided" },
+        {
+          error:
+            "Add at least one evidence source or a short bio before generating your first profile.",
+        },
         { status: 400 }
       );
     }
@@ -103,10 +125,41 @@ export async function POST(req: Request) {
     }
 
     const billing = await getBillingSnapshot(session.user.id);
+    await recordProductEvent({
+      event: "generate_profile_succeeded",
+      path: "/dashboard",
+      userId: session.user.id,
+      metadata: {
+        evidenceCount: evidenceItems.length,
+        projectCount:
+          typeof profileData === "object" &&
+          profileData &&
+          "projects" in profileData &&
+          Array.isArray(profileData.projects)
+            ? profileData.projects.length
+            : null,
+      },
+    });
 
     return NextResponse.json({ profile, billing });
   } catch (err) {
     console.error("Generate error:", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    await recordProductEvent({
+      event: "generate_profile_failed",
+      path: "/dashboard",
+      userId: session.user.id,
+      metadata: {
+        reason: err instanceof Error ? err.message : String(err),
+      },
+    });
+    return NextResponse.json(
+      {
+        error:
+          err instanceof Error
+            ? err.message
+            : "Profile generation failed. Try again after checking your evidence and bio.",
+      },
+      { status: 500 }
+    );
   }
 }

@@ -4,10 +4,13 @@ import type {
   EvidenceItem as PrismaEvidenceItem,
   UserProfile,
 } from "@prisma/client";
+import { PublicShareActions } from "@/components/public-share-actions";
 import { PublicPageNav } from "@/components/public-page-nav";
+import { StructuredData } from "@/components/structured-data";
+import { TrackPageView } from "@/components/track-page-view";
 import type { ProfileJSON } from "@/lib/schema";
 import type { PublicPageUser } from "@/lib/public-page";
-import { resolvePublicPageMode } from "@/lib/public-page";
+import { buildPublicPageModeHref, resolvePublicPageMode } from "@/lib/public-page";
 import { normalizeVisibility } from "@/lib/page-visibility";
 import { resolvePortfolioTheme } from "@/lib/portfolio-themes";
 import { normalizeProjectMedia } from "@/lib/project-media";
@@ -158,6 +161,32 @@ export function PublicProfilePage({
     (mode === "hiring"
       ? "Reach out for roles, collaborations, or product conversations."
       : "Reach out for applications, mentorship, collaborations, or long-term opportunities.");
+  const profileHref = buildPublicPageModeHref(basePath, mode);
+  const resumeHref = buildPublicPageModeHref(
+    basePath === "/" ? "/resume" : `${basePath}/resume`,
+    mode
+  );
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: user.name ?? username,
+    alternateName: `@${username}`,
+    description: profileData?.headline,
+    url: profileHref,
+    sameAs: [
+      userProfile?.website,
+      userProfile?.github,
+      userProfile?.linkedin,
+      userProfile?.youtube,
+    ].filter(Boolean),
+    knowsAbout: profileData?.skills?.map((skill) => skill.tag).slice(0, 12),
+    hasPart: profileData?.projects?.slice(0, 4).map((project) => ({
+      "@type": "CreativeWork",
+      name: project.title,
+      description: project.impact ?? project.problem ?? project.approach ?? "",
+      url: project.links?.[0]?.url,
+    })),
+  };
   const formatContactHref = (value: string, type: "email" | "phone" | "url") => {
     if (type === "email") {
       return `mailto:${value}`;
@@ -200,6 +229,11 @@ export function PublicProfilePage({
 
   return (
     <div className="portfolio-body min-h-screen" style={pageStyle}>
+      <TrackPageView
+        event="public_profile_viewed"
+        metadata={{ username, mode }}
+      />
+      <StructuredData data={structuredData} />
       {resolvedTheme.isDark && (
         <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
           <div
@@ -426,6 +460,32 @@ export function PublicProfilePage({
                   </div>
                 </div>
               </div>
+
+              <div className="rounded-[2rem] border p-5" style={panelStyle}>
+                <p className="lp-kicker text-[11px]" style={accentStyle}>
+                  Share & resume
+                </p>
+                <div className="mt-4 rounded-[1.25rem] border p-4" style={statTileStyle}>
+                  <p className="text-xs uppercase tracking-[0.14em]" style={mutedStyle}>
+                    Proof attached
+                  </p>
+                  <p className="mt-2 text-sm leading-7">
+                    {proofGallery.length > 0
+                      ? `${proofGallery.length} screenshot${proofGallery.length === 1 ? "" : "s"} and source links make this page easier to trust at a glance.`
+                      : "This page can add more screenshots and source links to strengthen the proof layer."}
+                  </p>
+                </div>
+                <PublicShareActions
+                  alternateHref={resumeHref}
+                  alternateLabel="Resume view"
+                  copyEvent="profile_copy_link_clicked"
+                  currentViewLabel="portfolio"
+                  downloadHref={`/api/resume?username=${encodeURIComponent(username)}`}
+                  mutedColor={resolvedTheme.muted}
+                  outlineButtonStyle={outlineButtonStyle}
+                  shareEvent="profile_share_clicked"
+                />
+              </div>
             </aside>
           </section>
 
@@ -513,7 +573,7 @@ export function PublicProfilePage({
                         <video
                           controls
                           playsInline
-                          preload="metadata"
+                          preload="none"
                           poster={projectVideo.posterUrl ?? undefined}
                           className={`w-full bg-black object-cover object-top ${
                             resolvedTheme.projectLayout === "feature"
@@ -529,6 +589,8 @@ export function PublicProfilePage({
                         <img
                           src={evidence.screenshot}
                           alt={project.title}
+                          loading="lazy"
+                          decoding="async"
                           className={`w-full object-cover object-top ${
                             resolvedTheme.projectLayout === "feature"
                               ? "h-64"
@@ -539,9 +601,23 @@ export function PublicProfilePage({
                         />
                       ) : null}
                       <div className={projectCardPaddingClass}>
-                        <h3 className="text-2xl font-semibold tracking-tight">
-                          {project.title}
-                        </h3>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <h3 className="text-2xl font-semibold tracking-tight">
+                            {project.title}
+                          </h3>
+                          <div className="flex flex-wrap gap-2">
+                            {evidence ? (
+                              <span className="rounded-full border px-3 py-1 text-[11px]" style={chipStyle}>
+                                Proof linked
+                              </span>
+                            ) : null}
+                            {project.links?.length ? (
+                              <span className="rounded-full border px-3 py-1 text-[11px]" style={chipStyle}>
+                                {project.links.length} source{project.links.length === 1 ? "" : "s"}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
                         {projectVideo ? (
                           <p className="mt-3 text-xs uppercase tracking-[0.18em]" style={accentStyle}>
                             Demo video
@@ -615,6 +691,23 @@ export function PublicProfilePage({
                                 <ExternalLink className="h-3.5 w-3.5" />
                               </a>
                             ))}
+                          </div>
+                        )}
+                        {evidence?.url && (
+                          <div className="mt-4 rounded-[1.1rem] border p-3" style={statTileStyle}>
+                            <p className="text-xs uppercase tracking-[0.14em]" style={mutedStyle}>
+                              Evidence source
+                            </p>
+                            <a
+                              href={evidence.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-flex items-center gap-2 text-sm hover:underline"
+                              style={accentStyle}
+                            >
+                              {evidence.title ?? evidence.url}
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
                           </div>
                         )}
                       </div>
@@ -965,6 +1058,9 @@ export function PublicProfilePage({
                 <h2 className="brand-display mt-2 text-4xl tracking-tight">
                   Proof Gallery
                 </h2>
+                <p className="mt-3 max-w-lg text-sm leading-7" style={mutedStyle}>
+                  Screenshots and linked sources make the work easier to audit and easier to share.
+                </p>
               </div>
 
               <div className={proofGridClass}>
@@ -987,6 +1083,8 @@ export function PublicProfilePage({
                     <img
                       src={item.screenshot!}
                       alt={item.title ?? "project screenshot"}
+                      loading="lazy"
+                      decoding="async"
                       className={`w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04] ${
                         resolvedTheme.proofLayout === "spotlight" && index === 0
                           ? "h-60"

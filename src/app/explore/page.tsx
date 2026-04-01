@@ -4,14 +4,25 @@ import { ArrowRight, ArrowUpRight, Compass, Globe, Sparkles } from "lucide-react
 import { prisma } from "@/lib/db";
 import { getDemoExploreProfiles } from "@/lib/demo-public-pages";
 import { resolvePortfolioTheme } from "@/lib/portfolio-themes";
+import { SITE_NAME, absoluteUrl } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Explore Personal Brands — LifePage",
+  title: "Explore Personal Brands",
   description:
     "Browse public personal brand sites, proof-driven portfolios, and resume-ready launches built with LifePage.",
+  alternates: {
+    canonical: absoluteUrl("/explore"),
+  },
+  openGraph: {
+    title: `Explore Personal Brands — ${SITE_NAME}`,
+    description:
+      "Browse public personal brand sites, proof-driven portfolios, and resume-ready launches built with LifePage.",
+    url: absoluteUrl("/explore"),
+    images: [absoluteUrl("/og-lifepage.svg")],
+  },
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 600;
 
 interface ProfileData {
   headline?: string;
@@ -227,6 +238,8 @@ export default async function ExplorePage() {
                         <img
                           src={profile.screenshot}
                           alt={`${profile.name}'s portfolio`}
+                          loading="lazy"
+                          decoding="async"
                           className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]"
                         />
                       </div>
