@@ -1,0 +1,91 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="72" y1="56" x2="1116" y2="590" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#071017"/>
+      <stop offset="0.55" stop-color="#0C1820"/>
+      <stop offset="1" stop-color="#142531"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="92" y2="92" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#79E5D2"/>
+      <stop offset="1" stop-color="#CFFFF6"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="250" y1="178" x2="898" y2="404" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#79E5D2"/>
+      <stop offset="0.35" stop-color="#B9FFF1"/>
+      <stop offset="0.65" stop-color="#8FA9FF"/>
+      <stop offset="1" stop-color="#F3B276"/>
+    </linearGradient>
+    <filter id="blurA" x="-102" y="-70" width="512" height="512" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur stdDeviation="55" result="effect1_foregroundBlur_1_2"/>
+    </filter>
+    <filter id="blurB" x="781" y="277" width="440" height="440" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur stdDeviation="55" result="effect1_foregroundBlur_1_2"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" rx="36" fill="url(#bg)"/>
+  <g opacity="0.75" filter="url(#blurA)">
+    <circle cx="154" cy="186" r="101" fill="#79E5D2" fill-opacity="0.35"/>
+  </g>
+  <g opacity="0.75" filter="url(#blurB)">
+    <circle cx="1001" cy="497" r="70" fill="#8FA9FF" fill-opacity="0.4"/>
+  </g>
+
+  <rect x="72" y="68" width="86" height="86" rx="28" fill="url(#mark)"/>
+  <text x="115" y="123" text-anchor="middle" fill="#061218" font-size="38" font-weight="700" font-family="Arial, sans-serif">L</text>
+
+  <text x="185" y="104" fill="#F8F3EA" font-size="42" font-weight="700" font-family="Arial, sans-serif">LifePage</text>
+  <text x="186" y="136" fill="#93A5B0" font-size="20" font-weight="500" font-family="Arial, sans-serif">AI Personal Brand Builder</text>
+
+  <text x="72" y="270" fill="#F8F3EA" font-size="72" font-weight="700" font-family="Arial, sans-serif">
+    <tspan x="72" dy="0">Turn proof of your work</tspan>
+    <tspan x="72" dy="84">into a portfolio people trust.</tspan>
+  </text>
+
+  <text x="72" y="430" fill="#A8B8C1" font-size="28" font-weight="500" font-family="Arial, sans-serif">
+    <tspan x="72" dy="0">Import real URLs, capture screenshots, generate a public page,</tspan>
+    <tspan x="72" dy="40">and export a resume that actually matches the story.</tspan>
+  </text>
+
+  <g>
+    <rect x="72" y="512" width="214" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.14"/>
+    <text x="179" y="543" text-anchor="middle" fill="#D7E1E6" font-size="20" font-weight="500" font-family="Arial, sans-serif">Import real URLs</text>
+  </g>
+  <g>
+    <rect x="304" y="512" width="230" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.14"/>
+    <text x="419" y="543" text-anchor="middle" fill="#D7E1E6" font-size="20" font-weight="500" font-family="Arial, sans-serif">Capture screenshots</text>
+  </g>
+  <g>
+    <rect x="552" y="512" width="252" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.14"/>
+    <text x="678" y="543" text-anchor="middle" fill="#D7E1E6" font-size="20" font-weight="500" font-family="Arial, sans-serif">Generate public page</text>
+  </g>
+  <g>
+    <rect x="822" y="512" width="306" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.14"/>
+    <text x="975" y="543" text-anchor="middle" fill="#D7E1E6" font-size="20" font-weight="500" font-family="Arial, sans-serif">Export a cleaner resume</text>
+  </g>
+
+  <rect x="788" y="84" width="340" height="328" rx="30" fill="#0A1115" fill-opacity="0.88" stroke="#FFFFFF" stroke-opacity="0.08"/>
+  <text x="826" y="126" fill="#94A2AD" font-size="18" font-weight="500" font-family="Arial, sans-serif">Live preview</text>
+  <text x="826" y="166" fill="#F7F1E8" font-size="34" font-weight="700" font-family="Arial, sans-serif">/u/alexchen</text>
+  <rect x="1008" y="116" width="88" height="34" rx="17" fill="#10B981" fill-opacity="0.12" stroke="#10B981" stroke-opacity="0.35"/>
+  <text x="1052" y="138" text-anchor="middle" fill="#B8F5D6" font-size="16" font-weight="600" font-family="Arial, sans-serif">Public</text>
+
+  <rect x="826" y="196" width="264" height="164" rx="22" fill="#79E5D2" fill-opacity="0.08" stroke="#FFFFFF" stroke-opacity="0.08"/>
+  <circle cx="874" cy="246" r="24" fill="url(#mark)"/>
+  <text x="914" y="240" fill="#F7F1E8" font-size="24" font-weight="700" font-family="Arial, sans-serif">Alex Chen</text>
+  <text x="914" y="272" fill="#91A0AA" font-size="18" font-weight="500" font-family="Arial, sans-serif">Full-stack engineer building AI products</text>
+  <rect x="850" y="302" width="64" height="42" rx="16" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.08"/>
+  <rect x="928" y="302" width="64" height="42" rx="16" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.08"/>
+  <rect x="1006" y="302" width="64" height="42" rx="16" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.08"/>
+  <text x="882" y="328" text-anchor="middle" fill="#F7F1E8" font-size="18" font-weight="700" font-family="Arial, sans-serif">12</text>
+  <text x="960" y="328" text-anchor="middle" fill="#F7F1E8" font-size="18" font-weight="700" font-family="Arial, sans-serif">4</text>
+  <text x="1038" y="328" text-anchor="middle" fill="#F7F1E8" font-size="18" font-weight="700" font-family="Arial, sans-serif">18</text>
+
+  <text x="826" y="470" fill="url(#accent)" font-size="22" font-weight="600" font-family="Arial, sans-serif">
+    Proof-linked projects • Resume view • Share-ready public page
+  </text>
+</svg>
