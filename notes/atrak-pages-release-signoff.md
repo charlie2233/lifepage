@@ -37,6 +37,8 @@ Record the final successful timestamps and operator initials here before launch.
 - `npm run build`: passed on 2026-04-01 with expected local DB fallback warnings for sitemap and explore generation
 - `npm run cf:build`: passed on 2026-04-01 with the same local DB fallback warnings
 - `npm run test:e2e:ci`: blocked on 2026-04-01 because authenticated flows crash out of the dev server and surface `ERR_CONNECTION_REFUSED`
+- `npm run cf:deploy`: blocked on 2026-04-01 because the Worker exceeds the Cloudflare free-plan 3 MiB size limit
+- Vercel launch attempt: blocked on 2026-04-01 because no production-ready remote Postgres or readable Stripe/R2/Cloudflare production secrets are available in the repo or shell environment
 
 ## Provider state before cutover
 
@@ -47,6 +49,8 @@ Record the final successful timestamps and operator initials here before launch.
 - `lifepage.one` redirect active: `TBD`
 - Stripe production webhook verified: `TBD`
 - Cloudflare for SaaS env configured in production: `TBD`
+- Existing Cloudflare Worker service `lifepage-web` has all required secret names configured, but those values are not readable from this session
+- Existing `workers.dev` host is still serving a stale LifePage build, not the current Atrak Pages release branch
 
 ## Go / no-go criteria
 
@@ -59,6 +63,9 @@ Record the final successful timestamps and operator initials here before launch.
 ## Open blocker
 
 - Resolve the Playwright release-gate failure before launch. The unauthenticated redirect spec passes, but authenticated flows currently fail after sign-in with `ERR_CONNECTION_REFUSED`, which implies the local Next dev server drops during the authenticated E2E run.
+- Provision a remotely reachable production Postgres for Vercel or export the existing Worker `DATABASE_URL` into Vercel manually.
+- Provide readable Stripe, R2, and Cloudflare for SaaS production env values for Vercel, or keep launch off Vercel.
+- Upgrade the Cloudflare account to a paid Workers plan or reduce the bundle under 3 MiB if Workers remains the only viable production host.
 
 ## Launch decision
 

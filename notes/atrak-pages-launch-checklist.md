@@ -19,6 +19,8 @@ Release branch: `release/atrak-pages-launch`
 - PR #19: hosting contingency memo
 
 See also: [`notes/domain-transition-plan.md`](./domain-transition-plan.md)
+See also: [`notes/production-env-matrix.md`](./production-env-matrix.md)
+See also: [`notes/incident-checklist.md`](./incident-checklist.md)
 
 ## Current provider state
 
@@ -56,6 +58,12 @@ Optional but recommended:
 
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_BROWSER_RENDERING_TOKEN`
+
+Critical operator note:
+
+- The local repo does **not** currently contain a remotely usable production `DATABASE_URL`.
+- `/Users/hanfei/My_portforlio/.env.local` points at `localhost:5432`, which cannot work on Vercel.
+- Do not start a Vercel launch until the real production secrets are exported from the existing infrastructure or entered manually.
 
 ### 3. Deploy and smoke test the Vercel preview
 
@@ -130,6 +138,11 @@ If the Vercel cutover fails:
 3. If you already moved `lifepage.one`, point or forward it back to the fallback page or temporarily leave it detached while the app issue is corrected.
 4. Redeploy the last known-good Vercel deployment or pause the custom-domain announcement.
 5. If needed, fall back to the in-repo Cloudflare Workers contingency path after env validation.
+
+Current contingency blocker:
+
+- As of 2026-04-01, the release branch Worker bundle exceeds the Cloudflare free-plan 3 MiB Worker size limit.
+- A real Worker launch from this branch requires either a paid Workers plan or further bundle reduction.
 
 If the brand rename needs to be rolled back:
 
