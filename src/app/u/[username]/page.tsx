@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url: absoluteUrl(`/u/${username}`),
       images: [
         {
-          url: absoluteUrl("/og-lifepage.svg"),
+          url: absoluteUrl("/og-atrak-pages.svg"),
           width: 1200,
           height: 630,
           alt: `${user.name ?? username} portfolio preview`,
@@ -50,7 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       card: "summary_large_image",
       title: `${user.name ?? username} — ${SITE_NAME}`,
       description: profile?.headline ?? `Portfolio of ${username}`,
-      images: [absoluteUrl("/og-lifepage.svg")],
+      images: [absoluteUrl("/og-atrak-pages.svg")],
     },
   };
 }

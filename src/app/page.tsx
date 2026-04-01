@@ -56,7 +56,7 @@ const DEFAULT_METADATA: Metadata = {
     url: absoluteUrl("/"),
     images: [
       {
-        url: absoluteUrl("/og-lifepage.svg"),
+        url: absoluteUrl("/og-atrak-pages.svg"),
         width: 1200,
         height: 630,
         alt: `${SITE_NAME} open graph image`,
@@ -67,7 +67,7 @@ const DEFAULT_METADATA: Metadata = {
     card: "summary_large_image",
     title: `${SITE_NAME} — ${SITE_TAGLINE}`,
     description: SITE_DESCRIPTION,
-    images: [absoluteUrl("/og-lifepage.svg")],
+    images: [absoluteUrl("/og-atrak-pages.svg")],
   },
 };
 
@@ -122,7 +122,7 @@ const HOW_IT_WORKS: Array<{
     step: "02",
     icon: Bot,
     title: "Shape the narrative",
-    desc: "LifePage reads the evidence, extracts the signal, and turns it into a portfolio story, resume, and positioning.",
+    desc: "Atrak Pages reads the evidence, extracts the signal, and turns it into a portfolio story, resume, and positioning.",
     color: "#7c3aed",
   },
   {
@@ -147,7 +147,7 @@ const FEATURES: Array<{
   { icon: FileText, title: "Resume System", desc: "Publish a separate resume page and export a polished PDF when you need it." },
   { icon: Palette, title: "Portfolio Models", desc: "Choose from 30 preset portfolio directions or let the agent reshape the UI for you." },
   { icon: ChartColumn, title: "Narrative Outputs", desc: "Generate timelines, scripts, trees, and structured brand artifacts from the same evidence." },
-  { icon: LayoutGrid, title: "Explore Feed", desc: "Browse public LifePage launches and study how others frame their work and identity." },
+  { icon: LayoutGrid, title: "Explore Feed", desc: "Browse public Atrak Pages launches and study how others frame their work and identity." },
 ];
 
 const WHO_ITS_FOR: Array<{
@@ -192,7 +192,7 @@ const TRUST_PILLARS: Array<{
   {
     icon: Link2,
     title: "Grounded in real evidence",
-    desc: "LifePage works from URLs, screenshots, and public proof instead of asking you to write everything from scratch.",
+    desc: "Atrak Pages works from URLs, screenshots, and public proof instead of asking you to write everything from scratch.",
   },
   {
     icon: Images,
@@ -256,7 +256,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   if (!user) {
     return {
-      title: "Portfolio not found — LifePage",
+      title: "Portfolio not found — Atrak Pages",
       description: hostname
         ? `No public portfolio is connected to ${hostname}.`
         : DEFAULT_METADATA.description,
@@ -268,7 +268,7 @@ export async function generateMetadata(): Promise<Metadata> {
     | undefined;
 
   return {
-    title: `${user.name ?? user.username ?? "Portfolio"} — LifePage`,
+    title: `${user.name ?? user.username ?? "Portfolio"} — Atrak Pages`,
     description: profile?.headline ?? DEFAULT_METADATA.description,
     openGraph: {
       title: `${user.name ?? user.username ?? "Portfolio"} — ${SITE_NAME}`,
@@ -319,12 +319,10 @@ function LandingPage() {
       <nav className="relative z-10 border-b border-white/8 bg-[#091015]/75 backdrop-blur-2xl">
         <div className="lp-shell flex items-center justify-between py-5">
           <div className="flex items-center gap-3">
-            <div className="animate-pulse-glow flex h-10 w-10 items-center justify-center rounded-2xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[11px] font-black tracking-[0.24em] text-[#041117]">
-              LP
-            </div>
+            <div className="animate-pulse-glow flex h-10 w-10 items-center justify-center rounded-2xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[11px] font-black tracking-[0.24em] text-[#041117]">AP</div>
             <div>
               <p className="brand-display text-[1.35rem] leading-none tracking-tight">
-                LifePage
+                Atrak Pages
               </p>
               <p className="lp-kicker mt-1 text-[10px] text-[#94a2ad]">
                 Brand, proof, deploy
@@ -381,7 +379,7 @@ function LandingPage() {
             </h1>
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-[#a4b1ba] sm:text-xl">
-              Paste your site, GitHub, demos, or school project links. LifePage
+              Paste your site, GitHub, demos, or school project links. Atrak Pages
               crawls the proof, captures screenshots, writes the story, and ships
               a public portfolio plus a cleaner resume view you can share right away.
             </p>
@@ -404,7 +402,7 @@ function LandingPage() {
             </div>
 
             <p className="mt-4 max-w-xl text-sm leading-7 text-[#91a1ab]">
-              Best first run: bring 3 links that show your best work. LifePage
+              Best first run: bring 3 links that show your best work. Atrak Pages
               does the first synthesis, and you keep editing from there.
             </p>
 
@@ -561,7 +559,7 @@ function LandingPage() {
               </h2>
             </div>
             <p className="max-w-xl text-base leading-7 text-[#97a4ae]">
-              LifePage is strongest when it makes the underlying work easier to trust:
+              Atrak Pages is strongest when it makes the underlying work easier to trust:
               clear sources, visible screenshots, and a resume that matches the page.
             </p>
           </div>
@@ -782,7 +780,7 @@ function LandingPage() {
               </h2>
             </div>
             <p className="max-w-lg text-base leading-7 text-[#97a4ae]">
-              LifePage is opinionated about audiences that most portfolio tools flatten:
+              Atrak Pages is opinionated about audiences that most portfolio tools flatten:
               creators, applicants, professionals, and people documenting a life in motion.
             </p>
           </div>
@@ -911,12 +909,10 @@ function LandingPage() {
       <footer className="relative z-10 border-t border-white/8 py-8">
         <div className="lp-shell flex flex-col gap-4 text-sm text-[#8f9ca6] sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[10px] font-black tracking-[0.2em] text-[#041117]">
-              LP
-            </div>
+            <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[10px] font-black tracking-[0.2em] text-[#041117]">AP</div>
             <div>
               <p className="brand-display text-lg leading-none text-[#f7f1e8]">
-                LifePage
+                Atrak Pages
               </p>
               <p className="mt-1 text-xs text-[#8f9ca6]">
                 Personal brand builder for people with proof

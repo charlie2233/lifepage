@@ -171,7 +171,7 @@ export function getCustomDomainNextAction(args: {
   requestedHostname: string;
 }) {
   if (!args.cloudflareConfigured) {
-    return "LifePage saved the requested hostname locally, but provisioning is paused until the Cloudflare for SaaS setup is completed for this environment.";
+    return "Atrak Pages saved the requested hostname locally, but provisioning is paused until the Cloudflare for SaaS setup is completed for this environment.";
   }
 
   if (args.lifecycleStatus === "active") {

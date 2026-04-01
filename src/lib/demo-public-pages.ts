@@ -75,14 +75,14 @@ const DEMO_PUBLIC_PROFILE_DEFINITIONS: DemoPublicProfileDefinition[] = [
       ],
       projects: [
         {
-          title: "LifePage",
+          title: "Atrak Pages",
           problem: "Resumes and scattered links undersell a person’s actual work.",
           approach:
             "Built an AI-powered portfolio workflow that crawls links, structures proof, and deploys a branded public page.",
           impact:
             "Created a faster way for students and builders to present themselves online with real proof.",
           tech: ["Next.js", "TypeScript", "Prisma", "OpenAI"],
-          links: [{ label: "Website", url: "https://lifepage.app" }],
+          links: [{ label: "Website", url: "https://pages.atrak.dev" }],
           media: [],
           evidenceRefs: [],
         },

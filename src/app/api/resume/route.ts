@@ -123,7 +123,7 @@ export async function GET(req: Request) {
     const resumeData = buildResumeData({
       email: resolvedUser.email,
       includeEmail: isOwner,
-      name: resolvedUser.name ?? resolvedUser.username ?? "LifePage User",
+      name: resolvedUser.name ?? resolvedUser.username ?? "Atrak Pages User",
       publicContactEmail: resolvedUser.profile?.contactEmail,
       profile: parsedProfile.data,
       profileLinks: resolvedUser.profile,

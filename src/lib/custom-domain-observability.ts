@@ -3,7 +3,7 @@ export function logCustomDomainEvent(
   details: Record<string, unknown>
 ) {
   console.info(
-    "[lifepage custom domain]",
+    "[atrak-pages custom domain]",
     JSON.stringify({
       event,
       at: new Date().toISOString(),

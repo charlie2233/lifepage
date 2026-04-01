@@ -33,7 +33,7 @@ export async function POST(req: Request) {
         {
           error:
             duplicateField === "email"
-              ? "That email already has a LifePage account."
+              ? "That email already has an Atrak Pages account."
               : "That username is already taken. Try another public handle.",
         },
         { status: 400 }

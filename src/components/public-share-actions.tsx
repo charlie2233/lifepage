@@ -36,7 +36,7 @@ export function PublicShareActions({
       try {
         await navigator.share({
           title: document.title,
-          text: `Check out this LifePage ${currentViewLabel}.`,
+          text: `Check out this Atrak Pages ${currentViewLabel}.`,
           url: window.location.href,
         });
         return;

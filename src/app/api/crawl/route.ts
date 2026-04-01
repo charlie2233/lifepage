@@ -53,7 +53,7 @@ function normalizeUrl(url: string) {
   try {
     parsed = new URL(candidate);
   } catch {
-    throw new Error(`Invalid URL: ${url}. Include the full page or domain you want LifePage to import.`);
+    throw new Error(`Invalid URL: ${url}. Include the full page or domain you want Atrak Pages to import.`);
   }
 
   if (!["http:", "https:"].includes(parsed.protocol)) {
@@ -214,7 +214,7 @@ export async function POST(req: Request) {
         {
           error:
             errors.slice(0, 3).join("; ") ||
-            "LifePage could not import those sources. Try a different page or verify the URLs are public.",
+            "Atrak Pages could not import those sources. Try a different page or verify the URLs are public.",
           results,
         },
         { status }

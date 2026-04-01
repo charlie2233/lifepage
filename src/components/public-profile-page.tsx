@@ -220,7 +220,7 @@ export function PublicProfilePage({
             Brand page coming soon
           </h1>
           <p className="mt-3 text-base leading-7" style={mutedStyle}>
-            @{username} is still shaping this LifePage and has not published the full story yet.
+            @{username} is still shaping this Atrak Pages profile and has not published the full story yet.
           </p>
         </div>
       </div>
@@ -1114,7 +1114,7 @@ export function PublicProfilePage({
         style={{ borderTopColor: resolvedTheme.footerBorder }}
       >
         <div className="lp-shell text-center text-xs" style={mutedStyle}>
-          Built with LifePage personal brand studio · Powered by AI ·{" "}
+          Built with Atrak Pages personal brand studio · Powered by AI ·{" "}
           <a
             href="https://atrak.dev"
             target="_blank"

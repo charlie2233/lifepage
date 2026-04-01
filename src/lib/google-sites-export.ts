@@ -205,7 +205,7 @@ export function buildGoogleSitesHtml(data: GoogleSitesExportData) {
   <body>
     <div class="page">
       <section class="hero">
-        <span class="eyebrow">Exported from LifePage</span>
+        <span class="eyebrow">Exported from Atrak Pages</span>
         <h1>${escapeHtml(data.name)}</h1>
         <p class="headline">${escapeHtml(data.headline)}</p>
         <p class="summary">${escapeHtml(data.about)}</p>

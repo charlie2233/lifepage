@@ -67,11 +67,9 @@ function RegisterPageContent() {
       <div className="relative mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-6xl items-center gap-8 lg:grid-cols-[minmax(0,1.08fr)_minmax(380px,0.92fr)]">
         <section className="hidden lg:block">
           <Link href="/" className="inline-flex items-center gap-2.5">
-            <div className="animate-pulse-glow flex h-9 w-9 items-center justify-center rounded-xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[10px] font-black tracking-[0.22em] text-[#041117]">
-              LP
-            </div>
+            <div className="animate-pulse-glow flex h-9 w-9 items-center justify-center rounded-xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[10px] font-black tracking-[0.22em] text-[#041117]">AP</div>
             <span className="brand-display text-[1.4rem] leading-none tracking-tight text-white">
-              LifePage
+              Atrak Pages
             </span>
           </Link>
 
@@ -86,7 +84,7 @@ function RegisterPageContent() {
               </span>
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-8 text-[#8ea0aa]">
-              LifePage works best when you already have a few real links. Bring a
+              Atrak Pages works best when you already have a few real links. Bring a
               homepage, a project or repo, and one proof-heavy page like docs,
               video, or a demo.
             </p>
@@ -102,7 +100,7 @@ function RegisterPageContent() {
               {
                 icon: Sparkles,
                 title: "Generate the story",
-                desc: "LifePage shapes the headline, about section, case studies, and resume bullets.",
+                desc: "Atrak Pages shapes the headline, about section, case studies, and resume bullets.",
               },
               {
                 icon: Search,
@@ -151,11 +149,9 @@ function RegisterPageContent() {
         <div className="relative w-full max-w-xl justify-self-center lg:max-w-none">
           <div className="mb-8 text-center lg:hidden">
             <Link href="/" className="inline-flex items-center gap-2.5">
-              <div className="animate-pulse-glow flex h-9 w-9 items-center justify-center rounded-xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[10px] font-black tracking-[0.22em] text-[#041117]">
-                LP
-              </div>
+              <div className="animate-pulse-glow flex h-9 w-9 items-center justify-center rounded-xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[10px] font-black tracking-[0.22em] text-[#041117]">AP</div>
               <span className="brand-display text-[1.4rem] leading-none tracking-tight text-white">
-                LifePage
+                Atrak Pages
               </span>
             </Link>
             <p className="mt-3 text-sm text-[#7a8d98]">
@@ -257,7 +253,7 @@ function RegisterPageContent() {
                 <div className="mt-3 space-y-2">
                   {[
                     "Paste a few URLs that show your best work.",
-                    "LifePage crawls the sources and captures screenshots.",
+                    "Atrak Pages crawls the sources and captures screenshots.",
                     "Generate a public profile and resume view from the evidence.",
                   ].map((step) => (
                     <div key={step} className="flex items-start gap-2 text-sm text-[#cbd5db]">

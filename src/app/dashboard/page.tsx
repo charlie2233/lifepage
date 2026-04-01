@@ -663,7 +663,7 @@ function formatCustomDomainStatus(status: CustomDomainStatus) {
 function getCustomDomainStatusCopy(status: CustomDomainStatus) {
   switch (status) {
     case "configuration_required":
-      return "The hostname is saved, but LifePage cannot provision or verify it from this environment until the Cloudflare SaaS provider setup is completed.";
+      return "The hostname is saved, but Atrak Pages cannot provision or verify it from this environment until the Cloudflare SaaS provider setup is completed.";
     case "pending_verification":
       return "Cloudflare has the hostname provisioned, but DNS is not pointing at the required CNAME target yet.";
     case "verified":
@@ -720,7 +720,7 @@ function getCustomDomainTroubleshootingItems(args: {
 
   if (!args.cloudflareSaasConfigured) {
     items.push(
-      "LifePage is missing part of its Cloudflare SaaS setup in this environment. The hostname is stored locally, but provisioning and verification are paused."
+      "Atrak Pages is missing part of its Cloudflare SaaS setup in this environment. The hostname is stored locally, but provisioning and verification are paused."
     );
     if (!args.customDomainTargetHost) {
       items.push(
@@ -1593,7 +1593,7 @@ const TAB_COPY: Record<
     eyebrow: "Import",
     title: "Bring proof in from the web",
     summary:
-      "Collect URLs, screenshots, and source material so LifePage has real evidence to work from.",
+      "Collect URLs, screenshots, and source material so Atrak Pages has real evidence to work from.",
   },
   profile: {
     eyebrow: "Profile",
@@ -1710,7 +1710,7 @@ const DEFAULT_PERSONA_SKILL_OPTIONS: AgentSkillOption[] = [
     id: "auto",
     label: "Auto",
     category: "persona",
-    description: "Let LifeAgent choose the expert mode.",
+    description: "Let the Atrak Pages agent choose the expert mode.",
   },
 ];
 
@@ -1719,7 +1719,7 @@ const DEFAULT_WORKFLOW_SKILL_OPTIONS: AgentSkillOption[] = [
     id: "auto",
     label: "Auto",
     category: "workflow",
-    description: "Let LifeAgent choose the workflow.",
+    description: "Let the Atrak Pages agent choose the workflow.",
   },
 ];
 
@@ -2778,7 +2778,7 @@ function DashboardPageContent() {
         type: "error",
         text: formatUiError(
           err,
-          "LifePage could not import those sources yet. Check that the URLs are public and try again."
+          "Atrak Pages could not import those sources yet. Check that the URLs are public and try again."
         ),
       });
     } finally {
@@ -3057,7 +3057,7 @@ function DashboardPageContent() {
     },
     {
       title: "Generate the public page",
-      description: "LifePage turns the evidence into a headline, projects, and resume view.",
+      description: "Atrak Pages turns the evidence into a headline, projects, and resume view.",
       done: Boolean(profile),
     },
   ];
@@ -3076,10 +3076,10 @@ function DashboardPageContent() {
       <header className="sticky top-0 z-50 border-b border-white/8 bg-[#080d10]/80 px-6 py-4 backdrop-blur-2xl flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5 text-xl font-bold">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[linear-gradient(135deg,rgba(0,245,255,0.9),rgba(121,229,210,0.85))] text-xs font-black text-black shadow-[0_6px_20px_rgba(0,245,255,0.25)]">
-            LP
+            AP
           </span>
           <span>
-            Life<span className="text-[#00f5ff]">Page</span>
+            Atrak <span className="text-[#00f5ff]">Pages</span>
           </span>
         </Link>
         <div className="flex items-center gap-4">
@@ -3269,7 +3269,7 @@ function DashboardPageContent() {
                 <h2 className="text-lg font-semibold">Import proof from the web</h2>
               </div>
               <p className="text-gray-400 text-sm mb-4">
-                Paste the URLs that best prove your work. LifePage crawls each
+                Paste the URLs that best prove your work. Atrak Pages crawls each
                 source, captures screenshots, and turns the useful signal into
                 portfolio-ready evidence. Google Sites roots also expand into
                 linked pages from the same site.
@@ -3586,7 +3586,7 @@ function DashboardPageContent() {
                 Generate the first public version
               </h2>
               <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-gray-400">
-                LifePage will synthesize the imported proof into a headline, about
+                Atrak Pages will synthesize the imported proof into a headline, about
                 section, projects, and resume framing you can refine from there.
               </p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -4171,7 +4171,7 @@ function DashboardPageContent() {
                   </select>
                   <p className="mt-1 text-[11px] text-gray-500">
                     {selectedPersonaSkill?.description ??
-                      "LifeAgent picks the expert mode automatically."}
+                      "The Atrak Pages agent picks the expert mode automatically."}
                   </p>
                 </div>
 
@@ -4192,7 +4192,7 @@ function DashboardPageContent() {
                   </select>
                   <p className="mt-1 text-[11px] text-gray-500">
                     {selectedWorkflowSkill?.description ??
-                      "LifeAgent picks the workflow automatically."}
+                      "The Atrak Pages agent picks the workflow automatically."}
                   </p>
                 </div>
 
@@ -5617,7 +5617,7 @@ function DashboardPageContent() {
                 <h2 className="text-lg font-semibold">Agent Defaults</h2>
               </div>
               <p className="text-sm text-gray-400 mb-5">
-                Pin default expert and workflow skills for LifeAgent, and add a brand voice note the agent should keep in mind on every turn.
+                Pin default expert and workflow skills for the Atrak Pages agent, and add a brand voice note the agent should keep in mind on every turn.
               </p>
 
               <div className="grid gap-4 lg:grid-cols-2">
@@ -6042,7 +6042,7 @@ function DashboardPageContent() {
                   {
                     step: "02",
                     title: "Save the request",
-                    desc: "LifePage provisions the managed hostname when Cloudflare SaaS is ready.",
+                    desc: "Atrak Pages provisions the managed hostname when Cloudflare SaaS is ready.",
                   },
                   {
                     step: "03",

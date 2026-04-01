@@ -98,7 +98,7 @@ export function getStripe() {
 
   return new Stripe(secretKey, {
     appInfo: {
-      name: "LifePage",
+      name: "Atrak Pages",
       version: "0.1.0",
     },
   });

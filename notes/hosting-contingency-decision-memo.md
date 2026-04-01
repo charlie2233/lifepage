@@ -1,7 +1,7 @@
 # Hosting Contingency Decision Memo
 
 Date: 2026-03-31
-Audit basis: local branch `97c9b22` plus current official platform docs
+Audit basis: integrated repository state at the time of review plus current official platform docs
 
 ## Executive summary
 
@@ -59,7 +59,6 @@ Relevant files:
 - `scripts/cf-build.mjs`
 - `src/middleware.entry.ts`
 - `src/proxy.ts`
-- `src/middleware.ts` on newer local work
 
 Implication:
 

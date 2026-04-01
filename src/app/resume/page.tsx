@@ -31,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   if (!user) {
     return {
-      title: "Resume not found — LifePage",
+      title: "Resume not found — Atrak Pages",
       description: hostname
         ? `No public resume is connected to ${hostname}.`
         : "No public resume found.",

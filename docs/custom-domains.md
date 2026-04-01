@@ -2,14 +2,14 @@
 
 ## Launch scope
 
-- LifePage launch support is limited to user-owned subdomains such as `portfolio.example.com`.
+- Atrak Pages launch support is limited to user-owned subdomains such as `portfolio.example.com`.
 - Apex/root domains such as `example.com` are explicitly out of scope for this phase.
 - Public routing only activates when both the Cloudflare custom hostname status and SSL status are `active`.
 
 ## User flow
 
 1. User saves a requested hostname in the dashboard.
-2. LifePage provisions a Cloudflare custom hostname when the provider configuration is available.
+2. Atrak Pages provisions a Cloudflare custom hostname when the provider configuration is available.
 3. The dashboard shows the exact CNAME record name and target the user must configure.
 4. `Verify DNS` checks that the requested hostname points at the required target and refreshes Cloudflare validation.
 5. The dashboard continues to show lifecycle, DNS, hostname, and SSL state until the domain is fully active.
@@ -37,7 +37,7 @@
 
 - `PublicPageSettings.customDomainDiagnostics` stores the latest launch-safe diagnostic snapshot for a user domain.
 - `PublicPageSettings.customDomainDnsStatus` stores DNS state separately from the higher-level lifecycle status.
-- Domain actions emit structured logs prefixed with `[lifepage custom domain]`.
+- Domain actions emit structured logs prefixed with `[atrak-pages custom domain]`.
 
 Example SQL for operator inspection:
 

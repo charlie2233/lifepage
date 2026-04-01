@@ -377,6 +377,34 @@ export async function PATCH(req: Request) {
       }
 
       if (!cloudflareCapability.configured) {
+        const preservingManagedHostname =
+          Boolean(existingSettings?.customDomainProviderId) &&
+          Boolean(existingSettings?.customDomainNormalized) &&
+          existingSettings?.customDomainNormalized !== normalizedDomain;
+
+        if (preservingManagedHostname && existingSettings) {
+          const warning = `Cloudflare for SaaS is not fully configured in this environment yet, so Atrak Pages kept the existing managed hostname ${existingSettings.customDomainNormalized} in place. Restore provider access before swapping it to ${normalizedDomain}.`;
+          const settings = await prisma.publicPageSettings.update({
+            where: { userId: session.user.id },
+            data: updateData,
+          });
+
+          logCustomDomainEvent("save-deferred-swap-blocked", {
+            userId: session.user.id,
+            existingHostname: existingSettings.customDomainNormalized,
+            requestedHostname: normalizedDomain,
+            providerId: existingSettings.customDomainProviderId,
+            missingCloudflareConfig: cloudflareCapability.missing,
+          });
+
+          return NextResponse.json({
+            settings,
+            warning,
+            cloudflareSaasConfigured: cloudflareCapability.configured,
+            cloudflareSaasCnameTarget: cloudflareCapability.cnameTarget,
+          });
+        }
+
         const warning =
           "The hostname was saved locally, but Cloudflare for SaaS is not fully configured in this environment yet. Provisioning and verification will stay paused until the provider setup is completed.";
         const storedProviderHostname =

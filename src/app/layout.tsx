@@ -81,7 +81,7 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
     images: [
       {
-        url: absoluteUrl("/og-lifepage.svg"),
+        url: absoluteUrl("/og-atrak-pages.svg"),
         width: 1200,
         height: 630,
         alt: `${SITE_NAME} open graph image`,
@@ -92,7 +92,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: `${SITE_NAME} — ${SITE_TAGLINE}`,
     description: SITE_DESCRIPTION,
-    images: [absoluteUrl("/og-lifepage.svg")],
+    images: [absoluteUrl("/og-atrak-pages.svg")],
   },
   robots: {
     index: true,

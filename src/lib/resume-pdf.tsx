@@ -185,8 +185,8 @@ export function ResumePdfDocument({ resume }: { resume: ResumePdfData }) {
       title={`${resume.name} Resume`}
       author={resume.name}
       subject={resume.headline}
-      creator="LifePage"
-      producer="LifePage"
+      creator="Atrak Pages"
+      producer="Atrak Pages"
     >
       <Page size="LETTER" style={styles.page}>
         <View style={styles.header}>

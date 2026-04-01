@@ -20,4 +20,4 @@ Phase 2: Apex custom-domain support
 
 ## Current product rule
 
-Until this milestone is completed, LifePage only supports subdomain custom domains such as `portfolio.example.com`.
+Until this milestone is completed, Atrak Pages only supports subdomain custom domains such as `portfolio.example.com`.

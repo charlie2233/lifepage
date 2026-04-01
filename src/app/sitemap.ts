@@ -31,7 +31,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         username: { not: null },
         publicPageSettings: {
           is: {
-            visibility: { not: "private" },
+            visibility: "public",
           },
         },
       },

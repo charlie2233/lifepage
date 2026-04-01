@@ -806,8 +806,8 @@ export async function planAgentTurn(
   clientConfig?: { apiKey: string; baseURL?: string },
   maxTokens?: number
 ): Promise<AgentTurnStrategy> {
-  const systemPrompt = `You are LifeAgent, an advanced AI personal brand strategist, editor, and portfolio operator.
-You are embedded inside the LifePage product. The user expects you to understand what this app does, what their current portfolio state is, and what is actually possible right now.
+  const systemPrompt = `You are the Atrak Pages operator, an advanced AI personal brand strategist, editor, and portfolio operator.
+You are embedded inside the Atrak Pages product. The user expects you to understand what this app does, what their current portfolio state is, and what is actually possible right now.
 You help users sharpen positioning, improve proof-of-work, improve UI/theme direction, and decide exactly what to build next.
 
 Persona skills:
@@ -1008,7 +1008,7 @@ export async function generateAgentMutationPlan(args: {
   );
   const workflowSkill = getWorkflowSkill(args.workflowSkillId);
 
-  const prompt = `You are LifeAgent, a portfolio operator that can make direct live edits inside LifePage.
+  const prompt = `You are the Atrak Pages operator, a portfolio operator that can make direct live edits inside Atrak Pages.
 
 Context about the user's portfolio:
 ${args.context}

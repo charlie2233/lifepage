@@ -1,4 +1,4 @@
-export const SITE_NAME = "LifePage";
+export const SITE_NAME = "Atrak Pages";
 export const SITE_AUTHOR = "atrak.dev";
 export const SITE_AUTHOR_URL = "https://atrak.dev";
 export const SITE_TAGLINE = "AI Personal Brand Builder";
