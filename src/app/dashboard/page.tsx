@@ -3043,11 +3043,13 @@ function DashboardPageContent() {
       ? "Ready to generate"
       : "Waiting for proof";
   const isFirstRun = evidence.length === 0 && !profile;
+  const requestedImportCount = splitCrawlInput(urlInput).length;
+  const draftMode = evidence.length === 0 && Boolean(userInfo.bio.trim());
   const canGenerateProfile = generating || evidence.length > 0 || Boolean(userInfo.bio.trim());
   const onboardingSteps = [
     {
-      title: "Add 2-3 strong URLs",
-      description: "Start with a homepage, repo, or proof-heavy project page.",
+      title: "Import 2-3 strong links",
+      description: "Homepage, case study or repo, then one proof-heavy page like a demo, docs, or video.",
       done: evidence.length > 0 || urlInput.trim().length > 0,
     },
     {
@@ -3220,6 +3222,10 @@ function DashboardPageContent() {
                 <p className="text-xs uppercase tracking-[0.18em] text-[#00f5ff]">
                   First-run checklist
                 </p>
+                <p className="mt-3 text-sm leading-7 text-gray-400">
+                  Treat the first version like a launch, not a full setup session.
+                  Import proof first, confirm it landed, then generate the page.
+                </p>
                 <div className="mt-4 space-y-3">
                   {onboardingSteps.map((step) => (
                     <div
@@ -3242,7 +3248,10 @@ function DashboardPageContent() {
 
               <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
                 <p className="text-xs uppercase tracking-[0.18em] text-[#00f5ff]">
-                  What the first version includes
+                  What ships in the first version
+                </p>
+                <p className="mt-3 text-sm leading-7 text-gray-400">
+                  The goal is a page worth sharing on day one, not a perfect final draft.
                 </p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                   {[
@@ -3274,6 +3283,32 @@ function DashboardPageContent() {
                 portfolio-ready evidence. Google Sites roots also expand into
                 linked pages from the same site.
               </p>
+              <div className="mb-4 grid gap-3 md:grid-cols-3">
+                {[
+                  {
+                    label: "1. Homepage",
+                    detail: "The page that explains who you are and what you make.",
+                  },
+                  {
+                    label: "2. Project page",
+                    detail: "A repo, case study, or launch page with concrete execution detail.",
+                  },
+                  {
+                    label: "3. Proof link",
+                    detail: "A demo, docs page, video, or walkthrough that proves the work shipped.",
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className="rounded-xl border border-white/10 bg-black/10 px-4 py-3"
+                  >
+                    <p className="text-xs uppercase tracking-[0.16em] text-[#9ceeff]">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-gray-300">{item.detail}</p>
+                  </div>
+                ))}
+              </div>
               <div className="mb-3 flex flex-wrap gap-2">
                 {["Multiple URLs", "GitHub + websites", "YouTube + docs", "Google Sites roots"].map((item) => (
                   <span
@@ -3291,14 +3326,14 @@ function DashboardPageContent() {
                     type="button"
                     onClick={() => {
                       setUrlInput(group.urls.join("\n"));
-                      trackProductEvent("dashboard_onboarding_viewed", {
+                      trackProductEvent("crawl_example_set_used", {
                         firstRun: isFirstRun,
                         exampleSet: group.label,
                       });
                     }}
                     className="rounded-full border border-[#00f5ff]/15 bg-[#00f5ff]/8 px-3 py-1.5 text-xs text-[#9ceeff] transition-colors hover:bg-[#00f5ff]/12"
                   >
-                    Use {group.label} examples
+                    Use {group.label} starter set
                   </button>
                 ))}
               </div>
@@ -3343,8 +3378,11 @@ function DashboardPageContent() {
                 <div className="mt-4 rounded-2xl border border-[#00f5ff]/15 bg-[#00f5ff]/6 p-4">
                   <div className="flex items-center gap-2 text-sm font-medium text-white">
                     <LoaderCircle className="h-4 w-4 animate-spin text-[#00f5ff]" />
-                    Importing your proof
+                    Importing {requestedImportCount || 1} source{requestedImportCount === 1 ? "" : "s"}
                   </div>
+                  <p className="mt-2 text-xs leading-6 text-gray-300">
+                    If one source partially fails, the useful evidence still lands and you can keep going.
+                  </p>
                   <div className="mt-3 grid gap-2 text-xs text-gray-300 sm:grid-cols-3">
                     <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
                       Fetching the page
@@ -3360,104 +3398,124 @@ function DashboardPageContent() {
               )}
             </div>
 
-            {/* Links */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <Link2 className="h-[18px] w-[18px] text-[#00f5ff]" />
-                <h2 className="text-lg font-semibold">Social Links</h2>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                {(
-                  [
-                    {
-                      key: "github",
-                      label: "GitHub",
-                      placeholder: "https://github.com/yourname",
-                    },
-                    {
-                      key: "linkedin",
-                      label: "LinkedIn",
-                      placeholder: "https://linkedin.com/in/yourname",
-                    },
-                    {
-                      key: "youtube",
-                      label: "YouTube",
-                      placeholder: "https://youtube.com/@yourname",
-                    },
-                    {
-                      key: "drive",
-                      label: "Google Drive / Portfolio",
-                      placeholder: "https://drive.google.com/...",
-                    },
-                  ] as const
-                ).map((l) => (
-                  <div key={l.key}>
-                    <label className="block text-sm text-gray-400 mb-1">
-                      {l.label}
-                    </label>
-                    <input
-                      type="url"
-                      value={links[l.key]}
-                      onChange={(e) =>
-                        setLinks({ ...links, [l.key]: e.target.value })
-                      }
-                      placeholder={l.placeholder}
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-[#00f5ff]/50 text-sm"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
+            <details className="group rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-[#00f5ff]">
+                    Optional detail pass
+                  </p>
+                  <h2 className="mt-2 text-lg font-semibold text-white">
+                    Add social links and short context before generating
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-7 text-gray-400">
+                    Helpful, but not required for the first publish. If you are trying
+                    to move fast, import proof first and come back to this after the draft lands.
+                  </p>
+                </div>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300">
+                  Expand
+                </span>
+              </summary>
 
-            {/* User Info */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <User className="h-[18px] w-[18px] text-[#00f5ff]" />
-                <h2 className="text-lg font-semibold">About You</h2>
+              <div className="mt-6 space-y-6">
+                <div>
+                  <div className="mb-4 flex items-center gap-2">
+                    <Link2 className="h-[18px] w-[18px] text-[#00f5ff]" />
+                    <h2 className="text-lg font-semibold">Social Links</h2>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {(
+                      [
+                        {
+                          key: "github",
+                          label: "GitHub",
+                          placeholder: "https://github.com/yourname",
+                        },
+                        {
+                          key: "linkedin",
+                          label: "LinkedIn",
+                          placeholder: "https://linkedin.com/in/yourname",
+                        },
+                        {
+                          key: "youtube",
+                          label: "YouTube",
+                          placeholder: "https://youtube.com/@yourname",
+                        },
+                        {
+                          key: "drive",
+                          label: "Google Drive / Portfolio",
+                          placeholder: "https://drive.google.com/...",
+                        },
+                      ] as const
+                    ).map((l) => (
+                      <div key={l.key}>
+                        <label className="mb-1 block text-sm text-gray-400">
+                          {l.label}
+                        </label>
+                        <input
+                          type="url"
+                          value={links[l.key]}
+                          onChange={(e) =>
+                            setLinks({ ...links, [l.key]: e.target.value })
+                          }
+                          placeholder={l.placeholder}
+                          className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/50 focus:outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-4 flex items-center gap-2">
+                    <User className="h-[18px] w-[18px] text-[#00f5ff]" />
+                    <h2 className="text-lg font-semibold">About You</h2>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-1 block text-sm text-gray-400">
+                        Your Name
+                      </label>
+                      <input
+                        value={userInfo.name}
+                        onChange={(e) =>
+                          setUserInfo({ ...userInfo, name: e.target.value })
+                        }
+                        placeholder="Alex Chen"
+                        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/50 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm text-gray-400">
+                        Short Bio / Context
+                      </label>
+                      <textarea
+                        value={userInfo.bio}
+                        onChange={(e) =>
+                          setUserInfo({ ...userInfo, bio: e.target.value })
+                        }
+                        placeholder="CS student at MIT, built 3 startups, won 2 hackathons..."
+                        rows={3}
+                        className="w-full resize-none rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/50 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm text-gray-400">
+                        Tags / Roles
+                      </label>
+                      <input
+                        value={userInfo.tags}
+                        onChange={(e) =>
+                          setUserInfo({ ...userInfo, tags: e.target.value })
+                        }
+                        placeholder="Full-Stack Developer, ML Engineer, Designer..."
+                        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-gray-600 focus:border-[#00f5ff]/50 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">
-                    Your Name
-                  </label>
-                  <input
-                    value={userInfo.name}
-                    onChange={(e) =>
-                      setUserInfo({ ...userInfo, name: e.target.value })
-                    }
-                    placeholder="Alex Chen"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-[#00f5ff]/50 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">
-                    Short Bio / Context
-                  </label>
-                  <textarea
-                    value={userInfo.bio}
-                    onChange={(e) =>
-                      setUserInfo({ ...userInfo, bio: e.target.value })
-                    }
-                    placeholder="CS student at MIT, built 3 startups, won 2 hackathons..."
-                    rows={3}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-[#00f5ff]/50 text-sm resize-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">
-                    Tags / Roles
-                  </label>
-                  <input
-                    value={userInfo.tags}
-                    onChange={(e) =>
-                      setUserInfo({ ...userInfo, tags: e.target.value })
-                    }
-                    placeholder="Full-Stack Developer, ML Engineer, Designer..."
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-[#00f5ff]/50 text-sm"
-                  />
-                </div>
-              </div>
-            </div>
+            </details>
 
             {/* Evidence Items */}
             {evidence.length > 0 ? (
@@ -3573,6 +3631,22 @@ function DashboardPageContent() {
                     site, GitHub profile, project write-up, or demo page is usually enough
                     to generate the first version.
                   </p>
+                  <div className="mt-5 flex flex-wrap justify-center gap-2">
+                    {CRAWL_EXAMPLE_GROUPS.map((group) => (
+                      <button
+                        key={group.label}
+                        type="button"
+                        onClick={() => setUrlInput(group.urls.join("\n"))}
+                        className="rounded-full border border-[#00f5ff]/15 bg-[#00f5ff]/8 px-3 py-1.5 text-xs text-[#9ceeff] transition-colors hover:bg-[#00f5ff]/12"
+                      >
+                        Load {group.label} starter set
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs leading-6 text-gray-500">
+                    Blocked on links? You can still write a short bio in the optional section
+                    and generate a rough draft first.
+                  </p>
                 </div>
               </div>
             )}
@@ -3588,6 +3662,10 @@ function DashboardPageContent() {
               <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-gray-400">
                 Atrak Pages will synthesize the imported proof into a headline, about
                 section, projects, and resume framing you can refine from there.
+              </p>
+              <p className="mx-auto mt-2 max-w-2xl text-xs leading-6 text-gray-500">
+                Best results come from imported proof. A short bio alone can still produce
+                a rough draft if you need a starting point.
               </p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
                 {[
@@ -3614,31 +3692,38 @@ function DashboardPageContent() {
                   {generating ? (
                     <>
                       <LoaderCircle className="h-5 w-5 animate-spin" />
-                      Generating your profile...
+                      {draftMode ? "Generating your draft..." : "Generating your profile..."}
                     </>
                   ) : (
                     <>
                       <WandSparkles className="h-5 w-5" />
-                      Generate My Profile
+                      {draftMode ? "Generate rough draft" : "Generate my profile"}
                     </>
                   )}
                 </button>
               </div>
               {!canGenerateProfile && (
                 <p className="mt-4 text-sm text-gray-500">
-                  Crawl at least one URL or add a short bio before generating.
+                  Import at least one URL or add a short bio before generating.
                 </p>
               )}
               {generating && (
-                <div className="mt-5 grid gap-2 text-xs text-gray-300 sm:grid-cols-3">
-                  <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
-                    Writing the headline
-                  </div>
-                  <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
-                    Structuring case studies
-                  </div>
-                  <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
-                    Preparing the resume view
+                <div className="mt-5">
+                  <p className="mb-3 text-xs leading-6 text-gray-400">
+                    {draftMode
+                      ? "This first draft will lean on your bio and any links already imported."
+                      : `Using ${evidence.length} imported proof item${evidence.length === 1 ? "" : "s"} to build the first public version.`}
+                  </p>
+                  <div className="grid gap-2 text-xs text-gray-300 sm:grid-cols-3">
+                    <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
+                      Writing the headline
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
+                      Structuring case studies
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2">
+                      Preparing the resume view
+                    </div>
                   </div>
                 </div>
               )}

@@ -17,6 +17,24 @@ Release branch: `release/atrak-pages-launch`
 - PR #17: post-launch enhancement sprint
 - PR #18: custom-domain hardening
 - PR #19: hosting contingency memo
+- PR #21: low-risk launch-adjacent polish subset only
+
+## Release-candidate additions from PR #21
+
+Included in this release candidate:
+
+- signup submit and failure instrumentation
+- clearer first-run import and generate guidance in the dashboard
+- lower-friction register copy and autocomplete hints
+- public profile and resume cleanup that removes internal product framing
+- safer public screenshot handling via `next/image`
+
+Explicitly deferred from PR #21:
+
+- the standalone sprint write-up and screenshot artifact note
+- any new analytics interpretation that depends on real production traffic
+- any further landing-page or public-profile experimentation beyond the already integrated copy/layout cleanup
+- any additional polish work that is not directly launch-adjacent
 
 See also: [`notes/domain-transition-plan.md`](./domain-transition-plan.md)
 See also: [`notes/production-env-matrix.md`](./production-env-matrix.md)
@@ -134,6 +152,16 @@ Run before announcing launch:
 - `npm run test:e2e:ci`
 - optional contingency validation: `npm run cf:build`
 - if using the Workers fallback, confirm the account is on a paid Workers plan or the bundle is below the free-plan limit before you treat it as a real rollback path
+
+## Launch-only from here
+
+Do not expand scope beyond these remaining launch blockers:
+
+1. unlock the production host
+2. complete DNS and redirect cutover
+3. verify auth, billing, crawl/generate, public page, resume, and custom-domain flows on the real host
+4. remove GitHub Pages ownership of `lifepage.one`
+5. keep any further polish, experimentation, or new instrumentation out of the release branch unless it is required to resolve a launch blocker
 
 ## Rollback
 

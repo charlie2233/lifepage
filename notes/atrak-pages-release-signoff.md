@@ -36,6 +36,7 @@ Record the final successful timestamps and operator initials here before launch.
 - `npm run lint`: passed on 2026-04-01
 - `npm run build`: passed on 2026-04-01 with expected local DB fallback warnings for sitemap and explore generation
 - `npm run cf:build`: passed on 2026-04-01 with the same local DB fallback warnings
+- targeted Playwright release-gate check `e2e/auth.spec.ts -g "unauthenticated dashboard requests redirect to login"`: passed on 2026-04-01 when run with the local env file
 - `npm run test:e2e:ci`: blocked on 2026-04-01 because authenticated flows crash out of the dev server and surface `ERR_CONNECTION_REFUSED`
 - `npm run cf:deploy`: blocked on 2026-04-01 because the Worker exceeds the Cloudflare free-plan 3 MiB size limit
 - Vercel launch attempt: blocked on 2026-04-01 because no production-ready remote Postgres or readable Stripe/R2/Cloudflare production secrets are available in the repo or shell environment
@@ -52,6 +53,20 @@ Record the final successful timestamps and operator initials here before launch.
 - Cloudflare Worker contingency deploy accepted by account plan: `TBD`
 - Existing Cloudflare Worker service `lifepage-web` has all required secret names configured, but those values are not readable from this session
 - Existing `workers.dev` host is still serving a stale LifePage build, not the current Atrak Pages release branch
+
+## Release-candidate polish included
+
+The release candidate includes only the low-risk PR #21 subset:
+
+- signup submit and failure instrumentation
+- first-run clarity improvements in register and dashboard
+- public profile and resume cleanup
+- safer public screenshot handling on portfolio surfaces
+
+Deferred on purpose:
+
+- sprint-only notes and screenshot artifacts
+- any new broad polish scope that does not directly unblock launch
 
 ## Go / no-go criteria
 

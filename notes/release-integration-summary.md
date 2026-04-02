@@ -2,7 +2,7 @@
 
 Date: 2026-04-01
 Branch: `release/atrak-pages-launch`
-Current release commit: `19794c6`
+Base release commit before PR #21 integration: `898d108`
 
 ## Integration result
 
@@ -19,6 +19,32 @@ Recommended integration order, if replayed from `main`, remains:
 2. PR #18
 3. PR #19
 4. release packaging / surface-brand rename
+
+For the release candidate pass on 2026-04-01, PR #21 was reviewed separately and only the low-risk launch-adjacent subset was approved for integration.
+
+### PR #21 release-candidate decision
+
+Recommendation:
+
+- use a cherry-pick, not a merge
+
+Why:
+
+- PR #21 is a single commit directly on top of `release/atrak-pages-launch`
+- `release/atrak-pages-launch` is an ancestor of `codex/post-launch-polish-sprint-1`
+- the change applies cleanly without conflicts, so cherry-pick keeps the history tighter and avoids carrying a sprint branch merge into the release candidate
+
+Included from PR #21:
+
+- signup instrumentation additions in [src/lib/product-analytics.ts](/Users/hanfei/.tmp/atrak-pages-launch/src/lib/product-analytics.ts) and [src/app/register/page.tsx](/Users/hanfei/.tmp/atrak-pages-launch/src/app/register/page.tsx)
+- dashboard first-run clarity in [src/app/dashboard/page.tsx](/Users/hanfei/.tmp/atrak-pages-launch/src/app/dashboard/page.tsx)
+- public profile and resume cleanup in [src/components/public-profile-page.tsx](/Users/hanfei/.tmp/atrak-pages-launch/src/components/public-profile-page.tsx), [src/components/public-resume-page.tsx](/Users/hanfei/.tmp/atrak-pages-launch/src/components/public-resume-page.tsx), and [src/components/public-share-actions.tsx](/Users/hanfei/.tmp/atrak-pages-launch/src/components/public-share-actions.tsx)
+- safer image handling on public surfaces through `next/image`
+
+Explicitly excluded from PR #21:
+
+- [notes/post-launch-polish-sprint-1.md](/Users/hanfei/.tmp/atrak-pages-launch/notes/post-launch-polish-sprint-1.md)
+- any follow-on polish work that is not needed for launch readiness
 
 That order keeps product and SEO changes in place before domain hardening, then layers the hosting memo after code changes, and only then applies launch-specific branding and cutover docs.
 
@@ -118,21 +144,21 @@ This keeps the launch branch focused on user-facing release work and avoids sche
 
 Revalidated on the current release branch:
 
-- `npm ci`: passed after clearing a partial install state
-- `npx prisma generate`: passed
-- `npm run test:unit`: passed
 - `npx tsc --noEmit`: passed
+- targeted `eslint` on the PR #21 touched files: passed
+- `npm run test:unit`: passed
 - `npm run build`: passed
   - known local warning: sitemap and explore generation fall back when the local `hanfei` database is absent
-- targeted release-gate test run: full Playwright suite attempted
-  - `e2e/auth.spec.ts` unauthenticated redirect test passed
-  - authenticated flows in `e2e/auth.spec.ts`, `e2e/billing-domains.spec.ts`, and `e2e/content.spec.ts` failed with `ERR_CONNECTION_REFUSED` after sign-in
+- targeted release-gate test run:
+  - `e2e/auth.spec.ts` unauthenticated redirect test passed when run with the local env file
+  - the full authenticated Playwright suite remains a known release-branch blocker from prior runs and was not reopened by the PR #21 integration
 
 Current interpretation:
 
 - integration is clean
 - build health is acceptable
-- release automation is blocked by a real authenticated e2e failure
+- PR #21 does not introduce a new regression signal
+- release automation is still blocked by the existing authenticated e2e failure and host/provider readiness
 
 ## Unresolved Production Blockers
 
@@ -157,9 +183,10 @@ If replaying from the pre-rename integrated base, the next step should be a **su
 
 For the current branch, that rename phase has already been packaged. The exact next step now is:
 
-1. debug the authenticated Playwright failure
-2. provision the Vercel project and env
-3. cut over `pages.atrak.dev`
-4. move `lifepage.one` to redirect-only behavior
+1. unlock the production host on Vercel or paid Workers
+2. cut over `pages.atrak.dev`
+3. move `lifepage.one` to redirect-only behavior
+4. rerun release smoke checks on the real host
+5. keep the release branch closed to further product-scope expansion unless a change directly resolves a launch blocker
 
 That is the fastest path from integrated branch to actual launch readiness.

@@ -177,11 +177,22 @@ const WHO_ITS_FOR: Array<{
   },
 ];
 
-const HERO_URL_EXAMPLES = [
-  "https://your-site.com",
-  "https://github.com/yourname",
-  "https://youtube.com/@yourname",
-  "https://docs.google.com/...",
+const HERO_IMPORT_RECIPES = [
+  {
+    label: "Homepage",
+    example: "https://your-site.com",
+    detail: "Start with the page that explains who you are and what you build.",
+  },
+  {
+    label: "Project repo or case study",
+    example: "https://github.com/yourname/project",
+    detail: "Choose the project you want people to remember after one click.",
+  },
+  {
+    label: "Proof page",
+    example: "https://youtube.com/@yourname",
+    detail: "Use a demo, docs, launch post, or walkthrough that proves the work shipped.",
+  },
 ];
 
 const TRUST_PILLARS: Array<{
@@ -192,17 +203,17 @@ const TRUST_PILLARS: Array<{
   {
     icon: Link2,
     title: "Grounded in real evidence",
-    desc: "Atrak Pages works from URLs, screenshots, and public proof instead of asking you to write everything from scratch.",
+    desc: "Start with a few real URLs and Atrak Pages turns them into a narrative with source-backed proof instead of blank-page writing.",
   },
   {
     icon: Images,
-    title: "Built for better first impressions",
-    desc: "Every profile can show project visuals, proof tiles, a resume view, and a clean public link you can send immediately.",
+    title: "Shows the work, not just claims",
+    desc: "Project visuals, proof tiles, and source links stay visible so the page reads like evidence instead of marketing copy.",
   },
   {
     icon: ShieldCheck,
-    title: "Trust signals stay visible",
-    desc: "Public, link-only, and private states are explicit, and the page keeps the source material easy to audit.",
+    title: "Ready to send in one pass",
+    desc: "You leave with a public page, a cleaner resume view, and explicit visibility controls for what stays public or private.",
   },
 ];
 
@@ -404,6 +415,12 @@ function LandingPage() {
               a public portfolio plus a cleaner resume view you can share right away.
             </p>
 
+            <div className="mt-6 flex flex-wrap gap-2.5 text-sm text-[#c9d2d9]">
+              <span className="lp-chip px-3.5 py-2">3 links in</span>
+              <span className="lp-chip px-3.5 py-2">Screenshots captured</span>
+              <span className="lp-chip px-3.5 py-2">Portfolio + resume out</span>
+            </div>
+
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/register"
@@ -422,8 +439,9 @@ function LandingPage() {
             </div>
 
             <p className="mt-4 max-w-xl text-sm leading-7 text-[#91a1ab]">
-              Best first run: bring 3 links that show your best work. Atrak Pages
-              does the first synthesis, and you keep editing from there.
+              Fastest first run: paste one homepage, one project repo or case study,
+              and one proof-heavy page. Atrak Pages does the first synthesis, and
+              you keep editing from there.
             </p>
 
             <div className="mt-7 flex flex-wrap gap-2.5 text-sm text-[#c9d2d9]">
@@ -434,8 +452,8 @@ function LandingPage() {
             </div>
 
             <div className="mt-8 flex flex-wrap gap-3 text-sm text-[#8d9aa5]">
-              <span className="lp-chip px-3 py-1.5">Crawls real URLs</span>
-              <span className="lp-chip px-3 py-1.5">Captures screenshots</span>
+              <span className="lp-chip px-3 py-1.5">No portfolio writing marathon</span>
+              <span className="lp-chip px-3 py-1.5">Proof stays visible</span>
               <span className="lp-chip px-3 py-1.5">Exports resume PDF</span>
               <span className="lp-chip px-3 py-1.5">Built by {SITE_AUTHOR}</span>
             </div>
@@ -452,23 +470,26 @@ function LandingPage() {
                     <span>What to paste first</span>
                   </div>
                   <div className="mt-4 space-y-3">
-                    {HERO_URL_EXAMPLES.map((example, index) => (
+                    {HERO_IMPORT_RECIPES.map((recipe, index) => (
                       <div
-                        key={example}
+                        key={recipe.label}
                         className={`card-hover rounded-2xl border border-white/8 bg-black/20 px-4 py-3 stagger-${index + 1} lp-fade-rise`}
                       >
                         <p className="text-[11px] uppercase tracking-[0.16em] text-[#79e5d2]">
-                          Example {index + 1}
+                          {recipe.label}
                         </p>
-                        <p className="mt-2 text-sm leading-6 text-[#d7dfe4]">
-                          {example}
+                        <p className="mt-2 text-sm font-medium leading-6 text-[#f2f7fa]">
+                          {recipe.example}
+                        </p>
+                        <p className="mt-1 text-xs leading-6 text-[#95a5af]">
+                          {recipe.detail}
                         </p>
                       </div>
                     ))}
                   </div>
                   <div className="mt-4 rounded-2xl border border-[#79e5d2]/12 bg-[#79e5d2]/6 px-4 py-3 text-sm leading-6 text-[#b7c6cf]">
-                    Strongest mix: one homepage, one project repo or case study,
-                    and one proof-heavy page like a demo, docs, or YouTube channel.
+                    Best conversion path: import 2-3 links that each prove something
+                    different, then publish the first page before you start polishing.
                   </div>
                 </div>
 
@@ -486,7 +507,7 @@ function LandingPage() {
                       </p>
                     </div>
                     <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200">
-                      Public
+                      Ready to share
                     </span>
                   </div>
 
@@ -533,7 +554,7 @@ function LandingPage() {
                     </div>
 
                     <div className="mt-5 flex flex-wrap gap-2">
-                      {["Hiring mode", "Admissions mode", "Separate resume page"].map(
+                      {["Proof-led case studies", "Resume view", "Share-ready link"].map(
                         (label) => (
                           <span
                             key={label}
@@ -549,9 +570,9 @@ function LandingPage() {
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   {[
-                    { title: "Evidence", value: "Screenshots and source links stay visible" },
-                    { title: "Narrative", value: "Headline, case studies, and resume bullets" },
-                    { title: "Share", value: "Public path, resume route, and custom domain" },
+                    { title: "Input recipe", value: "Homepage + project + proof page is the highest-signal first run." },
+                    { title: "Output", value: "Headline, case studies, screenshots, and a resume-first companion page." },
+                    { title: "Trust", value: "Public links still point back to the work, not just a polished summary." },
                   ].map((item) => (
                     <div key={item.title} className="lp-stat-tile p-4">
                       <p className="lp-kicker text-[10px] text-[#79e5d2]">
