@@ -6,16 +6,18 @@ Branch: `release/atrak-pages-launch`
 ## What Changed
 
 - Audited the live Stripe code paths, env requirements, and billing state sync behavior in the release branch.
-- Re-verified the current Vercel project env state after the initial billing setup pass.
+- Re-verified the current Vercel project env state after the user-directed “finish billing” pass.
 - Created the minimum Stripe test-mode catalog in the connected Stripe sandbox account for the repo’s four required paid plan variants.
 - Added the four real Preview Stripe price IDs to the Vercel project.
 - Re-verified that the protected preview can expose app routes through Vercel-authenticated fetch/share access without disabling preview protection.
 - Re-verified that the stable preview alias is serving current Atrak Pages branding and deployment-aware metadata, not stale localhost or LifePage metadata.
+- Verified that Preview still does not expose `STRIPE_SECRET_KEY` or `STRIPE_WEBHOOK_SECRET` in the live Vercel env inventory, so no honest end-to-end billing smoke can proceed yet.
+- Verified that the stable preview alias still resolves to the Apr 6 deployment, so it cannot be treated as proof that any later Stripe env changes are live.
 
 ## Changed Files
 
 - No application code changes were required.
-- This note is the only repo file added in this pass.
+- This note and the launch signoff precheck note document the current blocker state.
 
 ## Stripe Env Status
 
@@ -30,6 +32,8 @@ Preview is still missing:
 
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
+
+This was rechecked directly from the live Vercel Preview env list during this pass. The user assumption that those values had been added is not reflected in the current project state.
 
 Production is still missing the full Stripe billing set:
 
@@ -85,12 +89,14 @@ Webhook status:
 - not created from this environment
 - blocked by unavailable Stripe dashboard/API-key level access for endpoint creation and signing-secret capture
 - the connected Stripe tooling in this session can inspect account metadata and prices, but it does not expose the test secret key or create/reveal webhook signing secrets
+- there is still no authenticated proof available here that the Stripe webhook endpoint exists in the dashboard or is subscribed to the six required events
 
 ## Preview URL Tested
 
 - stable preview alias: `https://atrak-pages-preview.charlie2233s-projects.vercel.app`
 - current protected deployment behind that alias serves `Atrak Pages — AI Personal Brand Builder`
 - protected browser/manual testing can use a fresh Vercel share link or the existing project protection-bypass path; do not commit either secret-bearing URL into the repo
+- the alias still points at deployment `dpl_3P4t39mXwyamwZBpb6n86LbGhmsK`, created on 2026-04-06, so a fresh redeploy will still be required after the missing secrets are truly present
 
 ## Smoke-Test Results
 
@@ -103,9 +109,11 @@ Confirmed:
 - the repo’s billing routes are coded to fail clearly when Stripe is not configured:
   - checkout and portal return `503` with `Stripe billing is not configured.`
   - webhook returns `503` when Stripe config is incomplete
+- the four configured price IDs still match the code’s `plus/month`, `plus/year`, `pro/month`, and `pro/year` plan model exactly
 
 Blocked:
 
+- fresh preview redeploy for billing validation
 - authenticated billing checkout smoke
 - Stripe hosted checkout open
 - subscription completion
@@ -115,7 +123,8 @@ Blocked:
 
 Reason:
 
-- `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are still unavailable from the current authenticated tooling
+- `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are still absent from the live Vercel Preview env inventory
+- Stripe webhook existence and event subscription state are still unproven from the currently available authenticated tooling
 
 ## Exact Remaining Manual Actions
 
@@ -154,7 +163,8 @@ Reason:
 
 ## Remaining Blockers
 
-- Preview billing is still blocked on the real Stripe test secret key and webhook signing secret.
+- Preview billing is still blocked on the real Stripe test secret key and webhook signing secret not being visible in the live Vercel project.
+- Preview billing is still blocked on the absence of authenticated proof that the Stripe webhook endpoint exists and is subscribed correctly.
 - Production billing remains unconfigured because no live-mode Stripe values were available from this environment.
 
 ## Go / No-Go For Later DNS/Cutover
