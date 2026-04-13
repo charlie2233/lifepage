@@ -6,10 +6,11 @@ Branch: `release/atrak-pages-launch`
 ## What Changed
 
 - Audited the live Stripe code paths, env requirements, and billing state sync behavior in the release branch.
-- Verified the current Vercel project had no `STRIPE_*` env vars in either Preview or Production before this pass.
+- Re-verified the current Vercel project env state after the initial billing setup pass.
 - Created the minimum Stripe test-mode catalog in the connected Stripe sandbox account for the repo’s four required paid plan variants.
 - Added the four real Preview Stripe price IDs to the Vercel project.
-- Verified the protected preview can expose app routes through Vercel protection bypass, which is enough for later Stripe preview webhook testing without disabling preview protection.
+- Re-verified that the protected preview can expose app routes through Vercel-authenticated fetch/share access without disabling preview protection.
+- Re-verified that the stable preview alias is serving current Atrak Pages branding and deployment-aware metadata, not stale localhost or LifePage metadata.
 
 ## Changed Files
 
@@ -38,6 +39,11 @@ Production is still missing the full Stripe billing set:
 - `STRIPE_PLUS_YEARLY_PRICE_ID`
 - `STRIPE_PRO_MONTHLY_PRICE_ID`
 - `STRIPE_PRO_YEARLY_PRICE_ID`
+
+Important production note:
+
+- do not copy Preview test-mode Stripe values into Production
+- Production will need real live-mode Stripe secrets and live-mode prices during the later launch-signoff step
 
 ## Products, Prices, And Webhook
 
@@ -78,18 +84,25 @@ Webhook status:
 
 - not created from this environment
 - blocked by unavailable Stripe dashboard/API-key level access for endpoint creation and signing-secret capture
+- the connected Stripe tooling in this session can inspect account metadata and prices, but it does not expose the test secret key or create/reveal webhook signing secrets
 
 ## Preview URL Tested
 
 - stable preview alias: `https://atrak-pages-preview.charlie2233s-projects.vercel.app`
+- current protected deployment behind that alias serves `Atrak Pages — AI Personal Brand Builder`
+- protected browser/manual testing can use a fresh Vercel share link or the existing project protection-bypass path; do not commit either secret-bearing URL into the repo
 
 ## Smoke-Test Results
 
 Confirmed:
 
 - the protected Vercel preview is still reachable
-- the repo’s billing routes and UI already return human-readable “Stripe billing is not configured” behavior instead of opaque failures
-- Vercel protection bypass works for protected preview API routes, which is enough to support a preview Stripe webhook URL without disabling protection
+- the stable preview alias is serving current Atrak Pages HTML and preview-aware canonical/OG metadata
+- the `/upgrade` route is reachable through Vercel-authenticated fetch on the protected preview
+- Vercel protection bypass/share access works for protected preview routes, which is enough to support a preview Stripe webhook URL without disabling protection
+- the repo’s billing routes are coded to fail clearly when Stripe is not configured:
+  - checkout and portal return `503` with `Stripe billing is not configured.`
+  - webhook returns `503` when Stripe config is incomplete
 
 Blocked:
 
@@ -113,8 +126,9 @@ Reason:
 
 2. In the same Stripe sandbox account, create one webhook endpoint for the preview:
    - base path from code: `https://atrak-pages-preview.charlie2233s-projects.vercel.app/api/stripe/webhook`
-   - because preview protection stays enabled, append the existing Vercel project automation bypass query params when entering the preview webhook URL
-   - use the current project automation bypass secret already configured in Vercel Project Settings
+   - because preview protection stays enabled, use one of these two protected-preview access methods:
+     - preferred: generate a fresh Vercel preview share URL that resolves to `/api/stripe/webhook`
+     - fallback: append the existing Vercel project automation-bypass query params from Project Settings
    - subscribe only to:
      - `checkout.session.completed`
      - `customer.subscription.created`
