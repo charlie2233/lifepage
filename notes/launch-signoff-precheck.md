@@ -37,6 +37,7 @@ It does not cover:
 - Fresh deploy with live Stripe envs: `blocked`
   - the stable preview alias still points at deployment `dpl_3P4t39mXwyamwZBpb6n86LbGhmsK` from 2026-04-06
   - until the missing Stripe secrets actually exist in Preview, there is no valid reason to redeploy for billing smoke
+  - this was rechecked again in the latest verification pass and did not change
 
 ## Billing Readiness Result
 

@@ -13,6 +13,7 @@ Branch: `release/atrak-pages-launch`
 - Re-verified that the stable preview alias is serving current Atrak Pages branding and deployment-aware metadata, not stale localhost or LifePage metadata.
 - Verified that Preview still does not expose `STRIPE_SECRET_KEY` or `STRIPE_WEBHOOK_SECRET` in the live Vercel env inventory, so no honest end-to-end billing smoke can proceed yet.
 - Verified that the stable preview alias still resolves to the Apr 6 deployment, so it cannot be treated as proof that any later Stripe env changes are live.
+- Re-ran the same provider-side checks after the later “finish preview billing” request and got the same blocker result: the Preview env inventory still exposes only the four Stripe price IDs, not the two required Stripe secrets.
 
 ## Changed Files
 
