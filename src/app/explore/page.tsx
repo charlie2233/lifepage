@@ -4,14 +4,25 @@ import { ArrowRight, ArrowUpRight, Compass, Globe, Sparkles } from "lucide-react
 import { prisma } from "@/lib/db";
 import { getDemoExploreProfiles } from "@/lib/demo-public-pages";
 import { resolvePortfolioTheme } from "@/lib/portfolio-themes";
+import { SITE_NAME, absoluteUrl } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Explore Personal Brands — LifePage",
+  title: "Explore Personal Brands",
   description:
-    "Browse public personal brand sites, proof-driven portfolios, and resume-ready launches built with LifePage.",
+    "Browse public personal brand sites, proof-driven portfolios, and resume-ready launches built with Atrak Pages.",
+  alternates: {
+    canonical: absoluteUrl("/explore"),
+  },
+  openGraph: {
+    title: `Explore Personal Brands — ${SITE_NAME}`,
+    description:
+      "Browse public personal brand sites, proof-driven portfolios, and resume-ready launches built with Atrak Pages.",
+    url: absoluteUrl("/explore"),
+    images: [absoluteUrl("/og-atrak-pages.svg")],
+  },
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 600;
 
 interface ProfileData {
   headline?: string;
@@ -101,12 +112,10 @@ export default async function ExplorePage() {
       <nav className="relative z-10 border-b border-white/8 bg-[#091015]/70 backdrop-blur-2xl">
         <div className="lp-shell flex items-center justify-between py-5">
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[11px] font-black tracking-[0.24em] text-[#041117]">
-              LP
-            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[11px] font-black tracking-[0.24em] text-[#041117]">AP</div>
             <div>
               <p className="brand-display text-[1.35rem] leading-none tracking-tight">
-                LifePage
+                Atrak Pages
               </p>
               <p className="lp-kicker mt-1 text-[10px] text-[#94a2ad]">
                 Public brand pages
@@ -153,7 +162,7 @@ export default async function ExplorePage() {
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-8 text-[#99a6af]">
                 Discover creators, engineers, designers, students, and applicants
-                who turned scattered work into a sharper public story with LifePage.
+                who turned scattered work into a sharper public story with Atrak Pages.
               </p>
             </div>
 
@@ -227,6 +236,8 @@ export default async function ExplorePage() {
                         <img
                           src={profile.screenshot}
                           alt={`${profile.name}'s portfolio`}
+                          loading="lazy"
+                          decoding="async"
                           className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]"
                         />
                       </div>
@@ -373,7 +384,7 @@ export default async function ExplorePage() {
           >
             atrak.dev
           </a>{" "}
-          · LifePage
+          · Atrak Pages
         </div>
       </footer>
     </div>

@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import type { UserProfile } from "@prisma/client";
 import { PublicPageNav } from "@/components/public-page-nav";
+import { PublicShareActions } from "@/components/public-share-actions";
+import { StructuredData } from "@/components/structured-data";
+import { TrackPageView } from "@/components/track-page-view";
 import type { PublicPageUser } from "@/lib/public-page";
 import { buildPublicPageModeHref, resolvePublicPageMode } from "@/lib/public-page";
 import { buildResumeData } from "@/lib/public-resume";
@@ -11,7 +13,6 @@ import { resolvePortfolioTheme } from "@/lib/portfolio-themes";
 import { resolveResumeModel, type ResolvedResumeModel } from "@/lib/resume-models";
 import { ProfileJSONSchema } from "@/lib/schema";
 import {
-  ArrowUpRight,
   Download,
   ExternalLink,
   FileText,
@@ -343,9 +344,27 @@ export function PublicResumePage({
   const metaParts = [
     resume.username ? `@${resume.username}` : null,
     resume.location ?? null,
-    `${resolvedResumeModel.label} model`,
   ].filter(Boolean) as string[];
-  const reviewLabel = mode === "admissions" ? "admissions review" : "hiring review";
+  const portfolioHref = buildPublicPageModeHref(basePath, mode);
+  const resumeHref = buildPublicPageModeHref(
+    basePath === "/" ? "/resume" : `${basePath}/resume`,
+    mode
+  );
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: resume.name,
+    alternateName: resume.username ? `@${resume.username}` : undefined,
+    description: resume.headline,
+    url: resumeHref,
+    sameAs: resume.links.map((link) => link.url),
+    hasPart: resume.projects.slice(0, 4).map((project) => ({
+      "@type": "CreativeWork",
+      name: project.title,
+      description: project.impact ?? project.approach ?? project.problem ?? "",
+      url: project.links[0]?.url,
+    })),
+  };
 
   const metaBlock = (
     <>
@@ -472,6 +491,11 @@ export function PublicResumePage({
                     <h3 className="text-lg font-semibold" style={{ color: resolvedResumeModel.sheetText }}>
                       {project.title}
                     </h3>
+                    {project.impact && (
+                      <p className="mt-2 text-sm font-medium" style={{ color: resolvedResumeModel.accent }}>
+                        {project.impact}
+                      </p>
+                    )}
                     {project.tech.length > 0 && (
                       <p className="mt-2 text-sm" style={{ color: documentMuted }}>
                         {project.tech.join(", ")}
@@ -496,9 +520,11 @@ export function PublicResumePage({
                     </div>
                   )}
                 </div>
-                <p className="mt-4 text-sm leading-7" style={{ color: resolvedResumeModel.sheetText }}>
-                  {project.impact ?? project.approach ?? project.problem ?? ""}
-                </p>
+                {project.approach || project.problem ? (
+                  <p className="mt-4 text-sm leading-7" style={{ color: resolvedResumeModel.sheetText }}>
+                    {project.approach ?? project.problem}
+                  </p>
+                ) : null}
               </article>
             ))}
           </div>
@@ -684,6 +710,8 @@ export function PublicResumePage({
 
   return (
     <div className="portfolio-body min-h-screen" style={pageStyle}>
+      <TrackPageView event="public_resume_viewed" metadata={{ username, mode }} />
+      <StructuredData data={structuredData} />
       {resolvedTheme.isDark && (
         <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
           <div
@@ -718,7 +746,8 @@ export function PublicResumePage({
                 {resume.headline}
               </p>
               <p className="mt-6 max-w-2xl text-lg leading-8" style={mutedStyle}>
-                Separate from the portfolio page, this resume-first view is tuned for {reviewLabel} using the {resolvedResumeModel.label} layout system.
+                Use this version when someone needs the fastest scan of experience, outcomes, and links.
+                The portfolio carries the fuller proof and story.
               </p>
               {metaParts.length > 0 && (
                 <div className="mt-6 flex flex-wrap gap-2">
@@ -751,31 +780,36 @@ export function PublicResumePage({
                     <Download className="h-4 w-4" />
                     Download PDF
                   </a>
-                  <Link
-                    href={buildPublicPageModeHref(basePath, mode)}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border px-5 py-3 text-sm"
-                    style={outlineButtonStyle}
-                  >
-                    View portfolio
-                    <ArrowUpRight className="h-4 w-4" />
-                  </Link>
                 </div>
+                <PublicShareActions
+                  alternateHref={portfolioHref}
+                  alternateLabel="Portfolio view"
+                  copyEvent="resume_copy_link_clicked"
+                  currentViewLabel="resume"
+                  helperText="Share the cleaner recruiter-facing resume, copy the link, or jump back to the fuller portfolio page."
+                  mutedColor={resolvedTheme.muted}
+                  outlineButtonStyle={outlineButtonStyle}
+                  shareLabel="Share resume"
+                  shareText="Check out this Atrak Pages resume view. It is the fast-scan version of the portfolio, with links back to the fuller proof."
+                  shareEvent="resume_share_clicked"
+                />
               </div>
 
               <div className="rounded-[2rem] border p-5" style={panelStyle}>
                 <p className="lp-kicker text-[11px]" style={{ color: resolvedResumeModel.accent }}>
-                  Resume model
+                  Best for
                 </p>
                 <div className="mt-4 rounded-[1.5rem] border p-5" style={sideTileStyle}>
-                  <p className="text-sm font-medium">{resolvedResumeModel.label}</p>
+                  <p className="text-sm font-medium">
+                    {mode === "admissions" ? "Application review" : "Hiring review"}
+                  </p>
                   <p className="mt-2 text-xs leading-relaxed" style={mutedStyle}>
-                    {resolvedResumeModel.description}
+                    {mode === "admissions"
+                      ? "Send this when someone needs the concise version first, then move them to the portfolio for deeper proof and context."
+                      : "Send this when a recruiter or hiring manager wants the cleanest first read, then hand off the portfolio for case-study depth."}
                   </p>
                   <p className="mt-3 text-xs" style={mutedStyle}>
-                    {resolvedResumeModel.headerLayout} header · {resolvedResumeModel.asideLayout} aside · {resolvedResumeModel.sectionStyle} sections
-                  </p>
-                  <p className="mt-1 text-xs" style={mutedStyle}>
-                    {resolvedResumeModel.displayFont}/{resolvedResumeModel.bodyFont}
+                    Download the PDF for formal applications, or share the live link for a faster review loop.
                   </p>
                 </div>
               </div>

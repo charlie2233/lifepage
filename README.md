@@ -1,8 +1,9 @@
-# LifePage — AI Personal Brand Builder
+# Atrak Pages — AI Personal Brand Builder
 
 > Built with ❤️ by [atrak.dev](https://atrak.dev)
+> Atrak Pages is the public product name for the app formerly called LifePage.
 
-Turn your work into a stunning portfolio in minutes. Give LifePage a URL — your website, GitHub, YouTube channel, or any project page — and the AI **crawls it, screenshots it, and builds a world-class portfolio page** for you automatically.
+Turn your work into a stunning portfolio in minutes. Give Atrak Pages a URL — your website, GitHub, YouTube channel, or any project page — and the AI **crawls it, screenshots it, and builds a world-class portfolio page** for you automatically.
 
 ## ✨ Features
 
@@ -81,14 +82,14 @@ If the R2 variables are missing, project demo videos still work locally and are 
 
 Create exactly four recurring Stripe prices:
 
-- `LifePage Plus Monthly` — `$5/month`
-- `LifePage Plus Yearly` — `$50/year`
-- `LifePage Pro Monthly` — `$10/month`
-- `LifePage Pro Yearly` — `$100/year`
+- `Atrak Pages Plus Monthly` — `$5/month`
+- `Atrak Pages Plus Yearly` — `$50/year`
+- `Atrak Pages Pro Monthly` — `$10/month`
+- `Atrak Pages Pro Yearly` — `$100/year`
 
 Then wire the resulting price ids into the Stripe env vars above.
 
-LifePage only trusts the server-side Stripe price map. Do not expose price ids or amounts from the client as the source of truth.
+Atrak Pages only trusts the server-side Stripe price map. Do not expose price ids or amounts from the client as the source of truth.
 
 ### 3. Set Up Database
 
@@ -110,7 +111,7 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ## End-to-End Tests
 
-LifePage now ships with a Playwright release-gate suite for auth, billing webhook sync, crawl imports, profile generation, public pages, resume export, and Cloudflare SaaS domain activation.
+Atrak Pages now ships with a Playwright release-gate suite for auth, billing webhook sync, crawl imports, profile generation, public pages, resume export, and Cloudflare SaaS domain activation.
 
 ### Local E2E environment
 
@@ -142,11 +143,34 @@ For CI-style reporting:
 npm run test:e2e:ci
 ```
 
+## Deployment
+
+Atrak Pages should launch publicly at `https://pages.atrak.dev`.
+
+Recommended release posture:
+
+- Canonical app runtime: Vercel on `pages.atrak.dev`
+- Legacy transition domain: `lifepage.one` redirecting to `pages.atrak.dev`
+- GitHub Pages: fallback-only landing page at `https://charlie2233.github.io/My_portforlio/`, never the real runtime
+- Cloudflare Workers: secondary/contingency runtime path retained in-repo
+
+Release runbook: [`notes/atrak-pages-launch-checklist.md`](notes/atrak-pages-launch-checklist.md)
+Domain transition plan: [`notes/domain-transition-plan.md`](notes/domain-transition-plan.md)
+Production env matrix: [`notes/production-env-matrix.md`](notes/production-env-matrix.md)
+Incident checklist: [`notes/incident-checklist.md`](notes/incident-checklist.md)
+
+Current launch blockers from the repo environment:
+
+- Vercel is still the preferred production host, but this Codex environment is not authenticated to a Vercel project yet.
+- The Cloudflare Worker path is authenticated and already has production secrets, but the current OpenNext bundle exceeds the free-plan 3 MiB Worker size limit, so redeploying the release build there requires a paid Workers plan or bundle slimming.
+- `pages.atrak.dev` does not resolve yet, and `lifepage.one` is still attached to GitHub Pages in provider state.
+
 ## ☁️ Cloudflare Workers Deploy
 
-LifePage now includes an OpenNext + Wrangler path for Cloudflare Workers.
+Atrak Pages still includes an OpenNext + Wrangler path for Cloudflare Workers.
 
-For now, treat the Worker's `*.workers.dev` hostname as the only public/canonical host. GitHub Pages and parked custom domains are intentionally out of the serving path until custom-domain routing is reattached on purpose.
+Treat this as a contingency runtime for now, not the preferred public launch target.
+For this repo specifically, the current release build exceeds the free-plan Worker size limit, so the contingency path requires a paid Workers plan or a smaller bundle before it can be redeployed.
 
 ### Local preview
 
@@ -192,13 +216,13 @@ If you want Auth.js to use a fixed canonical hostname instead of trusting forwar
 npx wrangler secret put AUTH_URL
 ```
 
-For the first production launch, set `AUTH_URL` to your Worker hostname, for example:
+If you are validating the Workers path directly, set `AUTH_URL` to your Worker hostname, for example:
 
 ```text
-https://lifepage-web.<your-subdomain>.workers.dev
+https://<existing-worker-name>.<your-subdomain>.workers.dev
 ```
 
-During this cleanup phase, keep `AUTH_URL` pointed at the Worker hostname and leave custom domains detached. `NEXTAUTH_URL` can remain local-only for development.
+For the real launch, set `AUTH_URL` to `https://pages.atrak.dev`. `NEXTAUTH_URL` can remain local-only for development. If your fallback Worker still uses a legacy service id, keep that hostname until a separate post-launch cleanup renames it.
 
 ### Deploy
 
@@ -206,13 +230,15 @@ During this cleanup phase, keep `AUTH_URL` pointed at the Worker hostname and le
 npm run cf:deploy
 ```
 
-The initial launch target is the Worker's `*.workers.dev` hostname defined in `wrangler.jsonc`.
+The `*.workers.dev` hostname defined in `wrangler.jsonc` is a runtime fallback, not the intended public URL.
 
 ## Cloudflare for SaaS Domains
 
-LifePage supports customer-owned custom domains through Cloudflare for SaaS custom hostnames.
+Atrak Pages supports customer-owned custom domains through Cloudflare for SaaS custom hostnames.
 
-Temporary operating mode: custom domains should stay detached until DNS is intentionally repointed to the Cloudflare-managed target. Do not leave GitHub Pages DNS records in place for production domains.
+Detailed launch and operator guidance lives in [`docs/custom-domains.md`](docs/custom-domains.md).
+
+Temporary operating mode: custom domains should stay detached until DNS is intentionally repointed to the Cloudflare-managed target. Do not leave GitHub Pages DNS records in place for production domains, and reserve `lifepage.one` for transition redirect traffic rather than the canonical app runtime.
 
 ### Required SaaS hostnames
 
@@ -226,7 +252,7 @@ Do not use `*.workers.dev` as the customer-facing CNAME target in production.
 ### Launch scope
 
 - Subdomain custom domains only
-- Apex domains are intentionally out of scope for now
+- Apex domains are intentionally out of scope for now and should not be promised in product copy
 
 ### How verification works
 
@@ -234,6 +260,12 @@ Do not use `*.workers.dev` as the customer-facing CNAME target in production.
 2. The dashboard shows the required customer CNAME target.
 3. `Verify DNS` confirms the customer CNAME is in place and refreshes Cloudflare hostname validation.
 4. The domain becomes active only when both the Cloudflare hostname status and SSL status are active.
+
+### Graceful fallback when provider config is incomplete
+
+- The dashboard should never hard-error just because Cloudflare SaaS is incomplete in an environment.
+- A requested hostname can still be saved locally while provider setup is paused.
+- Verification remains paused with actionable copy until the Cloudflare SaaS configuration is finished.
 
 ## Stripe Billing Runbook
 
@@ -262,7 +294,7 @@ Subscribe to:
 - `invoice.paid`
 - `invoice.payment_failed`
 
-LifePage stores Stripe webhook event ids in the database to dedupe retries and keep an audit trail.
+Atrak Pages stores Stripe webhook event ids in the database to dedupe retries and keep an audit trail.
 
 ### 4. Local webhook testing
 
@@ -307,16 +339,16 @@ Cloudflare keeps prior Worker versions. Roll back from the dashboard or redeploy
 
 ### Current limitation
 
-Customer-owned custom domains require a Cloudflare-managed SaaS zone and the four Cloudflare SaaS environment variables listed above. Without them, the dashboard returns a hard error instead of simulating activation.
+Customer-owned custom domains still require a Cloudflare-managed SaaS zone and the four Cloudflare SaaS environment variables listed above for full provisioning. When those values are incomplete, the dashboard now falls back to a paused/config-required state instead of hard-failing the user flow.
 
 ## 🎬 Project Demo Videos
 
-LifePage can generate inline project demo videos for public portfolio pages.
+Atrak Pages can generate inline project demo videos for public portfolio pages.
 
 ### How it works
 
-1. A user or LifeAgent requests a project demo video.
-2. LifePage builds a Sora prompt from the project title, problem, approach, impact, tech stack, portfolio mode, and related evidence screenshots when available.
+1. A user or the Atrak Pages agent requests a project demo video.
+2. Atrak Pages builds a Sora prompt from the project title, problem, approach, impact, tech stack, portfolio mode, and related evidence screenshots when available.
 3. Sora renders an 8-second polished product demo.
 4. The completed video and poster image are uploaded to Cloudflare R2 when configured, or written to local output storage during development.
 5. The active generated profile is patched with a structured media object so the demo renders inline on the public project card.
@@ -413,4 +445,4 @@ prisma/
 
 ---
 
-Credits: Built by [atrak.dev](https://atrak.dev) · LifePage AI Personal Brand Builder
+Credits: Built by [atrak.dev](https://atrak.dev) · Atrak Pages AI Personal Brand Builder

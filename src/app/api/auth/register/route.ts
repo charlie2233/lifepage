@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { recordProductEvent } from "@/lib/product-analytics";
 
 const schema = z.object({
   name: z.string().min(1),
@@ -17,13 +18,24 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json()) as unknown;
     const { name, email, password, username } = schema.parse(body);
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedUsername = username.trim().toLowerCase();
 
     const exists = await prisma.user.findFirst({
-      where: { OR: [{ email }, { username }] },
+      where: {
+        OR: [{ email: normalizedEmail }, { username: normalizedUsername }],
+      },
     });
     if (exists) {
+      const duplicateField =
+        exists.email === normalizedEmail ? "email" : "username";
       return NextResponse.json(
-        { error: "Email or username already taken" },
+        {
+          error:
+            duplicateField === "email"
+              ? "That email already has an Atrak Pages account."
+              : "That username is already taken. Try another public handle.",
+        },
         { status: 400 }
       );
     }
@@ -32,8 +44,8 @@ export async function POST(req: Request) {
     const user = await prisma.user.create({
       data: {
         name,
-        email,
-        username,
+        email: normalizedEmail,
+        username: normalizedUsername,
         passwordHash,
         profile: { create: { theme: "obsidian" } },
         publicPageSettings: {
@@ -46,6 +58,14 @@ export async function POST(req: Request) {
         },
       },
     });
+    await recordProductEvent({
+      event: "signup_completed",
+      path: "/register",
+      userId: user.id,
+      metadata: {
+        username: user.username,
+      },
+    });
 
     return NextResponse.json({
       user: { id: user.id, email: user.email, username: user.username },
@@ -53,11 +73,14 @@ export async function POST(req: Request) {
   } catch (err) {
     if (err instanceof z.ZodError) {
       return NextResponse.json(
-        { error: err.issues[0]?.message ?? "Validation error" },
+        { error: err.issues[0]?.message ?? "Please check the form fields." },
         { status: 400 }
       );
     }
     console.error("Register error:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Registration failed. Please try again in a moment." },
+      { status: 500 }
+    );
   }
 }

@@ -3,11 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LifePage</title>
+    <title>Atrak Pages Fallback</title>
     <link rel="icon" href="favicon.ico" sizes="any" />
     <meta
       name="description"
-      content="LifePage is moving to a full Cloudflare-hosted app. This GitHub Pages site is a lightweight fallback landing page."
+      content="Atrak Pages lives at pages.atrak.dev. This GitHub Pages site is a lightweight fallback for legacy and transition traffic only."
     />
     <style>
       :root {
@@ -142,29 +142,31 @@
   </head>
   <body>
     <main class="card">
-      <div class="eyebrow"><span class="dot"></span> LifePage</div>
-      <h1>GitHub Pages fallback is live.</h1>
+      <div class="eyebrow"><span class="dot"></span> Atrak Pages</div>
+      <h1>GitHub Pages is fallback-only.</h1>
       <p>
-        The full LifePage product is a dynamic Next.js app with auth, billing, APIs,
-        and Cloudflare deployment logic. GitHub Pages cannot host that runtime, so this
-        site is a lightweight landing page instead of the full app.
+        The full Atrak Pages product is a dynamic Next.js app with auth, billing,
+        APIs, and user portfolios. GitHub Pages cannot host that runtime, so this
+        site only exists to catch legacy and transition traffic.
       </p>
       <div class="status">
         <strong>Current status</strong>
         <p>
-          This repository now has a valid Pages landing page. The full app deployment is
-          being served through Cloudflare Workers when the target account and bundle size
-          constraints are satisfied.
+          Atrak Pages, formerly LifePage, is launching at <code>https://pages.atrak.dev</code>.
+          GitHub Pages should stay at the repo fallback URL only, and <code>https://lifepage.one</code> should redirect to the canonical app instead of acting as a host itself.
         </p>
       </div>
       <div class="actions">
+        <a class="button button-primary" href="https://pages.atrak.dev">Open Atrak Pages</a>
         <a class="button button-primary" href="https://github.com/charlie2233/My_portforlio">Open Repository</a>
         <a class="button button-secondary" href="https://github.com/charlie2233/My_portforlio/actions">View CI</a>
       </div>
       <p class="small">
-        Public URLs:
-        <code>https://lifepage.one</code>
-        and
+        Runtime:
+        <code>https://pages.atrak.dev</code>.
+        Legacy redirect:
+        <code>https://lifepage.one</code>.
+        Fallback page:
         <code>https://charlie2233.github.io/My_portforlio/</code>
       </p>
     </main>

@@ -65,11 +65,9 @@ function LoginPageContent() {
         {/* Logo */}
         <div className="mb-8 text-center">
           <Link href="/" className="inline-flex items-center gap-2.5">
-            <div className="animate-pulse-glow flex h-9 w-9 items-center justify-center rounded-xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[10px] font-black tracking-[0.22em] text-[#041117]">
-              LP
-            </div>
+            <div className="animate-pulse-glow flex h-9 w-9 items-center justify-center rounded-xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[10px] font-black tracking-[0.22em] text-[#041117]">AP</div>
             <span className="brand-display text-[1.4rem] leading-none tracking-tight text-white">
-              LifePage
+              Atrak Pages
             </span>
           </Link>
           <p className="mt-3 text-sm text-[#7a8d98]">

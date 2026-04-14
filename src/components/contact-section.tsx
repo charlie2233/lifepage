@@ -60,7 +60,7 @@ export function ContactSection() {
       payload.append("email", parsed.data.email);
       payload.append("company", parsed.data.company ?? "");
       payload.append("message", parsed.data.message);
-      payload.append("_subject", "LifePage contact form");
+      payload.append("_subject", "Atrak Pages contact form");
 
       const response = await fetch(FORMSPREE_ENDPOINT, {
         method: "POST",
@@ -219,7 +219,7 @@ export function ContactSection() {
               />
             </div>
 
-            <input type="hidden" name="_subject" value="LifePage contact form" />
+            <input type="hidden" name="_subject" value="Atrak Pages contact form" />
 
             <div className="hidden" aria-hidden="true">
               <label htmlFor="website">Website</label>

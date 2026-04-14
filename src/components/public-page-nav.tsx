@@ -58,11 +58,11 @@ export function PublicPageNav({
               boxShadow: `0 8px 24px ${theme.accent}35`,
             }}
           >
-            LP
+            AP
           </div>
           <div>
             <p className="brand-display text-[1.35rem] leading-none tracking-tight">
-              LifePage
+              Atrak Pages
             </p>
             <p className="lp-kicker mt-1 text-[10px]" style={mutedStyle}>
               {activeSection === "resume" ? "Public resume" : "Public profile"}

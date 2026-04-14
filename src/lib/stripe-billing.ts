@@ -14,6 +14,7 @@ import {
   isEntitledStripeStatus,
   syncStripeBillingState,
 } from "@/lib/billing";
+import { getAppBaseUrl as getConfiguredAppBaseUrl } from "@/lib/runtime-env";
 
 const PAID_PLAN_TIERS = PLAN_TIERS.filter((plan) => plan !== "free");
 type PaidPlanTier = Exclude<PlanTier, "free">;
@@ -63,7 +64,7 @@ function buildFakeBillingUrl(
   request: Request | undefined,
   params?: Record<string, string>
 ) {
-  const baseUrl = getAppBaseUrl(request);
+  const baseUrl = getBillingBaseUrl(request);
   const url = new URL("/dashboard", baseUrl);
   url.hash = "settings-billing";
   url.searchParams.set("e2e_billing", kind);
@@ -98,7 +99,7 @@ export function getStripe() {
 
   return new Stripe(secretKey, {
     appInfo: {
-      name: "LifePage",
+      name: "Atrak Pages",
       version: "0.1.0",
     },
   });
@@ -151,12 +152,8 @@ export function getPlanFromStripePriceId(priceId?: string | null): {
   return null;
 }
 
-export function getAppBaseUrl(request?: Request) {
-  const configured =
-    process.env.AUTH_URL ??
-    process.env.NEXTAUTH_URL ??
-    process.env.APP_URL ??
-    null;
+export function getBillingBaseUrl(request?: Request) {
+  const configured = getConfiguredAppBaseUrl();
   if (configured) {
     return configured.replace(/\/$/, "");
   }
@@ -394,7 +391,7 @@ export async function createStripeCheckoutUrl(args: {
   }
 
   const stripe = getStripe();
-  const baseUrl = getAppBaseUrl(args.request);
+  const baseUrl = getBillingBaseUrl(args.request);
   const customerId = await ensureStripeCustomer(args.userId);
   const priceId = getPriceIdForSelection(args.planTier, args.interval);
 
@@ -436,7 +433,7 @@ export async function createStripePortalUrl(args: {
   }
 
   const stripe = getStripe();
-  const baseUrl = getAppBaseUrl(args.request);
+  const baseUrl = getBillingBaseUrl(args.request);
   const customerId = await getExistingStripeCustomerId(args.userId);
 
   const session = await stripe.billingPortal.sessions.create({

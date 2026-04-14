@@ -4,6 +4,9 @@ import { PublicResumePage } from "@/components/public-resume-page";
 import type { ProfileJSON } from "@/lib/schema";
 import { getDemoPublicPageUser } from "@/lib/demo-public-pages";
 import { getPublicPageUserByUsername } from "@/lib/public-page";
+import { SITE_NAME, absoluteUrl } from "@/lib/site";
+
+export const revalidate = 300;
 
 interface Props {
   params: Promise<{ username: string }>;
@@ -25,11 +28,39 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     | undefined;
 
   return {
-    title: `${user.name ?? username} Resume — LifePage`,
+    title: `${user.name ?? username} Resume`,
     description:
       profile?.resume.summary ??
       profile?.headline ??
       `Resume of ${user.name ?? username}`,
+    alternates: {
+      canonical: absoluteUrl(`/u/${username}/resume`),
+    },
+    openGraph: {
+      title: `${user.name ?? username} Resume — ${SITE_NAME}`,
+      description:
+        profile?.resume.summary ??
+        profile?.headline ??
+        `Resume of ${user.name ?? username}`,
+      url: absoluteUrl(`/u/${username}/resume`),
+      images: [
+        {
+          url: absoluteUrl("/og-atrak-pages.svg"),
+          width: 1200,
+          height: 630,
+          alt: `${user.name ?? username} resume preview`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${user.name ?? username} Resume — ${SITE_NAME}`,
+      description:
+        profile?.resume.summary ??
+        profile?.headline ??
+        `Resume of ${user.name ?? username}`,
+      images: [absoluteUrl("/og-atrak-pages.svg")],
+    },
   };
 }
 

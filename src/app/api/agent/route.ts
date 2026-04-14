@@ -364,7 +364,7 @@ async function executeAgentTool(args: {
   } else if (tool === "generate_project_video") {
     if (!currentProfile) {
       throw new Error(
-        "Generate a profile first before asking LifeAgent to create project demo videos."
+        "Generate a profile first before asking the Atrak Pages agent to create project demo videos."
       );
     }
 

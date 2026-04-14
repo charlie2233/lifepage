@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { canonicalizeCrawlUrl } from "@/lib/crawl-state";
 import { prisma } from "@/lib/db";
 import { crawlUrl, expandGoogleSitesUrls, isGoogleSitesUrl } from "@/lib/crawler";
+import { recordProductEvent } from "@/lib/product-analytics";
 import { z } from "zod";
 
 const schema = z.object({
@@ -34,7 +35,9 @@ function getRequestedUrls(body: z.infer<typeof schema>) {
   ];
 
   if (requestedUrls.length === 0) {
-    throw createInputError("Provide at least one URL");
+    throw createInputError(
+      "Add at least one URL. A homepage, GitHub profile, or project page is a strong place to start."
+    );
   }
 
   return requestedUrls;
@@ -50,11 +53,11 @@ function normalizeUrl(url: string) {
   try {
     parsed = new URL(candidate);
   } catch {
-    throw new Error(`Invalid URL: ${url}`);
+    throw new Error(`Invalid URL: ${url}. Include the full page or domain you want Atrak Pages to import.`);
   }
 
   if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new Error(`Invalid URL: ${url}`);
+    throw new Error(`Invalid URL: ${url}. Only http and https links are supported.`);
   }
 
   return parsed.toString();
@@ -114,6 +117,14 @@ export async function POST(req: Request) {
     const body = (await req.json()) as unknown;
     const parsedBody = schema.parse(body);
     const requestedUrls = getRequestedUrls(parsedBody);
+    await recordProductEvent({
+      event: "crawl_started",
+      path: "/dashboard",
+      userId: session.user.id,
+      metadata: {
+        urlCount: requestedUrls.length,
+      },
+    });
 
     const results: Array<{
       inputUrl: string;
@@ -189,15 +200,37 @@ export async function POST(req: Request) {
       const status = errors.every((error) => error.startsWith("Invalid URL:"))
         ? 400
         : 500;
+      await recordProductEvent({
+        event: "crawl_failed",
+        path: "/dashboard",
+        userId: session.user.id,
+        metadata: {
+          urlCount: requestedUrls.length,
+          errors: errors.slice(0, 3),
+        },
+      });
 
       return NextResponse.json(
         {
-          error: errors.slice(0, 3).join("; ") || "Crawl failed",
+          error:
+            errors.slice(0, 3).join("; ") ||
+            "Atrak Pages could not import those sources. Try a different page or verify the URLs are public.",
           results,
         },
         { status }
       );
     }
+
+    await recordProductEvent({
+      event: "crawl_completed",
+      path: "/dashboard",
+      userId: session.user.id,
+      metadata: {
+        requestedUrlCount: requestedUrls.length,
+        importedItemCount: items.length,
+        failedItemCount: results.filter((result) => result.error).length,
+      },
+    });
 
     return NextResponse.json({
       item: items[0],
@@ -208,7 +241,11 @@ export async function POST(req: Request) {
     console.error("Crawl error:", err);
     if (err instanceof z.ZodError) {
       return NextResponse.json(
-        { error: err.issues[0]?.message ?? "Invalid URL" },
+        {
+          error:
+            err.issues[0]?.message ??
+            "That input does not look like a valid URL list yet.",
+        },
         { status: 400 }
       );
     }

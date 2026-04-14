@@ -4,23 +4,21 @@ import {
   CloudflareSaasError,
   createCloudflareCustomHostname,
   deleteCloudflareCustomHostname,
-  extractCloudflareHostnameError,
   findCloudflareCustomHostnameByHostname,
-  getCloudflareSaasCnameTarget,
+  getCloudflareSaasCapability,
   getCloudflareCustomHostname,
-  isCloudflareSaasConfigured,
   type CloudflareCustomHostname,
 } from "@/lib/cloudflare-saas";
-import {
-  buildCustomDomainVerificationRecord,
-  deriveCustomDomainLifecycleState,
-  normalizeCustomDomainProviderStatus,
-  normalizeCustomDomainSslStatus,
-} from "@/lib/custom-domain-lifecycle";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { normalizeCustomDomain } from "@/lib/custom-domain";
+import {
+  buildClearedCustomDomainState,
+  buildManagedCustomDomainState,
+} from "@/lib/custom-domain-state";
+import { isE2ETestMode } from "@/lib/e2e-mode";
 import type { PublicPageVisibility } from "@/lib/page-visibility";
+import { logCustomDomainEvent } from "@/lib/custom-domain-observability";
 import {
   PortfolioThemeConfigSchema,
   PortfolioThemeIdSchema,
@@ -55,6 +53,7 @@ type SettingsUpdateData = {
   customDomain?: string | null;
   customDomainNormalized?: string | null;
   customDomainStatus?: string;
+  customDomainDnsStatus?: string;
   customDomainVerificationName?: string | null;
   customDomainVerificationValue?: string | null;
   customDomainProviderId?: string | null;
@@ -63,6 +62,7 @@ type SettingsUpdateData = {
   customDomainProviderError?: string | null;
   customDomainLastCheckedAt?: Date | null;
   customDomainError?: string | null;
+  customDomainDiagnostics?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
 };
 
 function isProviderNotFound(error: unknown) {
@@ -99,43 +99,45 @@ function toUserFacingDomainError(error: unknown) {
   };
 }
 
-function buildManagedCustomDomainUpdate(args: {
-  hostname: string;
-  providerHostname?: CloudflareCustomHostname | null;
-  dnsVerified: boolean;
-  customDomainError?: string | null;
-  lastCheckedAt?: Date | null;
-  forceError?: boolean;
-}) {
-  const verification = buildCustomDomainVerificationRecord(args.hostname);
-  const providerError = extractCloudflareHostnameError(args.providerHostname);
-  const providerStatus = normalizeCustomDomainProviderStatus(
-    args.providerHostname?.status
+function shouldSimulateMissingCloudflareSetup(req: Request) {
+  return (
+    isE2ETestMode() &&
+    req.headers.get("x-e2e-cloudflare-saas")?.trim().toLowerCase() === "missing"
   );
-  const sslStatus = normalizeCustomDomainSslStatus(
-    args.providerHostname?.ssl?.status
-  );
-  const status = deriveCustomDomainLifecycleState({
-    dnsVerified: args.dnsVerified,
-    providerStatus,
-    sslStatus,
-    providerError,
-    forceError: args.forceError,
-  });
+}
+
+function toSettingsUpdateData(
+  data: ReturnType<typeof buildManagedCustomDomainState>
+) {
+  return {
+    ...data,
+    customDomainDiagnostics:
+      data.customDomainDiagnostics === null
+        ? Prisma.JsonNull
+        : data.customDomainDiagnostics,
+  } satisfies SettingsUpdateData;
+}
+
+function buildStoredProviderHostname(
+  hostname: string,
+  settings?: {
+    customDomainProviderId?: string | null;
+    customDomainProviderStatus?: string | null;
+    customDomainSslStatus?: string | null;
+  } | null
+) {
+  if (!settings?.customDomainProviderId && !settings?.customDomainProviderStatus) {
+    return null;
+  }
 
   return {
-    customDomain: args.hostname,
-    customDomainNormalized: args.hostname,
-    customDomainStatus: status,
-    customDomainVerificationName: verification.name,
-    customDomainVerificationValue: verification.value,
-    customDomainProviderId: args.providerHostname?.id ?? null,
-    customDomainProviderStatus: providerStatus,
-    customDomainSslStatus: sslStatus,
-    customDomainProviderError: providerError,
-    customDomainLastCheckedAt: args.lastCheckedAt ?? null,
-    customDomainError: args.customDomainError ?? providerError ?? null,
-  } satisfies SettingsUpdateData;
+    id: settings.customDomainProviderId ?? "stored-provider-id",
+    hostname,
+    status: settings.customDomainProviderStatus ?? null,
+    ssl: {
+      status: settings.customDomainSslStatus ?? null,
+    },
+  } as CloudflareCustomHostname;
 }
 
 async function resolveCustomHostnameForUser(args: {
@@ -214,10 +216,12 @@ export async function GET() {
     where: { userId: session.user.id },
   });
 
+  const cloudflareCapability = getCloudflareSaasCapability();
+
   return NextResponse.json({
     settings,
-    cloudflareSaasConfigured: isCloudflareSaasConfigured(),
-    cloudflareSaasCnameTarget: getCloudflareSaasCnameTarget(),
+    cloudflareSaasConfigured: cloudflareCapability.configured,
+    cloudflareSaasCnameTarget: cloudflareCapability.cnameTarget,
   });
 }
 
@@ -235,6 +239,9 @@ export async function PATCH(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
+  const cloudflareCapability = getCloudflareSaasCapability({
+    forceMissing: shouldSimulateMissingCloudflareSetup(req),
+  });
 
   const updateData: SettingsUpdateData = {};
 
@@ -270,22 +277,11 @@ export async function PATCH(req: Request) {
   }
 
   if (Object.prototype.hasOwnProperty.call(parsed.data, "customDomain")) {
-    if (!isCloudflareSaasConfigured()) {
-      return NextResponse.json(
-        {
-          error:
-            "Custom domains are unavailable until Cloudflare for SaaS is configured.",
-          cloudflareSaasConfigured: false,
-          cloudflareSaasCnameTarget: getCloudflareSaasCnameTarget(),
-        },
-        { status: 503 }
-      );
-    }
-
     const rawDomain = parsed.data.customDomain?.trim() ?? "";
 
     if (!rawDomain) {
-      if (existingSettings?.customDomainProviderId) {
+      let warning: string | null = null;
+      if (existingSettings?.customDomainProviderId && cloudflareCapability.configured) {
         try {
           await deleteCloudflareCustomHostname(existingSettings.customDomainProviderId);
         } catch (error) {
@@ -298,7 +294,10 @@ export async function PATCH(req: Request) {
           }
           return NextResponse.json({ error: message }, { status });
         }
-      } else if (existingSettings?.customDomainNormalized) {
+      } else if (
+        existingSettings?.customDomainNormalized &&
+        cloudflareCapability.configured
+      ) {
         try {
           const existingProvider = await resolveCustomHostnameForUser({
             hostname: existingSettings.customDomainNormalized,
@@ -318,21 +317,36 @@ export async function PATCH(req: Request) {
           }
           return NextResponse.json({ error: message }, { status });
         }
+      } else if (existingSettings?.customDomainProviderId) {
+        warning =
+          "The hostname was cleared locally, but this environment cannot contact Cloudflare right now, so any existing provider-side hostname may still need operator cleanup.";
+        logCustomDomainEvent("clear-local-only", {
+          userId: session.user.id,
+          hostname: existingSettings.customDomainNormalized,
+          providerId: existingSettings.customDomainProviderId,
+          missingCloudflareConfig: cloudflareCapability.missing,
+        });
       }
 
-      Object.assign(updateData, {
-        customDomain: null,
-        customDomainNormalized: null,
-        customDomainStatus: "none",
-        customDomainVerificationName: null,
-        customDomainVerificationValue: null,
-        customDomainProviderId: null,
-        customDomainProviderStatus: null,
-        customDomainSslStatus: null,
-        customDomainProviderError: null,
-        customDomainLastCheckedAt: null,
-        customDomainError: null,
-      } satisfies SettingsUpdateData);
+      Object.assign(
+        updateData,
+        {
+          ...buildClearedCustomDomainState(),
+          customDomainDiagnostics: Prisma.JsonNull,
+        } satisfies SettingsUpdateData
+      );
+
+      const settings = await prisma.publicPageSettings.upsert({
+        where: { userId: session.user.id },
+        create: { userId: session.user.id, ...updateData },
+        update: updateData,
+      });
+      return NextResponse.json({
+        settings,
+        warning,
+        cloudflareSaasConfigured: cloudflareCapability.configured,
+        cloudflareSaasCnameTarget: cloudflareCapability.cnameTarget,
+      });
     } else {
       let normalizedDomain: string;
       try {
@@ -362,6 +376,75 @@ export async function PATCH(req: Request) {
         );
       }
 
+      if (!cloudflareCapability.configured) {
+        const preservingManagedHostname =
+          Boolean(existingSettings?.customDomainProviderId) &&
+          Boolean(existingSettings?.customDomainNormalized) &&
+          existingSettings?.customDomainNormalized !== normalizedDomain;
+
+        if (preservingManagedHostname && existingSettings) {
+          const warning = `Cloudflare for SaaS is not fully configured in this environment yet, so Atrak Pages kept the existing managed hostname ${existingSettings.customDomainNormalized} in place. Restore provider access before swapping it to ${normalizedDomain}.`;
+          const settings = await prisma.publicPageSettings.update({
+            where: { userId: session.user.id },
+            data: updateData,
+          });
+
+          logCustomDomainEvent("save-deferred-swap-blocked", {
+            userId: session.user.id,
+            existingHostname: existingSettings.customDomainNormalized,
+            requestedHostname: normalizedDomain,
+            providerId: existingSettings.customDomainProviderId,
+            missingCloudflareConfig: cloudflareCapability.missing,
+          });
+
+          return NextResponse.json({
+            settings,
+            warning,
+            cloudflareSaasConfigured: cloudflareCapability.configured,
+            cloudflareSaasCnameTarget: cloudflareCapability.cnameTarget,
+          });
+        }
+
+        const warning =
+          "The hostname was saved locally, but Cloudflare for SaaS is not fully configured in this environment yet. Provisioning and verification will stay paused until the provider setup is completed.";
+        const storedProviderHostname =
+          existingSettings?.customDomainNormalized === normalizedDomain
+            ? buildStoredProviderHostname(normalizedDomain, existingSettings)
+            : null;
+        Object.assign(
+          updateData,
+          toSettingsUpdateData(
+            buildManagedCustomDomainState({
+              hostname: normalizedDomain,
+              providerHostname: storedProviderHostname,
+              dnsVerified: false,
+              dnsChecked: false,
+              cloudflareConfigured: false,
+              customDomainError: warning,
+            })
+          )
+        );
+
+        const settings = await prisma.publicPageSettings.upsert({
+          where: { userId: session.user.id },
+          create: { userId: session.user.id, ...updateData },
+          update: updateData,
+        });
+
+        logCustomDomainEvent("save-deferred", {
+          userId: session.user.id,
+          hostname: normalizedDomain,
+          missingCloudflareConfig: cloudflareCapability.missing,
+        });
+
+        return NextResponse.json({
+          settings,
+          warning,
+          cloudflareSaasConfigured: cloudflareCapability.configured,
+          cloudflareSaasCnameTarget: cloudflareCapability.cnameTarget,
+        });
+      }
+
       const replacingExistingDomain =
         existingSettings?.customDomainNormalized &&
         existingSettings.customDomainNormalized !== normalizedDomain;
@@ -371,6 +454,12 @@ export async function PATCH(req: Request) {
           await deleteCloudflareCustomHostname(existingSettings.customDomainProviderId);
         } catch (error) {
           const { message, status } = toUserFacingDomainError(error);
+          logCustomDomainEvent("replace-delete-failed", {
+            userId: session.user.id,
+            hostname: existingSettings.customDomainNormalized,
+            providerId: existingSettings.customDomainProviderId,
+            message,
+          });
           await updateExistingDomainErrorState({
             userId: session.user.id,
             message,
@@ -389,6 +478,11 @@ export async function PATCH(req: Request) {
           }
         } catch (error) {
           const { message, status } = toUserFacingDomainError(error);
+          logCustomDomainEvent("replace-lookup-delete-failed", {
+            userId: session.user.id,
+            hostname: existingSettings.customDomainNormalized,
+            message,
+          });
           await updateExistingDomainErrorState({
             userId: session.user.id,
             message,
@@ -418,22 +512,42 @@ export async function PATCH(req: Request) {
 
         Object.assign(
           updateData,
-          buildManagedCustomDomainUpdate({
-            hostname: normalizedDomain,
-            providerHostname,
-            dnsVerified: false,
-          })
+          toSettingsUpdateData(
+            buildManagedCustomDomainState({
+              hostname: normalizedDomain,
+              providerHostname,
+              dnsVerified: false,
+              dnsChecked: false,
+              cloudflareConfigured: cloudflareCapability.configured,
+            })
+          )
         );
+        logCustomDomainEvent("save-provisioned", {
+          userId: session.user.id,
+          hostname: normalizedDomain,
+          providerId: providerHostname.id,
+          providerStatus: providerHostname.status ?? null,
+          sslStatus: providerHostname.ssl?.status ?? null,
+        });
       } catch (error) {
         const { message, status } = toUserFacingDomainError(error);
+        logCustomDomainEvent("save-provision-failed", {
+          userId: session.user.id,
+          hostname: normalizedDomain,
+          message,
+        });
         Object.assign(
           updateData,
-          buildManagedCustomDomainUpdate({
-            hostname: normalizedDomain,
-            dnsVerified: false,
-            customDomainError: message,
-            forceError: true,
-          })
+          toSettingsUpdateData(
+            buildManagedCustomDomainState({
+              hostname: normalizedDomain,
+              dnsVerified: false,
+              dnsChecked: false,
+              cloudflareConfigured: cloudflareCapability.configured,
+              customDomainError: message,
+              forceError: true,
+            })
+          )
         );
 
         try {
@@ -458,8 +572,8 @@ export async function PATCH(req: Request) {
     });
     return NextResponse.json({
       settings,
-      cloudflareSaasConfigured: isCloudflareSaasConfigured(),
-      cloudflareSaasCnameTarget: getCloudflareSaasCnameTarget(),
+      cloudflareSaasConfigured: cloudflareCapability.configured,
+      cloudflareSaasCnameTarget: cloudflareCapability.cnameTarget,
     });
   } catch (error) {
     if (

@@ -95,12 +95,12 @@ export async function GET() {
       ? { label: "Phone", url: `tel:${user.profile.phone.replace(/[^\d+]/g, "")}` }
       : null,
     user.username && appBaseUrl
-      ? { label: "LifePage", url: `${appBaseUrl}/u/${user.username}` }
+      ? { label: "Atrak Pages", url: `${appBaseUrl}/u/${user.username}` }
       : null,
   ].filter((link): link is NonNullable<typeof link> => Boolean(link));
 
   const html = buildGoogleSitesHtml({
-    name: user.name ?? user.username ?? "LifePage User",
+    name: user.name ?? user.username ?? "Atrak Pages User",
     headline: parsedProfile.data.headline,
     about: parsedProfile.data.about,
     mode: (user.publicPageSettings?.mode as "hiring" | "admissions") ?? "hiring",

@@ -1,13 +1,17 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import type { CSSProperties } from "react";
 import type {
   EvidenceItem as PrismaEvidenceItem,
   UserProfile,
 } from "@prisma/client";
+import { PublicShareActions } from "@/components/public-share-actions";
 import { PublicPageNav } from "@/components/public-page-nav";
+import { StructuredData } from "@/components/structured-data";
+import { TrackPageView } from "@/components/track-page-view";
 import type { ProfileJSON } from "@/lib/schema";
 import type { PublicPageUser } from "@/lib/public-page";
-import { resolvePublicPageMode } from "@/lib/public-page";
+import { buildPublicPageModeHref, resolvePublicPageMode } from "@/lib/public-page";
 import { normalizeVisibility } from "@/lib/page-visibility";
 import { resolvePortfolioTheme } from "@/lib/portfolio-themes";
 import { normalizeProjectMedia } from "@/lib/project-media";
@@ -37,6 +41,16 @@ function getVisibilityLabel(visibility: string) {
   }
 
   return visibility === "private" ? "Private" : "Public";
+}
+
+function getHostnameLabel(value?: string | null) {
+  if (!value) return null;
+
+  try {
+    return new URL(value).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
 }
 
 export function PublicProfilePage({
@@ -95,11 +109,6 @@ export function PublicProfilePage({
     borderColor: resolvedTheme.outlineBorder,
     color: resolvedTheme.outlineText,
   };
-  const publicBadgeStyle = {
-    borderColor: `${resolvedTheme.accent}55`,
-    background: `${resolvedTheme.accent}16`,
-    color: resolvedTheme.isDark ? resolvedTheme.accentSoft : resolvedTheme.accent,
-  };
   const trophyTileStyle = {
     borderColor: resolvedTheme.panelBorder,
     background: resolvedTheme.isDark
@@ -145,6 +154,10 @@ export function PublicProfilePage({
       ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
       : "grid gap-4 sm:grid-cols-2 lg:grid-cols-3";
   const proofGallery = evidenceItems.filter((item) => item.screenshot);
+  const focusLabel =
+    mode === "hiring"
+      ? "Open for roles, collaborations, and product conversations."
+      : "Organized for admissions readers who need proof, context, and trajectory.";
   const hasPublicContact =
     Boolean(userProfile?.contactNote) ||
     Boolean(userProfile?.contactEmail) ||
@@ -158,6 +171,32 @@ export function PublicProfilePage({
     (mode === "hiring"
       ? "Reach out for roles, collaborations, or product conversations."
       : "Reach out for applications, mentorship, collaborations, or long-term opportunities.");
+  const profileHref = buildPublicPageModeHref(basePath, mode);
+  const resumeHref = buildPublicPageModeHref(
+    basePath === "/" ? "/resume" : `${basePath}/resume`,
+    mode
+  );
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: user.name ?? username,
+    alternateName: `@${username}`,
+    description: profileData?.headline,
+    url: profileHref,
+    sameAs: [
+      userProfile?.website,
+      userProfile?.github,
+      userProfile?.linkedin,
+      userProfile?.youtube,
+    ].filter(Boolean),
+    knowsAbout: profileData?.skills?.map((skill) => skill.tag).slice(0, 12),
+    hasPart: profileData?.projects?.slice(0, 4).map((project) => ({
+      "@type": "CreativeWork",
+      name: project.title,
+      description: project.impact ?? project.problem ?? project.approach ?? "",
+      url: project.links?.[0]?.url,
+    })),
+  };
   const formatContactHref = (value: string, type: "email" | "phone" | "url") => {
     if (type === "email") {
       return `mailto:${value}`;
@@ -191,7 +230,7 @@ export function PublicProfilePage({
             Brand page coming soon
           </h1>
           <p className="mt-3 text-base leading-7" style={mutedStyle}>
-            @{username} is still shaping this LifePage and has not published the full story yet.
+            @{username} is still shaping this Atrak Pages profile and has not published the full story yet.
           </p>
         </div>
       </div>
@@ -200,6 +239,11 @@ export function PublicProfilePage({
 
   return (
     <div className="portfolio-body min-h-screen" style={pageStyle}>
+      <TrackPageView
+        event="public_profile_viewed"
+        metadata={{ username, mode }}
+      />
+      <StructuredData data={structuredData} />
       {resolvedTheme.isDark && (
         <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
           <div
@@ -224,23 +268,20 @@ export function PublicProfilePage({
         <div className="lp-shell py-14 md:py-20">
           <section className={heroSectionClass}>
             <div className={`rounded-[2rem] border p-7 md:p-8 ${heroCardClass}`} style={panelStyle}>
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className="rounded-full border px-3 py-1 text-xs"
-                  style={
-                    visibility === "public"
-                      ? publicBadgeStyle
-                      : neutralBadgeStyle
-                  }
-                >
-                  {getVisibilityLabel(visibility)}
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="lp-kicker text-[11px]" style={accentStyle}>
+                  {mode === "hiring" ? "Selected work" : "Admissions story"}
                 </span>
-                <span className="rounded-full border px-3 py-1 text-xs" style={chipStyle}>
-                  {mode === "hiring" ? "Hiring view" : "Admissions view"}
-                </span>
-                <span className="rounded-full border px-3 py-1 text-xs" style={chipStyle}>
-                  Theme: {resolvedTheme.label}
-                </span>
+                {userProfile?.location ? (
+                  <span className="text-xs" style={mutedStyle}>
+                    Based in {userProfile.location}
+                  </span>
+                ) : null}
+                {visibility !== "public" ? (
+                  <span className="rounded-full border px-3 py-1 text-xs" style={neutralBadgeStyle}>
+                    {getVisibilityLabel(visibility)}
+                  </span>
+                ) : null}
               </div>
 
               <h1 className="brand-display mt-6 text-[3.4rem] leading-[0.92] tracking-[-0.05em] md:text-[4.6rem]">
@@ -253,7 +294,7 @@ export function PublicProfilePage({
                 {profileData.about}
               </p>
               <p className={`mt-4 text-sm leading-7 ${heroCopyClass}`} style={mutedStyle}>
-                A public brand page built from projects, proof, and the story behind the work.
+                Built from selected work, proof, and the execution story behind it.
               </p>
 
               <div className={`mt-8 flex flex-wrap gap-3 ${heroActionsClass}`}>
@@ -391,15 +432,9 @@ export function PublicProfilePage({
 
               <div className="rounded-[2rem] border p-5" style={panelStyle}>
                 <p className="lp-kicker text-[11px]" style={accentStyle}>
-                  Identity details
+                  Quick read
                 </p>
                 <div className="mt-4 space-y-3">
-                  <div className="rounded-[1.25rem] border p-4" style={statTileStyle}>
-                    <p className="text-xs uppercase tracking-[0.14em]" style={mutedStyle}>
-                      Username
-                    </p>
-                    <p className="mt-2 text-base font-medium">@{username}</p>
-                  </div>
                   {userProfile?.location && (
                     <div
                       className="flex items-center gap-3 rounded-[1.25rem] border p-4"
@@ -416,15 +451,63 @@ export function PublicProfilePage({
                   )}
                   <div className="rounded-[1.25rem] border p-4" style={statTileStyle}>
                     <p className="text-xs uppercase tracking-[0.14em]" style={mutedStyle}>
-                      Current emphasis
+                      Best fit
                     </p>
                     <p className="mt-2 text-sm leading-7">
-                      {mode === "hiring"
-                        ? "Structured around proof, impact, and project clarity."
-                        : "Structured around growth, motivation, and long-term trajectory."}
+                      {focusLabel}
+                    </p>
+                  </div>
+                  {profileData.skills?.length ? (
+                    <div className="rounded-[1.25rem] border p-4" style={statTileStyle}>
+                      <p className="text-xs uppercase tracking-[0.14em]" style={mutedStyle}>
+                        Core stack
+                      </p>
+                      <p className="mt-2 text-sm leading-7">
+                        {profileData.skills
+                          .slice(0, 4)
+                          .map((skill) => skill.tag)
+                          .join(" · ")}
+                      </p>
+                    </div>
+                  ) : null}
+                  <div className="rounded-[1.25rem] border p-4" style={statTileStyle}>
+                    <p className="text-xs uppercase tracking-[0.14em]" style={mutedStyle}>
+                      Public path
+                    </p>
+                    <p className="mt-2 text-sm leading-7">
+                      @{username}
                     </p>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-[2rem] border p-5" style={panelStyle}>
+                <p className="lp-kicker text-[11px]" style={accentStyle}>
+                  Share this page
+                </p>
+                <div className="mt-4 rounded-[1.25rem] border p-4" style={statTileStyle}>
+                  <p className="text-xs uppercase tracking-[0.14em]" style={mutedStyle}>
+                    Proof layer
+                  </p>
+                  <p className="mt-2 text-sm leading-7">
+                    {proofGallery.length > 0
+                      ? `${proofGallery.length} screenshot${proofGallery.length === 1 ? "" : "s"} and linked sources help a reader audit the work fast.`
+                      : "Add screenshots or source links in the dashboard to make the page easier to audit at a glance."}
+                  </p>
+                </div>
+                <PublicShareActions
+                  alternateHref={resumeHref}
+                  alternateLabel="Resume view"
+                  copyEvent="profile_copy_link_clicked"
+                  currentViewLabel="portfolio"
+                  downloadHref={`/api/resume?username=${encodeURIComponent(username)}`}
+                  helperText="Share the portfolio for a proof-rich first impression, copy a clean link, or jump to the recruiter-friendly resume view."
+                  mutedColor={resolvedTheme.muted}
+                  outlineButtonStyle={outlineButtonStyle}
+                  shareLabel="Share portfolio"
+                  shareText="Check out this Atrak Pages portfolio. It highlights real work, visible proof, and a companion resume view."
+                  shareEvent="profile_share_clicked"
+                />
               </div>
             </aside>
           </section>
@@ -483,13 +566,28 @@ export function PublicProfilePage({
 
               <div className={projectGridClass}>
                 {profileData.projects.map((project, index) => {
+                  const normalizedProjectTitle = project.title.toLowerCase();
                   const evidence = evidenceItems.find((item) => {
+                    const titleMatches =
+                      item.title?.toLowerCase().includes(normalizedProjectTitle) ??
+                      false;
+                    const descriptionMatches =
+                      item.description?.toLowerCase().includes(normalizedProjectTitle) ??
+                      false;
+                    if (titleMatches || descriptionMatches) {
+                      return true;
+                    }
                     if (!item.url) return false;
                     try {
                       const evidenceHost = new URL(item.url).hostname;
-                      return project.links?.some((link) =>
-                        link.url.includes(evidenceHost)
-                      );
+                      return project.links?.some((link) => {
+                        try {
+                          const linkHost = new URL(link.url).hostname;
+                          return linkHost === evidenceHost || link.url.includes(evidenceHost);
+                        } catch {
+                          return link.url.includes(evidenceHost);
+                        }
+                      });
                     } catch {
                       return false;
                     }
@@ -497,6 +595,8 @@ export function PublicProfilePage({
                   const projectVideo = normalizeProjectMedia(project.media).find(
                     (item) => item.type === "video" && item.status === "ready"
                   );
+                  const evidenceHost = getHostnameLabel(evidence?.url);
+                  const primarySourceHost = getHostnameLabel(project.links?.[0]?.url ?? null);
 
                   return (
                     <article
@@ -513,7 +613,7 @@ export function PublicProfilePage({
                         <video
                           controls
                           playsInline
-                          preload="metadata"
+                          preload="none"
                           poster={projectVideo.posterUrl ?? undefined}
                           className={`w-full bg-black object-cover object-top ${
                             resolvedTheme.projectLayout === "feature"
@@ -525,27 +625,91 @@ export function PublicProfilePage({
                           src={projectVideo.url}
                         />
                       ) : evidence?.screenshot ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={evidence.screenshot}
-                          alt={project.title}
-                          className={`w-full object-cover object-top ${
+                        <div
+                          className={`relative w-full overflow-hidden ${
                             resolvedTheme.projectLayout === "feature"
                               ? "h-64"
                               : resolvedTheme.projectLayout === "stack"
                                 ? "h-44"
                                 : "h-52"
                           }`}
-                        />
+                        >
+                          <Image
+                            src={evidence.screenshot}
+                            alt={project.title}
+                            fill
+                            sizes={
+                              resolvedTheme.projectLayout === "feature"
+                                ? "100vw"
+                                : "(max-width: 1024px) 100vw, 50vw"
+                            }
+                            className="object-cover object-top"
+                          />
+                        </div>
                       ) : null}
                       <div className={projectCardPaddingClass}>
-                        <h3 className="text-2xl font-semibold tracking-tight">
-                          {project.title}
-                        </h3>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <h3 className="text-2xl font-semibold tracking-tight">
+                            {project.title}
+                          </h3>
+                          <div className="flex flex-wrap gap-2">
+                            {evidence ? (
+                              <span className="rounded-full border px-3 py-1 text-[11px]" style={chipStyle}>
+                                {evidenceHost ? `Proof from ${evidenceHost}` : "Proof linked"}
+                              </span>
+                            ) : null}
+                            {project.links?.length ? (
+                              <span className="rounded-full border px-3 py-1 text-[11px]" style={chipStyle}>
+                                {project.links.length} source{project.links.length === 1 ? "" : "s"}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
                         {projectVideo ? (
                           <p className="mt-3 text-xs uppercase tracking-[0.18em]" style={accentStyle}>
                             Demo video
                           </p>
+                        ) : null}
+                        {project.impact ? (
+                          <div className="mt-5 rounded-[1.2rem] border p-4" style={statTileStyle}>
+                            <p className="lp-kicker text-[11px]" style={impactLabelStyle}>
+                              Strongest outcome
+                            </p>
+                            <p className="mt-2 text-sm leading-7" style={impactTextStyle}>
+                              {project.impact}
+                            </p>
+                          </div>
+                        ) : null}
+                        {evidence?.url ? (
+                          <div className="mt-4 rounded-[1.1rem] border p-3" style={statTileStyle}>
+                            <p className="text-xs uppercase tracking-[0.14em]" style={mutedStyle}>
+                              Proof source
+                            </p>
+                            <a
+                              href={evidence.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-flex items-center gap-2 text-sm hover:underline"
+                              style={accentStyle}
+                            >
+                              {evidence.title ?? evidenceHost ?? evidence.url}
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                            {evidenceHost ? (
+                              <p className="mt-1 text-xs" style={mutedStyle}>
+                                Source host: {evidenceHost}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : primarySourceHost ? (
+                          <div className="mt-4 rounded-[1.1rem] border p-3" style={statTileStyle}>
+                            <p className="text-xs uppercase tracking-[0.14em]" style={mutedStyle}>
+                              Primary source
+                            </p>
+                            <p className="mt-2 text-sm" style={accentStyle}>
+                              {primarySourceHost}
+                            </p>
+                          </div>
                         ) : null}
                         {mode === "hiring" ? (
                           <div className="mt-5 space-y-4">
@@ -569,20 +733,10 @@ export function PublicProfilePage({
                                 </p>
                               </div>
                             )}
-                            {project.impact && (
-                              <div>
-                                <p className="lp-kicker text-[11px]" style={impactLabelStyle}>
-                                  Impact
-                                </p>
-                                <p className="mt-2 text-sm leading-7" style={impactTextStyle}>
-                                  {project.impact}
-                                </p>
-                              </div>
-                            )}
                           </div>
                         ) : (
                           <p className="mt-4 text-sm leading-7" style={mutedStyle}>
-                            {project.approach ?? project.problem}
+                            {project.impact ?? project.approach ?? project.problem}
                           </p>
                         )}
 
@@ -965,6 +1119,9 @@ export function PublicProfilePage({
                 <h2 className="brand-display mt-2 text-4xl tracking-tight">
                   Proof Gallery
                 </h2>
+                <p className="mt-3 max-w-lg text-sm leading-7" style={mutedStyle}>
+                  Screenshots and linked sources make the work easier to audit and easier to share.
+                </p>
               </div>
 
               <div className={proofGridClass}>
@@ -983,24 +1140,38 @@ export function PublicProfilePage({
                     }`}
                     style={panelStyle}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.screenshot!}
-                      alt={item.title ?? "project screenshot"}
-                      className={`w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04] ${
+                    <div
+                      className={`relative w-full overflow-hidden ${
                         resolvedTheme.proofLayout === "spotlight" && index === 0
                           ? "h-60"
                           : resolvedTheme.proofLayout === "mosaic" && index % 3 === 0
                             ? "h-56"
                             : "h-44"
                       }`}
-                    />
+                    >
+                      <Image
+                        src={item.screenshot!}
+                        alt={item.title ?? "project screenshot"}
+                        fill
+                        sizes={
+                          resolvedTheme.proofLayout === "mosaic"
+                            ? "(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+                            : "(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                        }
+                        className="object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]"
+                      />
+                    </div>
                     <div className="p-4">
                       <p className="text-sm font-medium">
                         {item.title ?? "Evidence item"}
                       </p>
                       <p className="mt-1 text-xs" style={mutedStyle}>
-                        Open source proof
+                        {getHostnameLabel(item.url)
+                          ? `Source: ${getHostnameLabel(item.url)}`
+                          : "Open source proof"}
+                      </p>
+                      <p className="mt-2 text-xs" style={accentStyle}>
+                        Open linked proof
                       </p>
                     </div>
                   </a>
@@ -1016,7 +1187,7 @@ export function PublicProfilePage({
         style={{ borderTopColor: resolvedTheme.footerBorder }}
       >
         <div className="lp-shell text-center text-xs" style={mutedStyle}>
-          Built with LifePage personal brand studio · Powered by AI ·{" "}
+          Built with Atrak Pages personal brand studio · Powered by AI ·{" "}
           <a
             href="https://atrak.dev"
             target="_blank"

@@ -1,12 +1,16 @@
 {
-  "name": "lifepage",
+  "name": "atrak-pages",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "test:unit": "node --import tsx --test src/lib/*.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ci": "playwright test --reporter=line,html --workers=1",

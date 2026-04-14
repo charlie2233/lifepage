@@ -7,7 +7,17 @@ import type { ProfileJSON } from "@/lib/schema";
 import { PublicProfilePage } from "@/components/public-profile-page";
 import { ContactSection } from "@/components/contact-section";
 import { LandingPricing } from "@/components/landing-pricing";
+import { StructuredData } from "@/components/structured-data";
+import { TrackPageView } from "@/components/track-page-view";
 import { isStripeBillingConfigured } from "@/lib/stripe-billing";
+import {
+  SITE_AUTHOR,
+  SITE_AUTHOR_URL,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TAGLINE,
+  absoluteUrl,
+} from "@/lib/site";
 import {
   getPublicPageUserByCustomDomain,
 } from "@/lib/public-page";
@@ -24,21 +34,41 @@ import {
   FileText,
   Globe,
   GraduationCap,
+  Images,
   LayoutGrid,
   Link2,
   Lock,
   Palette,
   Search,
+  ShieldCheck,
   Sparkles,
 } from "lucide-react";
 
-const SITE_AUTHOR = "atrak.dev";
-const SITE_AUTHOR_URL = "https://atrak.dev";
-
 const DEFAULT_METADATA: Metadata = {
-  title: "LifePage",
-  description:
-    "AI-powered personal brand and life-story builder for creators, students, job seekers, and people documenting their life.",
+  title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+  description: SITE_DESCRIPTION,
+  alternates: {
+    canonical: absoluteUrl("/"),
+  },
+  openGraph: {
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+    url: absoluteUrl("/"),
+    images: [
+      {
+        url: absoluteUrl("/og-atrak-pages.svg"),
+        width: 1200,
+        height: 630,
+        alt: `${SITE_NAME} open graph image`,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+    images: [absoluteUrl("/og-atrak-pages.svg")],
+  },
 };
 
 const DEMO_PROFILES = [
@@ -92,7 +122,7 @@ const HOW_IT_WORKS: Array<{
     step: "02",
     icon: Bot,
     title: "Shape the narrative",
-    desc: "LifePage reads the evidence, extracts the signal, and turns it into a portfolio story, resume, and positioning.",
+    desc: "Atrak Pages reads the evidence, extracts the signal, and turns it into a portfolio story, resume, and positioning.",
     color: "#7c3aed",
   },
   {
@@ -117,7 +147,7 @@ const FEATURES: Array<{
   { icon: FileText, title: "Resume System", desc: "Publish a separate resume page and export a polished PDF when you need it." },
   { icon: Palette, title: "Portfolio Models", desc: "Choose from 30 preset portfolio directions or let the agent reshape the UI for you." },
   { icon: ChartColumn, title: "Narrative Outputs", desc: "Generate timelines, scripts, trees, and structured brand artifacts from the same evidence." },
-  { icon: LayoutGrid, title: "Explore Feed", desc: "Browse public LifePage launches and study how others frame their work and identity." },
+  { icon: LayoutGrid, title: "Explore Feed", desc: "Browse public Atrak Pages launches and study how others frame their work and identity." },
 ];
 
 const WHO_ITS_FOR: Array<{
@@ -144,6 +174,46 @@ const WHO_ITS_FOR: Array<{
     icon: ChartColumn,
     title: "People recording their life",
     desc: "Document milestones, timelines, projects, memories, and the way your life evolves over time.",
+  },
+];
+
+const HERO_IMPORT_RECIPES = [
+  {
+    label: "Homepage",
+    example: "https://your-site.com",
+    detail: "Start with the page that explains who you are and what you build.",
+  },
+  {
+    label: "Project repo or case study",
+    example: "https://github.com/yourname/project",
+    detail: "Choose the project you want people to remember after one click.",
+  },
+  {
+    label: "Proof page",
+    example: "https://youtube.com/@yourname",
+    detail: "Use a demo, docs, launch post, or walkthrough that proves the work shipped.",
+  },
+];
+
+const TRUST_PILLARS: Array<{
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+}> = [
+  {
+    icon: Link2,
+    title: "Grounded in real evidence",
+    desc: "Start with a few real URLs and Atrak Pages turns them into a narrative with source-backed proof instead of blank-page writing.",
+  },
+  {
+    icon: Images,
+    title: "Shows the work, not just claims",
+    desc: "Project visuals, proof tiles, and source links stay visible so the page reads like evidence instead of marketing copy.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Ready to send in one pass",
+    desc: "You leave with a public page, a cleaner resume view, and explicit visibility controls for what stays public or private.",
   },
 ];
 
@@ -197,7 +267,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   if (!user) {
     return {
-      title: "Portfolio not found — LifePage",
+      title: "Portfolio not found — Atrak Pages",
       description: hostname
         ? `No public portfolio is connected to ${hostname}.`
         : DEFAULT_METADATA.description,
@@ -207,18 +277,69 @@ export async function generateMetadata(): Promise<Metadata> {
   const profile = user.generatedProfiles[0]?.data as unknown as
     | ProfileJSON
     | undefined;
+  const currentOrigin = hostname ? `https://${hostname}` : absoluteUrl("/");
 
   return {
-    title: `${user.name ?? user.username ?? "Portfolio"} — LifePage`,
+    title: `${user.name ?? user.username ?? "Portfolio"} — Atrak Pages`,
     description: profile?.headline ?? DEFAULT_METADATA.description,
+    alternates: {
+      canonical: currentOrigin,
+    },
+    openGraph: {
+      type: "website",
+      title: `${user.name ?? user.username ?? "Portfolio"} — ${SITE_NAME}`,
+      description: profile?.headline ?? SITE_DESCRIPTION,
+      url: currentOrigin,
+      images: [
+        {
+          url: new URL("/og-atrak-pages.svg", currentOrigin).toString(),
+          width: 1200,
+          height: 630,
+          alt: `${user.name ?? user.username ?? "Portfolio"} preview`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${user.name ?? user.username ?? "Portfolio"} — ${SITE_NAME}`,
+      description: profile?.headline ?? SITE_DESCRIPTION,
+      images: [new URL("/og-atrak-pages.svg", currentOrigin).toString()],
+    },
   };
 }
 
 function LandingPage() {
   const stripeConfigured = isStripeBillingConfigured();
+  const landingStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: SITE_NAME,
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    description: SITE_DESCRIPTION,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+    },
+    creator: {
+      "@type": "Person",
+      name: SITE_AUTHOR,
+      url: SITE_AUTHOR_URL,
+    },
+    featureList: [
+      "Import GitHub, website, video, and document URLs",
+      "Generate a public portfolio page and resume view",
+      "Capture screenshots and evidence for stronger credibility",
+      "Share public pages or custom domains",
+    ],
+  };
 
   return (
-    <div className="lp-page overflow-hidden text-white">
+    <>
+      <TrackPageView event="landing_page_viewed" />
+      <StructuredData data={landingStructuredData} />
+      <div className="lp-page overflow-hidden text-white">
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <div className="animate-orb-float absolute -top-32 left-[8%] h-[34rem] w-[34rem] rounded-full bg-[#79e5d2]/12 blur-[130px]" />
         <div className="animate-orb-float-alt absolute right-[4%] top-[16%] h-[28rem] w-[28rem] rounded-full bg-[#8fa9ff]/14 blur-[120px]" />
@@ -229,12 +350,10 @@ function LandingPage() {
       <nav className="relative z-10 border-b border-white/8 bg-[#091015]/75 backdrop-blur-2xl">
         <div className="lp-shell flex items-center justify-between py-5">
           <div className="flex items-center gap-3">
-            <div className="animate-pulse-glow flex h-10 w-10 items-center justify-center rounded-2xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[11px] font-black tracking-[0.24em] text-[#041117]">
-              LP
-            </div>
+            <div className="animate-pulse-glow flex h-10 w-10 items-center justify-center rounded-2xl border border-[#79e5d2]/30 bg-[linear-gradient(135deg,rgba(121,229,210,0.9),rgba(207,255,246,0.92))] text-[11px] font-black tracking-[0.24em] text-[#041117]">AP</div>
             <div>
               <p className="brand-display text-[1.35rem] leading-none tracking-tight">
-                LifePage
+                Atrak Pages
               </p>
               <p className="lp-kicker mt-1 text-[10px] text-[#94a2ad]">
                 Brand, proof, deploy
@@ -283,24 +402,31 @@ function LandingPage() {
             </div>
 
             <h1 className="brand-display mt-8 max-w-4xl text-[3.4rem] leading-[0.95] tracking-[-0.05em] text-[#f8f3ea] sm:text-[4.4rem] lg:text-[5.6rem]">
-              Build your personal brand.
+              Turn proof of your work
+              <span className="block">into a portfolio people trust.</span>
               <span className="animate-gradient-text block bg-[linear-gradient(120deg,#79e5d2_0%,#b9fff1_30%,#8fa9ff_60%,#f3b276_100%)] bg-clip-text text-transparent">
-                Deploy it like a product.
+                Publish the page and the resume together.
               </span>
             </h1>
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-[#a4b1ba] sm:text-xl">
-              Turn scattered links, projects, and proof into a clear public
-              presence. LifePage imports your work, writes the story, builds the
-              page, and deploys it as a brand site and resume you can actually share.
+              Paste your site, GitHub, demos, or school project links. Atrak Pages
+              crawls the proof, captures screenshots, writes the story, and ships
+              a public portfolio plus a cleaner resume view you can share right away.
             </p>
+
+            <div className="mt-6 flex flex-wrap gap-2.5 text-sm text-[#c9d2d9]">
+              <span className="lp-chip px-3.5 py-2">3 links in</span>
+              <span className="lp-chip px-3.5 py-2">Screenshots captured</span>
+              <span className="lp-chip px-3.5 py-2">Portfolio + resume out</span>
+            </div>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/register"
                 className="lp-button-primary btn-fancy px-7 py-3.5 text-base"
               >
-                Build my brand
+                Create my free page
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
@@ -308,21 +434,27 @@ function LandingPage() {
                 className="lp-button-secondary px-7 py-3.5 text-base"
               >
                 <Search className="h-4 w-4" />
-                Explore brands
+                See live examples
               </Link>
             </div>
 
+            <p className="mt-4 max-w-xl text-sm leading-7 text-[#91a1ab]">
+              Fastest first run: paste one homepage, one project repo or case study,
+              and one proof-heavy page. Atrak Pages does the first synthesis, and
+              you keep editing from there.
+            </p>
+
             <div className="mt-7 flex flex-wrap gap-2.5 text-sm text-[#c9d2d9]">
-              <span className="lp-chip px-3.5 py-2">Personal brands</span>
-              <span className="lp-chip px-3.5 py-2">College applications</span>
+              <span className="lp-chip px-3.5 py-2">Internship portfolios</span>
               <span className="lp-chip px-3.5 py-2">Job applications</span>
-              <span className="lp-chip px-3.5 py-2">Life documentation</span>
+              <span className="lp-chip px-3.5 py-2">Admissions storytelling</span>
+              <span className="lp-chip px-3.5 py-2">Creator / founder intros</span>
             </div>
 
             <div className="mt-8 flex flex-wrap gap-3 text-sm text-[#8d9aa5]">
-              <span className="lp-chip px-3 py-1.5">Free to start</span>
-              <span className="lp-chip px-3 py-1.5">Multiple URL import</span>
-              <span className="lp-chip px-3 py-1.5">Custom domain ready</span>
+              <span className="lp-chip px-3 py-1.5">No portfolio writing marathon</span>
+              <span className="lp-chip px-3 py-1.5">Proof stays visible</span>
+              <span className="lp-chip px-3 py-1.5">Exports resume PDF</span>
               <span className="lp-chip px-3 py-1.5">Built by {SITE_AUTHOR}</span>
             </div>
           </div>
@@ -333,36 +465,31 @@ function LandingPage() {
                 <div className="rounded-[1.5rem] border border-white/10 bg-[rgba(255,255,255,0.035)] p-4">
                   <div className="flex items-center justify-between text-xs text-[#a9b6be]">
                     <span className="lp-kicker text-[10px] text-[#79e5d2]">
-                      Brand flow
+                      First-run inputs
                     </span>
-                    <span>From proof to publish</span>
+                    <span>What to paste first</span>
                   </div>
                   <div className="mt-4 space-y-3">
-                    {[
-                      { icon: Link2, label: "Import proof", copy: "Site, GitHub, docs, videos, school work, or Google Sites" },
-                      { icon: Bot, label: "Shape the story", copy: "AI turns raw evidence into positioning, projects, a resume, and a stronger narrative" },
-                      { icon: Globe, label: "Deploy anywhere", copy: "Launch on /u/yourname or your own domain with public, link-only, or private access" },
-                    ].map((item, i) => {
-                      const Icon = item.icon;
-                      return (
-                        <div
-                          key={item.label}
-                          className={`card-hover flex items-start gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-3 stagger-${i + 1} lp-fade-rise`}
-                        >
-                          <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl border border-[#79e5d2]/20 bg-[#79e5d2]/12">
-                            <Icon className="h-4 w-4 text-[#79e5d2]" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-[#f4efe8]">
-                              {item.label}
-                            </p>
-                            <p className="mt-1 text-sm leading-6 text-[#93a1ab]">
-                              {item.copy}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {HERO_IMPORT_RECIPES.map((recipe, index) => (
+                      <div
+                        key={recipe.label}
+                        className={`card-hover rounded-2xl border border-white/8 bg-black/20 px-4 py-3 stagger-${index + 1} lp-fade-rise`}
+                      >
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-[#79e5d2]">
+                          {recipe.label}
+                        </p>
+                        <p className="mt-2 text-sm font-medium leading-6 text-[#f2f7fa]">
+                          {recipe.example}
+                        </p>
+                        <p className="mt-1 text-xs leading-6 text-[#95a5af]">
+                          {recipe.detail}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 rounded-2xl border border-[#79e5d2]/12 bg-[#79e5d2]/6 px-4 py-3 text-sm leading-6 text-[#b7c6cf]">
+                    Best conversion path: import 2-3 links that each prove something
+                    different, then publish the first page before you start polishing.
                   </div>
                 </div>
 
@@ -373,14 +500,14 @@ function LandingPage() {
                         Live preview
                       </p>
                       <p className="mt-2 brand-display text-2xl tracking-tight">
-                        alexchen.com
+                        /u/alexchen
                       </p>
                       <p className="mt-1 text-xs text-[#94a2ad]">
-                        A live portfolio and resume deployment
+                        Portfolio page + separate resume view
                       </p>
                     </div>
                     <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200">
-                      Public
+                      Ready to share
                     </span>
                   </div>
 
@@ -418,16 +545,16 @@ function LandingPage() {
                       </div>
                       <div className="lp-stat-tile p-4">
                         <p className="text-2xl font-semibold text-[#f7f1e8]">
-                          1
+                          18
                         </p>
                         <p className="mt-1 text-xs text-[#8e9ca6]">
-                          Resume page
+                          Proof items
                         </p>
                       </div>
                     </div>
 
                     <div className="mt-5 flex flex-wrap gap-2">
-                      {["Hiring mode", "Admissions mode", "Separate resume page"].map(
+                      {["Proof-led case studies", "Resume view", "Share-ready link"].map(
                         (label) => (
                           <span
                             key={label}
@@ -443,9 +570,9 @@ function LandingPage() {
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   {[
-                    { title: "Visibility", value: "Public, link-only, or private" },
-                    { title: "AI layer", value: "Credits, models, agent workflows" },
-                    { title: "Deploy", value: "Profile path, resume page, custom domain" },
+                    { title: "Input recipe", value: "Homepage + project + proof page is the highest-signal first run." },
+                    { title: "Output", value: "Headline, case studies, screenshots, and a resume-first companion page." },
+                    { title: "Trust", value: "Public links still point back to the work, not just a polished summary." },
                   ].map((item) => (
                     <div key={item.title} className="lp-stat-tile p-4">
                       <p className="lp-kicker text-[10px] text-[#79e5d2]">
@@ -459,6 +586,42 @@ function LandingPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="relative z-10 pb-16">
+        <div className="lp-shell">
+          <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="lp-kicker text-xs text-[#79e5d2]">Why it feels credible</p>
+              <h2 className="brand-display mt-3 text-4xl tracking-tight text-[#f8f3ea] md:text-5xl">
+                The page is built from proof, not just prompts
+              </h2>
+            </div>
+            <p className="max-w-xl text-base leading-7 text-[#97a4ae]">
+              Atrak Pages is strongest when it makes the underlying work easier to trust:
+              clear sources, visible screenshots, and a resume that matches the page.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {TRUST_PILLARS.map((pillar) => {
+              const Icon = pillar.icon;
+              return (
+                <div key={pillar.title} className="lp-panel rounded-[1.6rem] p-5">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#79e5d2]/20 bg-[#79e5d2]/8">
+                    <Icon className="h-5 w-5 text-[#79e5d2]" />
+                  </div>
+                  <h3 className="mt-5 text-lg font-semibold text-[#f8f3ea]">
+                    {pillar.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-7 text-[#97a4ae]">
+                    {pillar.desc}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -658,7 +821,7 @@ function LandingPage() {
               </h2>
             </div>
             <p className="max-w-lg text-base leading-7 text-[#97a4ae]">
-              LifePage is opinionated about audiences that most portfolio tools flatten:
+              Atrak Pages is opinionated about audiences that most portfolio tools flatten:
               creators, applicants, professionals, and people documenting a life in motion.
             </p>
           </div>
@@ -751,11 +914,11 @@ function LandingPage() {
           <div className="lp-panel glow-ring-teal rounded-[2rem] px-6 py-10 text-center sm:px-10 sm:py-12">
             <p className="lp-kicker text-xs text-[#79e5d2]">Launch</p>
             <h2 className="brand-display mt-4 text-4xl tracking-tight text-[#f8f3ea] md:text-5xl">
-              Ready to launch your brand?
+              Ready to turn your proof into a page worth sharing?
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-[#97a4ae]">
-              Turn your work into a sharper public story, publish the page, and
-              walk away with a resume that actually matches the site.
+              Bring a few real links, publish a sharper story, and leave with a
+              portfolio page plus a resume that actually matches it.
             </p>
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Link
@@ -787,12 +950,10 @@ function LandingPage() {
       <footer className="relative z-10 border-t border-white/8 py-8">
         <div className="lp-shell flex flex-col gap-4 text-sm text-[#8f9ca6] sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[10px] font-black tracking-[0.2em] text-[#041117]">
-              LP
-            </div>
+            <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#79e5d2,#cffff6)] text-[10px] font-black tracking-[0.2em] text-[#041117]">AP</div>
             <div>
               <p className="brand-display text-lg leading-none text-[#f7f1e8]">
-                LifePage
+                Atrak Pages
               </p>
               <p className="mt-1 text-xs text-[#8f9ca6]">
                 Personal brand builder for people with proof
@@ -818,7 +979,8 @@ function LandingPage() {
           </p>
         </div>
       </footer>
-    </div>
+      </div>
+    </>
   );
 }
 

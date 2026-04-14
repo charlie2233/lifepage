@@ -39,6 +39,7 @@ model User {
   publicPageSettings PublicPageSettings?
   automations   Automation[]
   agentArtifacts AgentArtifact[]
+  productEvents ProductEvent[]
 }
 
 model UserProfile {
@@ -109,6 +110,7 @@ model PublicPageSettings {
   customDomain           String?
   customDomainNormalized String?  @unique
   customDomainStatus     String   @default("none")
+  customDomainDnsStatus  String   @default("not_started")
   customDomainVerificationName String?
   customDomainVerificationValue String?
   customDomainProviderId String?
@@ -117,6 +119,7 @@ model PublicPageSettings {
   customDomainProviderError String?
   customDomainLastCheckedAt DateTime?
   customDomainError      String?
+  customDomainDiagnostics Json?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 }
@@ -155,6 +158,20 @@ model AgentArtifact {
   output    Json
   meta      Json?
   createdAt DateTime @default(now())
+}
+
+model ProductEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  event     String
+  path      String?
+  referrer  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([event, createdAt])
+  @@index([userId, createdAt])
 }
 
 model StripeWebhookEvent {
