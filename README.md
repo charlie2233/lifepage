@@ -37,8 +37,8 @@ Turn your work into a stunning portfolio in minutes. Give LifePage a URL — you
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/charlie2233/My_portforlio
-cd My_portforlio
+git clone https://github.com/charlie2233/lifepage
+cd lifepage
 npm install
 ```
 
