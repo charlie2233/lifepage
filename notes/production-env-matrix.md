@@ -1,6 +1,6 @@
 # Atrak Pages Production Environment Matrix
 
-Date: 2026-04-01
+Date: 2026-04-27
 Branch: `release/atrak-pages-launch`
 
 ## Purpose
@@ -11,8 +11,8 @@ Rules:
 
 - Vercel is the preferred production host.
 - `AUTH_URL` is the production source of truth for canonical URLs.
-- `pages.atrak.dev` is the only canonical app host.
-- `lifepage.one` is redirect-only and must never be used as the app host, auth callback host, or billing return host.
+- `lifepage.one` is the canonical app host for the current release branch.
+- `www.lifepage.one`, `pages.atrak.dev`, and `www.pages.atrak.dev` should behave as aliases or redirects to the primary app host.
 
 ## Required For Preview And Production
 
@@ -20,7 +20,7 @@ Rules:
 |---|---|---|---|---|
 | `DATABASE_URL` | required | required | Prisma/Postgres runtime | Must point at a hosted database, not localhost |
 | `AUTH_SECRET` | required | required | Auth.js signing secret | `NEXTAUTH_SECRET` can stay unset if `AUTH_SECRET` is used |
-| `AUTH_URL` | required | required | Canonical host and billing return base | Preview should use its preview host. Production must be `https://pages.atrak.dev` |
+| `AUTH_URL` | required | required | Canonical host and billing return base | Preview should use its preview host. Production must be `https://lifepage.one` |
 | `OPENAI_API_KEY` | required | required | AI generation, profile synthesis, project videos | Required for real crawl/generate flows |
 
 ## Usually Required For Production
@@ -71,8 +71,16 @@ Rules:
 
 ## Current Operator Findings
 
-- The current Codex environment is not authenticated to a Vercel project yet.
-- `pages.atrak.dev` does not resolve yet, so canonical-domain production is not cut over.
-- The existing Cloudflare Worker `lifepage-web` has all required secret names populated, but those values are not readable from this session.
-- The currently live `workers.dev` host is still serving an older LifePage build.
-- A fresh deploy of the current release bundle to Cloudflare fails on the free-plan 3 MiB Worker size limit, so the Worker fallback requires a paid plan or bundle reduction before it can be treated as a real rollout path.
+- The current Codex environment is linked to `charlie2233s-projects/atrak-pages` and can deploy to Vercel.
+- Production `AUTH_URL` is now set to `https://lifepage.one`.
+- Production Stripe billing envs are still missing in Vercel:
+  - `STRIPE_SECRET_KEY`
+  - `STRIPE_WEBHOOK_SECRET`
+  - `STRIPE_PLUS_MONTHLY_PRICE_ID`
+  - `STRIPE_PLUS_YEARLY_PRICE_ID`
+  - `STRIPE_PRO_MONTHLY_PRICE_ID`
+  - `STRIPE_PRO_YEARLY_PRICE_ID`
+- The current production deployment is `dpl_5A9H46jJGSmmkM6427Jc7MELvMcU` at `https://atrak-pages-8z93iquwa-charlie2233s-projects.vercel.app`.
+- That deployment emits canonical, OG, robots, and sitemap URLs under `https://lifepage.one`.
+- `lifepage.one` and `www.lifepage.one` are attached to the Vercel project, but public DNS still points to GitHub Pages.
+- GitHub Pages still owns the custom domain `lifepage.one` on `main:/docs`, so it must be detached only after Stripe envs are completed and Porkbun DNS is ready to flip.
