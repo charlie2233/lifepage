@@ -82,7 +82,7 @@ const DEMO_PUBLIC_PROFILE_DEFINITIONS: DemoPublicProfileDefinition[] = [
           impact:
             "Created a faster way for students and builders to present themselves online with real proof.",
           tech: ["Next.js", "TypeScript", "Prisma", "OpenAI"],
-          links: [{ label: "Website", url: "https://pages.atrak.dev" }],
+          links: [{ label: "Website", url: "https://lifepage.one" }],
           media: [],
           evidenceRefs: [],
         },

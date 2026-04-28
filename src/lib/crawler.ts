@@ -123,7 +123,7 @@ export async function crawlUrl(url: string): Promise<CrawlResult> {
       timeout: 15000,
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; AtrakPagesBot/1.0; +https://pages.atrak.dev)",
+          "Mozilla/5.0 (compatible; AtrakPagesBot/1.0; +https://lifepage.one)",
       },
     });
     html = response.data as string;

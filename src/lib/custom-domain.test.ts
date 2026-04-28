@@ -126,17 +126,17 @@ test("managed custom-domain state separates provider-setup and DNS readiness", (
 test("legacy and alias hosts redirect to the primary app hostname", () => {
   withEnv(
     {
-      AUTH_URL: "https://pages.atrak.dev",
+      AUTH_URL: "https://lifepage.one",
       NEXTAUTH_URL: undefined,
       NEXT_PUBLIC_SITE_URL: undefined,
       NEXT_PUBLIC_APP_URL: undefined,
       APP_URL: undefined,
     },
     () => {
-      assert.equal(shouldRedirectToPrimaryAppHostname("lifepage.one"), true);
+      assert.equal(shouldRedirectToPrimaryAppHostname("lifepage.one"), false);
       assert.equal(shouldRedirectToPrimaryAppHostname("www.lifepage.one"), true);
+      assert.equal(shouldRedirectToPrimaryAppHostname("pages.atrak.dev"), true);
       assert.equal(shouldRedirectToPrimaryAppHostname("www.pages.atrak.dev"), true);
-      assert.equal(shouldRedirectToPrimaryAppHostname("pages.atrak.dev"), false);
       assert.equal(isInternalAppHostname("lifepage.one"), true);
     }
   );

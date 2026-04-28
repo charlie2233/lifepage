@@ -3,8 +3,8 @@ import { getAppBaseUrl } from "@/lib/runtime-env";
 const HOST_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 const CANONICAL_REDIRECT_HOSTS = new Set([
-  "lifepage.one",
   "www.lifepage.one",
+  "pages.atrak.dev",
   "www.pages.atrak.dev",
 ]);
 
