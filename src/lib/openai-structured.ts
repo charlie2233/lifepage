@@ -93,10 +93,14 @@ export async function generateStructuredJsonFromPrompt<
   const client = getOpenAI(clientConfig);
 
   if (shouldUseResponsesApi(model, clientConfig)) {
+    const responsesPrompt = /\bjson\b/i.test(prompt)
+      ? prompt
+      : `Return valid JSON only.\n\n${prompt}`;
     const response = await client.responses.create({
       model,
-      input: prompt,
+      input: responsesPrompt,
       ...(instructions ? { instructions } : {}),
+      reasoning: { effort: "minimal" },
       text: {
         format: { type: "json_object" },
       },
