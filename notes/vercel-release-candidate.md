@@ -108,22 +108,32 @@ Verified on the fresh production deployment URL:
 
 Preview release-candidate smoke is green, and the production runtime is green for auth plus AI. Public cutover is still blocked by provider-side domain control:
 
-- Production Stripe envs are still missing in Vercel:
-  - `STRIPE_SECRET_KEY`
-  - `STRIPE_WEBHOOK_SECRET`
-  - `STRIPE_PLUS_MONTHLY_PRICE_ID`
-  - `STRIPE_PLUS_YEARLY_PRICE_ID`
-  - `STRIPE_PRO_MONTHLY_PRICE_ID`
-  - `STRIPE_PRO_YEARLY_PRICE_ID`
 - `lifepage.one` is still attached to GitHub Pages.
 - Porkbun DNS for `lifepage.one` and `www.lifepage.one` still points to GitHub Pages.
+- Vercel still reports the domain as externally unconfigured until Porkbun is updated:
+  - `A lifepage.one 76.76.21.21`
+  - `A www.lifepage.one 76.76.21.21`
+  - or switch registrar nameservers to `ns1.vercel-dns.com` / `ns2.vercel-dns.com`
+
+Production billing is still optional follow-up work, not the hard public-launch blocker:
+
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_PLUS_MONTHLY_PRICE_ID`
+- `STRIPE_PLUS_YEARLY_PRICE_ID`
+- `STRIPE_PRO_MONTHLY_PRICE_ID`
+- `STRIPE_PRO_YEARLY_PRICE_ID`
 
 ## Exact Remaining Actions
 
 1. Remove `lifepage.one` from GitHub Pages custom-domain settings when the DNS change is ready.
+   - GitHub API fallback:
+     - `gh api -X PUT repos/charlie2233/lifepage/pages -f cname=null -F https_enforced=true -f source[branch]=main -f source[path]=/docs`
 2. Change Porkbun DNS to Vercel:
    - `A lifepage.one 76.76.21.21`
    - `A www.lifepage.one 76.76.21.21`
+   - Alternative Vercel-managed path:
+     - switch the registrar nameservers to `ns1.vercel-dns.com` and `ns2.vercel-dns.com`
 3. Wait for propagation, then verify the public host:
    - `https://lifepage.one/`
    - `https://lifepage.one/login`

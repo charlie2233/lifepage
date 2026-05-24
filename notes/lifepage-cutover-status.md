@@ -53,6 +53,16 @@ Commit: `74d9448`
 
 ## Still Blocked
 
+- GitHub Pages still owns the custom domain `lifepage.one`.
+- Porkbun DNS still points to GitHub Pages:
+  - `lifepage.one` -> `185.199.110.153`, `185.199.111.153`, `185.199.108.153`
+  - `www.lifepage.one` -> `charlie2233.github.io`
+- Vercel still reports the external domain as unconfigured because Porkbun has not been updated yet:
+  - intended nameservers: `ns1.vercel-dns.com`, `ns2.vercel-dns.com`
+  - current nameservers: `curitiba.ns.porkbun.com`, `fortaleza.ns.porkbun.com`, `maceio.ns.porkbun.com`, `salvador.ns.porkbun.com`
+
+## Optional Post-Cutover Billing Follow-Up
+
 - Production Stripe billing envs are still missing in Vercel:
   - `STRIPE_SECRET_KEY`
   - `STRIPE_WEBHOOK_SECRET`
@@ -63,10 +73,7 @@ Commit: `74d9448`
 - Because of that, paid billing cannot launch yet:
   - checkout session creation returns `503 Stripe billing is not configured.`
   - billing portal session creation returns `503 Stripe billing is not configured.`
-- GitHub Pages still owns the custom domain `lifepage.one`.
-- Porkbun DNS still points to GitHub Pages:
-  - `lifepage.one` -> `185.199.110.153`, `185.199.111.153`, `185.199.108.153`
-  - `www.lifepage.one` -> `charlie2233.github.io`
+- This is no longer a blocker for a basic public launch because the dashboard already disables paid actions safely.
 
 ## Do Not Do Yet
 
@@ -75,9 +82,13 @@ Do not remove the GitHub Pages custom domain until Porkbun DNS is ready to flip 
 ## Exact Remaining Manual Actions
 
 1. Remove `lifepage.one` from GitHub Pages settings at the same time the DNS change is ready.
+   - GitHub API fallback:
+     - `gh api -X PUT repos/charlie2233/lifepage/pages -f cname=null -F https_enforced=true -f source[branch]=main -f source[path]=/docs`
 2. Change Porkbun DNS to Vercel:
    - `A lifepage.one 76.76.21.21`
    - `A www.lifepage.one 76.76.21.21`
+   - Alternative Vercel-managed path:
+     - switch the registrar nameservers to `ns1.vercel-dns.com` and `ns2.vercel-dns.com`
 3. Wait for DNS to propagate, then verify:
    - `https://lifepage.one/`
    - `https://lifepage.one/login`
