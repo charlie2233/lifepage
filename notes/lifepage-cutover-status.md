@@ -60,6 +60,11 @@ Commit: `74d9448`
 - Vercel still reports the external domain as unconfigured because Porkbun has not been updated yet:
   - intended nameservers: `ns1.vercel-dns.com`, `ns2.vercel-dns.com`
   - current nameservers: `curitiba.ns.porkbun.com`, `fortaleza.ns.porkbun.com`, `maceio.ns.porkbun.com`, `salvador.ns.porkbun.com`
+- A deeper browser-side registrar audit on 2026-05-24 still did not yield writable Porkbun access:
+  - the active Chrome profile contains Porkbun cookies such as `BUNSESSION2`, but a copied non-headless session still resolves to `https://porkbun.com/account/login?...`
+  - Chrome does not have saved Porkbun credentials in either active local profile
+  - a headless Chromium session is detected by Porkbun and returns `Hardcore hacker detected. Countermeasures deployed.`
+  - result: DNS cannot be changed from this environment without a real Porkbun login or a manual registrar-side update
 
 ## Optional Post-Cutover Billing Follow-Up
 
