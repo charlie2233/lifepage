@@ -1,50 +1,14 @@
-import OpenAI from "openai";
 import {
   buildE2EProfileFromCrawl,
   buildE2EProfileFromText,
   isFakeAiEnabled,
 } from "@/lib/e2e-mode";
+import {
+  generateStructuredJsonFromPrompt,
+  type OpenAIClientConfig,
+} from "@/lib/openai-structured";
 import { ProfileJSONSchema, type ProfileJSON } from "@/lib/schema";
 import { type CrawlResult } from "@/lib/crawler";
-
-function getOpenAI(clientConfig?: { apiKey: string; baseURL?: string }) {
-  return new OpenAI({
-    apiKey: clientConfig?.apiKey ?? process.env.OPENAI_API_KEY,
-    baseURL: clientConfig?.baseURL,
-  });
-}
-
-function getMaxTokenOption(model: string, maxTokens?: number) {
-  if (!maxTokens) {
-    return {};
-  }
-
-  const normalizedModel = model.trim().toLowerCase();
-  if (
-    normalizedModel.startsWith("gpt-5") ||
-    normalizedModel.startsWith("o1") ||
-    normalizedModel.startsWith("o3") ||
-    normalizedModel.startsWith("o4")
-  ) {
-    return { max_completion_tokens: maxTokens };
-  }
-
-  return { max_tokens: maxTokens };
-}
-
-function getTemperatureOption(model: string, temperature: number) {
-  const normalizedModel = model.trim().toLowerCase();
-  if (
-    normalizedModel.startsWith("gpt-5") ||
-    normalizedModel.startsWith("o1") ||
-    normalizedModel.startsWith("o3") ||
-    normalizedModel.startsWith("o4")
-  ) {
-    return {};
-  }
-
-  return { temperature };
-}
 
 const PROFILE_JSON_TEMPLATE = `{
   "headline": "string",
@@ -63,7 +27,7 @@ export async function generateProfileFromCrawl(
   crawlResults: CrawlResult[],
   userInfo: { name?: string; githubUrl?: string; linkedinUrl?: string },
   model: string,
-  clientConfig?: { apiKey: string; baseURL?: string },
+  clientConfig?: OpenAIClientConfig,
   maxTokens?: number
 ): Promise<ProfileJSON> {
   if (isFakeAiEnabled()) {
@@ -105,24 +69,22 @@ Generate a comprehensive profile JSON with these rules:
 Return ONLY valid JSON matching this exact structure:
 ${PROFILE_JSON_TEMPLATE}`;
 
-  const completion = await getOpenAI(clientConfig).chat.completions.create({
+  return generateStructuredJsonFromPrompt({
     model,
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    ...getTemperatureOption(model, 0.3),
-    ...getMaxTokenOption(model, maxTokens),
+    schema: ProfileJSONSchema,
+    schemaName: "profile_json",
+    prompt,
+    temperature: 0.3,
+    clientConfig,
+    maxTokens,
   });
-
-  const raw = completion.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(raw) as unknown;
-  return ProfileJSONSchema.parse(parsed);
 }
 
 export async function generateProfileFromText(
   text: string,
   userInfo: { name?: string },
   model: string,
-  clientConfig?: { apiKey: string; baseURL?: string },
+  clientConfig?: OpenAIClientConfig,
   maxTokens?: number
 ): Promise<ProfileJSON> {
   if (isFakeAiEnabled()) {
@@ -139,15 +101,13 @@ Write the output so it feels substantial enough for a real public portfolio page
 Return ONLY valid JSON matching this exact structure:
 ${PROFILE_JSON_TEMPLATE}`;
 
-  const completion = await getOpenAI(clientConfig).chat.completions.create({
+  return generateStructuredJsonFromPrompt({
     model,
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    ...getTemperatureOption(model, 0.3),
-    ...getMaxTokenOption(model, maxTokens),
+    schema: ProfileJSONSchema,
+    schemaName: "profile_json",
+    prompt,
+    temperature: 0.3,
+    clientConfig,
+    maxTokens,
   });
-
-  const raw = completion.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(raw) as unknown;
-  return ProfileJSONSchema.parse(parsed);
 }

@@ -4,8 +4,11 @@
  * Tools produce structured JSON outputs stored as AgentArtifacts.
  */
 
-import OpenAI from "openai";
 import { z } from "zod";
+import {
+  generateStructuredJsonFromPrompt,
+  type OpenAIClientConfig,
+} from "@/lib/openai-structured";
 import {
   describePortfolioThemesForAgent,
   getPortfolioThemePreset,
@@ -33,45 +36,6 @@ import {
   AgentMutationSummarySchema,
   AgentPortfolioPatchSchema,
 } from "@/lib/agent-mutations";
-
-function getOpenAI(clientConfig?: { apiKey: string; baseURL?: string }) {
-  return new OpenAI({
-    apiKey: clientConfig?.apiKey ?? process.env.OPENAI_API_KEY,
-    baseURL: clientConfig?.baseURL,
-  });
-}
-
-function getMaxTokenOption(model: string, maxTokens?: number) {
-  if (!maxTokens) {
-    return {};
-  }
-
-  const normalizedModel = model.trim().toLowerCase();
-  if (
-    normalizedModel.startsWith("gpt-5") ||
-    normalizedModel.startsWith("o1") ||
-    normalizedModel.startsWith("o3") ||
-    normalizedModel.startsWith("o4")
-  ) {
-    return { max_completion_tokens: maxTokens };
-  }
-
-  return { max_tokens: maxTokens };
-}
-
-function getTemperatureOption(model: string, temperature: number) {
-  const normalizedModel = model.trim().toLowerCase();
-  if (
-    normalizedModel.startsWith("gpt-5") ||
-    normalizedModel.startsWith("o1") ||
-    normalizedModel.startsWith("o3") ||
-    normalizedModel.startsWith("o4")
-  ) {
-    return {};
-  }
-
-  return { temperature };
-}
 
 // ─── Shared types ──────────────────────────────────────────────────────────────
 
@@ -306,7 +270,7 @@ export async function generateTimeline(
   model: string,
   style: TimelineStyle = "vertical",
   options?: AgentPromptOptions,
-  clientConfig?: { apiKey: string; baseURL?: string },
+  clientConfig?: OpenAIClientConfig,
   maxTokens?: number
 ): Promise<TimelineOutput> {
   const styleDescriptions: Record<TimelineStyle, string> = {
@@ -352,17 +316,15 @@ Rules:
 - Mark truly pivotal moments as highlight: true
 - If a primary focus area is provided, make sure at least half of the timeline is directly relevant to it`;
 
-  const completion = await getOpenAI(clientConfig).chat.completions.create({
+  return generateStructuredJsonFromPrompt({
     model,
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    ...getTemperatureOption(model, 0.5),
-    ...getMaxTokenOption(model, maxTokens),
+    schema: TimelineOutputSchema,
+    schemaName: "timeline_output",
+    prompt,
+    temperature: 0.5,
+    clientConfig,
+    maxTokens,
   });
-
-  const raw = completion.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(raw) as unknown;
-  return TimelineOutputSchema.parse(parsed);
 }
 
 // ─── Video script / presentation tool ─────────────────────────────────────────
@@ -397,7 +359,7 @@ export async function generateVideoScript(
   model: string,
   style: VideoStyle = "documentary",
   options?: AgentPromptOptions,
-  clientConfig?: { apiKey: string; baseURL?: string },
+  clientConfig?: OpenAIClientConfig,
   maxTokens?: number
 ): Promise<VideoScriptOutput> {
   const styleDescriptions: Record<VideoStyle, string> = {
@@ -448,17 +410,15 @@ Rules:
 - ${style === "pitch" ? "Every second counts — be ruthlessly concise" : ""}
 - If a primary focus area is provided, make it the center of the narrative`;
 
-  const completion = await getOpenAI(clientConfig).chat.completions.create({
+  return generateStructuredJsonFromPrompt({
     model,
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    ...getTemperatureOption(model, 0.6),
-    ...getMaxTokenOption(model, maxTokens),
+    schema: VideoScriptOutputSchema,
+    schemaName: "video_script_output",
+    prompt,
+    temperature: 0.6,
+    clientConfig,
+    maxTokens,
   });
-
-  const raw = completion.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(raw) as unknown;
-  return VideoScriptOutputSchema.parse(parsed);
 }
 
 // ─── Tree / mind-map tool ──────────────────────────────────────────────────────
@@ -501,7 +461,7 @@ export async function generateTree(
   model: string,
   style: TreeStyle = "skills",
   options?: AgentPromptOptions,
-  clientConfig?: { apiKey: string; baseURL?: string },
+  clientConfig?: OpenAIClientConfig,
   maxTokens?: number
 ): Promise<TreeOutput> {
   const styleDescriptions: Record<TreeStyle, string> = {
@@ -555,17 +515,15 @@ Rules:
 - Base everything on actual evidence from the context
 - If a primary focus area is provided, make it a dominant branch or the root framing`;
 
-  const completion = await getOpenAI(clientConfig).chat.completions.create({
+  return generateStructuredJsonFromPrompt({
     model,
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    ...getTemperatureOption(model, 0.4),
-    ...getMaxTokenOption(model, maxTokens),
+    schema: TreeOutputSchema,
+    schemaName: "tree_output",
+    prompt,
+    temperature: 0.4,
+    clientConfig,
+    maxTokens,
   });
-
-  const raw = completion.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(raw) as unknown;
-  return TreeOutputSchema.parse(parsed);
 }
 
 // ─── Portfolio theme tool ────────────────────────────────────────────────────
@@ -586,7 +544,7 @@ export async function setPortfolioTheme(
   model: string,
   style: string = "custom",
   options?: AgentPromptOptions,
-  clientConfig?: { apiKey: string; baseURL?: string },
+  clientConfig?: OpenAIClientConfig,
   maxTokens?: number
 ): Promise<PortfolioThemeOutput> {
   const normalizedStyle = style === "custom" ? "custom" : normalizePortfolioThemeId(style);
@@ -654,17 +612,15 @@ Rules:
 - Match the user's brand context and evidence
 - Focus on layout mood, typography direction, and palette; do not mention CSS or code`;
 
-  const completion = await getOpenAI(clientConfig).chat.completions.create({
+  const validated = await generateStructuredJsonFromPrompt({
     model,
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    ...getTemperatureOption(model, 0.6),
-    ...getMaxTokenOption(model, maxTokens),
+    schema: PortfolioThemeOutputSchema,
+    schemaName: "portfolio_theme_output",
+    prompt,
+    temperature: 0.6,
+    clientConfig,
+    maxTokens,
   });
-
-  const raw = completion.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(raw) as unknown;
-  const validated = PortfolioThemeOutputSchema.parse(parsed);
 
   return {
     ...validated,
@@ -691,7 +647,7 @@ export async function setResumeModel(
   model: string,
   style: string = "custom",
   options?: AgentPromptOptions,
-  clientConfig?: { apiKey: string; baseURL?: string },
+  clientConfig?: OpenAIClientConfig,
   maxTokens?: number
 ): Promise<ResumeModelOutput> {
   const normalizedStyle = style === "custom" ? "custom" : normalizeResumeModelId(style);
@@ -753,17 +709,15 @@ Rules:
 - Stay structured and production-safe; no gimmicks and no raw CSS
 - Focus on hierarchy, screening clarity, and tone rather than design jargon`;
 
-  const completion = await getOpenAI(clientConfig).chat.completions.create({
+  const validated = await generateStructuredJsonFromPrompt({
     model,
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    ...getTemperatureOption(model, 0.6),
-    ...getMaxTokenOption(model, maxTokens),
+    schema: ResumeModelOutputSchema,
+    schemaName: "resume_model_output",
+    prompt,
+    temperature: 0.6,
+    clientConfig,
+    maxTokens,
   });
-
-  const raw = completion.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(raw) as unknown;
-  const validated = ResumeModelOutputSchema.parse(parsed);
 
   return {
     ...validated,
@@ -803,7 +757,7 @@ export async function planAgentTurn(
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }>,
   model: string,
   options?: AgentPlannerOptions,
-  clientConfig?: { apiKey: string; baseURL?: string },
+  clientConfig?: OpenAIClientConfig,
   maxTokens?: number
 ): Promise<AgentTurnStrategy> {
   const systemPrompt = `You are the Atrak Pages operator, an advanced AI personal brand strategist, editor, and portfolio operator.
@@ -881,22 +835,27 @@ Return JSON only with this structure:
   ]
 }`;
 
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: systemPrompt },
-    ...conversationHistory.slice(-8),
-    { role: "user", content: message },
-  ];
+  const transcript = conversationHistory
+    .slice(-8)
+    .map((entry) => `${entry.role.toUpperCase()}:\n${entry.content}`)
+    .join("\n\n");
+  const plannerPrompt = [
+    transcript ? `Conversation history:\n${transcript}` : null,
+    `Current user message:\n${message}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
-  const completion = await getOpenAI(clientConfig).chat.completions.create({
+  const parsed = await generateStructuredJsonFromPrompt({
     model,
-    messages,
-    response_format: { type: "json_object" },
-    ...getTemperatureOption(model, 0.2),
-    ...getMaxTokenOption(model, Math.min(maxTokens ?? 700, 700)),
+    schema: AgentTurnStrategySchema,
+    schemaName: "agent_turn_strategy",
+    instructions: systemPrompt,
+    prompt: plannerPrompt,
+    temperature: 0.2,
+    clientConfig,
+    maxTokens: Math.min(maxTokens ?? 700, 700),
   });
-
-  const raw = completion.choices[0]?.message?.content ?? "{}";
-  const parsed = AgentTurnStrategySchema.parse(JSON.parse(raw) as unknown);
   const resolvedPersonaSkillId =
     options?.forcedPersonaSkillId ?? parsed.personaSkillId;
   const resolvedWorkflowSkillId =
@@ -999,7 +958,7 @@ export async function generateAgentMutationPlan(args: {
   workflowSkillId: WorkflowSkillId;
   focusLabel?: string | null;
   focusContext?: string | null;
-  clientConfig?: { apiKey: string; baseURL?: string };
+  clientConfig?: OpenAIClientConfig;
   maxTokens?: number;
 }) {
   const skillInstructionBlock = describeSkillInstructionsForPrompt(
@@ -1071,16 +1030,15 @@ Return:
   }
 }`;
 
-  const completion = await getOpenAI(args.clientConfig).chat.completions.create({
+  return generateStructuredJsonFromPrompt({
     model: args.model,
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    ...getTemperatureOption(args.model, 0.35),
-    ...getMaxTokenOption(args.model, Math.min(args.maxTokens ?? 2200, 2200)),
+    schema: AgentMutationPlanSchema,
+    schemaName: "agent_mutation_plan",
+    prompt,
+    temperature: 0.35,
+    clientConfig: args.clientConfig,
+    maxTokens: Math.min(args.maxTokens ?? 2200, 2200),
   });
-
-  const raw = completion.choices[0]?.message?.content ?? "{}";
-  return AgentMutationPlanSchema.parse(JSON.parse(raw) as unknown);
 }
 
 // ─── Automation executor ───────────────────────────────────────────────────────
