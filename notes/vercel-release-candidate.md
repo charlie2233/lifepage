@@ -2,7 +2,7 @@
 
 Date: 2026-05-24
 Branch: `release/atrak-pages-launch`
-Commit: `9d8bc52`
+Commit: `74d9448`
 
 ## What Changed
 
@@ -13,11 +13,12 @@ Commit: `9d8bc52`
 - Switched the launch-default OpenAI models to:
   - advanced -> `gpt-4.1`
   - standard -> `gpt-4.1-mini`
+- Added an explicit mutation override so the live edit agent respects literal headline replacement requests.
 - Redeployed a fresh preview and repointed the stable preview alias:
   - `https://atrak-pages-preview.charlie2233s-projects.vercel.app`
   - -> `https://atrak-pages-6tqdjfqa7-charlie2233s-projects.vercel.app`
 - Redeployed Vercel production from the same release head:
-  - `https://atrak-pages-8dbp2ikrg-charlie2233s-projects.vercel.app`
+  - `https://atrak-pages-q6m8i7qk6-charlie2233s-projects.vercel.app`
 
 ## Vercel Settings Fixed
 
@@ -96,12 +97,16 @@ Verified on the fresh production deployment URL:
 - `/api/auth/register` -> passes
 - `/api/auth/session` -> passes after credentials login
 - credentials callback -> `302 Location: https://lifepage.one/dashboard`
+- `/api/crawl` -> passes
+- `/api/generate` -> passes and creates a real active profile
+- `/api/agent` -> passes and now preserves literal headline replacements exactly
 - `/api/billing/checkout` -> `503 Stripe billing is not configured.`
 - `/api/billing/portal` -> `503 Stripe billing is not configured.`
+- Dashboard billing UI already disables paid actions cleanly when Stripe is not configured.
 
 ## Remaining Blockers
 
-Preview release-candidate smoke is green, but public launch is still blocked by provider-side production work:
+Preview release-candidate smoke is green, and the production runtime is green for auth plus AI. Public cutover is still blocked by provider-side domain control:
 
 - Production Stripe envs are still missing in Vercel:
   - `STRIPE_SECRET_KEY`
@@ -115,20 +120,19 @@ Preview release-candidate smoke is green, but public launch is still blocked by 
 
 ## Exact Remaining Actions
 
-1. Add the six real production Stripe envs in Vercel.
-2. Deploy `release/atrak-pages-launch` to Vercel production again after those envs exist.
-3. Remove `lifepage.one` from GitHub Pages custom-domain settings.
-4. Change Porkbun DNS to Vercel:
+1. Remove `lifepage.one` from GitHub Pages custom-domain settings when the DNS change is ready.
+2. Change Porkbun DNS to Vercel:
    - `A lifepage.one 76.76.21.21`
    - `A www.lifepage.one 76.76.21.21`
-5. Wait for propagation, then verify the public host:
+3. Wait for propagation, then verify the public host:
    - `https://lifepage.one/`
    - `https://lifepage.one/login`
    - auth callback round-trip on `lifepage.one`
-   - checkout and billing portal return paths on `lifepage.one`
+   - AI generation and agent mutation on `lifepage.one`
+4. Add the six real production Stripe envs in Vercel whenever paid billing is ready to launch.
 
 ## Go / No-Go For Later DNS/Cutover
 
 - `No-go`
 
-Do not move to DNS or canonical cutover yet. The preview is now stable, correctly branded, and honestly browser-testable, but production billing envs plus domain ownership/DNS cleanup are still required before `lifepage.one` can safely serve the real app.
+Do not move to DNS or canonical cutover yet. The preview is stable and the production runtime is green for auth plus AI, but `lifepage.one` still cannot serve the real app until GitHub Pages ownership is removed and Porkbun DNS is flipped to Vercel.
