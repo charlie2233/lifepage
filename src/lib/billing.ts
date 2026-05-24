@@ -141,8 +141,8 @@ export const AI_PROVIDER_DEFINITIONS: Record<AiProvider, AiProviderDefinition> =
     label: "OpenAI",
     summary:
       "Use OpenAI models directly, including GPT-5, GPT-5 mini, and GPT-5.1 family choices.",
-    defaultAdvancedModel: process.env.OPENAI_ADVANCED_MODEL ?? "gpt-5",
-    defaultStandardModel: process.env.OPENAI_STANDARD_MODEL ?? "gpt-5-mini",
+    defaultAdvancedModel: process.env.OPENAI_ADVANCED_MODEL ?? "gpt-4.1",
+    defaultStandardModel: process.env.OPENAI_STANDARD_MODEL ?? "gpt-4.1-mini",
     available: Boolean(process.env.OPENAI_API_KEY),
   },
 };
