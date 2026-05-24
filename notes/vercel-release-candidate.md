@@ -1,22 +1,23 @@
 # Vercel Release Candidate
 
-Date: 2026-04-03
+Date: 2026-05-24
 Branch: `release/atrak-pages-launch`
+Commit: `9d8bc52`
 
 ## What Changed
 
-- Updated the Vercel project itself through the authenticated Vercel API:
+- Kept the Vercel project on the verified settings:
   - Framework Preset -> `Next.js`
   - Node.js Version -> `22.x`
-- Kept the existing production-scoped real values that were already set:
-  - `AUTH_URL=https://pages.atrak.dev`
-  - `AUTH_SECRET`
-  - `OPENAI_API_KEY`
-  - `OPENAI_SORA_MODEL=sora-2`
-- Confirmed the project already had an automation protection-bypass secret configured and used it for browser-level preview access without disabling preview protection.
-- Redeployed a fresh preview after the project-setting fix and repointed the stable preview alias to the new deployment:
+- Added a shared OpenAI structured-output helper that keeps OpenAI reasoning models on the Responses path while preserving the older chat-completions path for compatible third-party providers.
+- Switched the launch-default OpenAI models to:
+  - advanced -> `gpt-4.1`
+  - standard -> `gpt-4.1-mini`
+- Redeployed a fresh preview and repointed the stable preview alias:
   - `https://atrak-pages-preview.charlie2233s-projects.vercel.app`
-  - -> `https://atrak-pages-ebinccag6-charlie2233s-projects.vercel.app`
+  - -> `https://atrak-pages-6tqdjfqa7-charlie2233s-projects.vercel.app`
+- Redeployed Vercel production from the same release head:
+  - `https://atrak-pages-8dbp2ikrg-charlie2233s-projects.vercel.app`
 
 ## Vercel Settings Fixed
 
@@ -39,10 +40,19 @@ Production:
 Preview:
 
 - No durable branch-scoped Preview envs are stored in Vercel yet.
-- The current release-candidate preview was deployed with real deployment-level runtime values for:
-  - `AUTH_URL=https://atrak-pages-preview.charlie2233s-projects.vercel.app`
+- The current release-candidate preview is using real deployment/runtime values for:
   - `AUTH_SECRET`
+  - `DATABASE_URL`
   - `OPENAI_API_KEY`
+
+Production still does not have any Stripe billing envs:
+
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_PLUS_MONTHLY_PRICE_ID`
+- `STRIPE_PLUS_YEARLY_PRICE_ID`
+- `STRIPE_PRO_MONTHLY_PRICE_ID`
+- `STRIPE_PRO_YEARLY_PRICE_ID`
 
 ## Preview Access Instructions
 
@@ -62,56 +72,63 @@ Safe access method:
 
 ## Smoke Results
 
-Verified on the current stable preview alias:
+Verified on the current stable preview alias / latest preview deployment:
 
-- `/` -> passes, current Atrak Pages branding
-- `/register` -> passes as page load
-- `/login` -> passes as page load
-- `/dashboard` -> passes as unauthenticated redirect
-- `/explore` -> passes as page load
-- `/u/alexchen` -> passes with preview branding and no localhost canonical leakage
-- `/u/alexchen/resume` -> passes with preview branding and no localhost canonical leakage
+- `/` -> passes with current Atrak Pages branding
+- `/register` -> passes
+- `/login` -> passes
+- `/dashboard` -> passes after authenticated sign-in
+- `/explore` -> passes
+- `/api/auth/register` -> passes with real DB-backed user creation
+- `/api/auth/session` -> passes with real authenticated session persistence
+- `/api/generate` -> passes with the default OpenAI path and creates a real active profile
+- `/api/profile` -> passes and returns the generated profile
+- `/api/agent` -> passes and applies a real headline mutation after profile generation
+- `/u/<username>` -> passes and serves the user’s DB-backed public profile
 - `robots.txt` -> passes and points to the preview host
 - `sitemap.xml` -> passes and points to the preview host
-- `/api/billing` -> reachable but returns `401 Unauthorized` without an authenticated session
 
-Browser-level registration attempt on the current release-candidate preview:
+The preview is now honestly release-candidate-grade for auth, DB, core AI generation, and first agent-edit flows.
 
-- attempted through the real `/register` form
-- failed with visible UI error
-- matching runtime log confirms the cause:
-  - `POST /api/auth/register -> 500`
-  - Prisma `P1001`
-  - `Can't reach database server at 127.0.0.1:5432`
+Verified on the fresh production deployment URL:
 
-## Remaining Blocker
+- canonical/OG/robots/sitemap all point at `https://lifepage.one`
+- `/api/auth/register` -> passes
+- `/api/auth/session` -> passes after credentials login
+- credentials callback -> `302 Location: https://lifepage.one/dashboard`
+- `/api/billing/checkout` -> `503 Stripe billing is not configured.`
+- `/api/billing/portal` -> `503 Stripe billing is not configured.`
 
-One blocker remains for honest release-candidate smoke:
+## Remaining Blockers
 
-- `DATABASE_URL`
-  - Scope: Preview and Production
-  - Expected format: `postgresql://USER:PASSWORD@HOST:PORT/DB?sslmode=require`
-  - Why it blocks RC smoke:
-    - registration cannot succeed
-    - auth/session persistence cannot be verified
-    - authenticated dashboard flow cannot be verified
-    - public-profile data falls back instead of loading from the real DB
+Preview release-candidate smoke is green, but public launch is still blocked by provider-side production work:
 
-## Non-Blocking Follow-Up
+- Production Stripe envs are still missing in Vercel:
+  - `STRIPE_SECRET_KEY`
+  - `STRIPE_WEBHOOK_SECRET`
+  - `STRIPE_PLUS_MONTHLY_PRICE_ID`
+  - `STRIPE_PLUS_YEARLY_PRICE_ID`
+  - `STRIPE_PRO_MONTHLY_PRICE_ID`
+  - `STRIPE_PRO_YEARLY_PRICE_ID`
+- `lifepage.one` is still attached to GitHub Pages.
+- Porkbun DNS for `lifepage.one` and `www.lifepage.one` still points to GitHub Pages.
 
-- Git connection for the Vercel project is still not active.
-- CLI attempt to connect `https://github.com/charlie2233/My_portforlio.git` failed even though the repo is public and the current GitHub viewer has admin access.
-- This is not blocking the current preview alias, but it should be fixed later if you want durable branch-scoped Preview envs in Vercel.
+## Exact Remaining Actions
 
-Exact manual follow-up:
-
-1. Open Vercel project `atrak-pages`
-2. Go to `Settings -> Git`
-3. Connect `charlie2233/My_portforlio`
-4. If Vercel says the repo is unavailable, re-authorize the Vercel GitHub integration and explicitly grant access to that repository
+1. Add the six real production Stripe envs in Vercel.
+2. Deploy `release/atrak-pages-launch` to Vercel production again after those envs exist.
+3. Remove `lifepage.one` from GitHub Pages custom-domain settings.
+4. Change Porkbun DNS to Vercel:
+   - `A lifepage.one 76.76.21.21`
+   - `A www.lifepage.one 76.76.21.21`
+5. Wait for propagation, then verify the public host:
+   - `https://lifepage.one/`
+   - `https://lifepage.one/login`
+   - auth callback round-trip on `lifepage.one`
+   - checkout and billing portal return paths on `lifepage.one`
 
 ## Go / No-Go For Later DNS/Cutover
 
 - `No-go`
 
-Do not move to DNS or canonical cutover yet. The preview is now stable, correctly branded, and honestly browser-testable, but a real hosted `DATABASE_URL` is still required before it becomes a true release candidate.
+Do not move to DNS or canonical cutover yet. The preview is now stable, correctly branded, and honestly browser-testable, but production billing envs plus domain ownership/DNS cleanup are still required before `lifepage.one` can safely serve the real app.

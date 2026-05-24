@@ -1,17 +1,23 @@
 # lifepage.one Cutover Status
 
-Date: 2026-04-27
+Date: 2026-05-24
 Branch: `release/atrak-pages-launch`
-Commit: `eba8d26`
+Commit: `9d8bc52`
 
 ## What Changed
 
 - The release branch now treats `lifepage.one` as the canonical host.
 - Legacy redirect handling now treats `pages.atrak.dev` as the old hostname instead of the primary one.
 - Production `AUTH_URL` in Vercel was updated to `https://lifepage.one`.
-- A fresh Vercel production deployment was created:
-  - deployment id: `dpl_5A9H46jJGSmmkM6427Jc7MELvMcU`
-  - deployment URL: `https://atrak-pages-8z93iquwa-charlie2233s-projects.vercel.app`
+- A fresh Vercel production deployment was created from the current release head:
+  - deployment id: `dpl_6r4idQ4wp5whYLZHrbd28E1MXTPX`
+  - deployment URL: `https://atrak-pages-8dbp2ikrg-charlie2233s-projects.vercel.app`
+- Since then, preview launch-plumbing was hardened and re-verified:
+  - new-user registration works
+  - authenticated session persistence works
+  - default profile generation works
+  - first agent mutation works
+  - all of the above are green on the stable preview alias after switching default OpenAI models to `gpt-4.1` / `gpt-4.1-mini`
 
 ## Verified Green
 
@@ -24,6 +30,18 @@ Commit: `eba8d26`
   - robots host `https://lifepage.one`
   - sitemap URLs under `https://lifepage.one/...`
 - Vercel aliases now point `lifepage.one`, `www.lifepage.one`, `pages.atrak.dev`, and `www.pages.atrak.dev` at the fresh production deployment.
+- Production auth and DB-backed runtime are green on the Vercel deployment URL:
+  - `/api/auth/register` creates a real user
+  - `/api/auth/session` returns a real authenticated session
+  - the credentials callback responds with `302 Location: https://lifepage.one/dashboard`
+- Production billing is truthfully blocked in the expected way:
+  - `/api/billing/checkout` returns `503 Stripe billing is not configured.`
+  - `/api/billing/portal` returns `503 Stripe billing is not configured.`
+- The current stable preview alias is now healthy for:
+  - auth
+  - DB-backed profile generation
+  - agent headline mutation
+  - public profile rendering
 
 ## Still Blocked
 
@@ -49,7 +67,7 @@ Do not remove the GitHub Pages custom domain and do not flip Porkbun DNS until t
 ## Exact Remaining Manual Actions
 
 1. Add the six production Stripe envs in Vercel with real values.
-2. Redeploy production after those envs exist.
+2. Redeploy production once more after those envs exist so checkout and portal pick them up.
 3. Remove `lifepage.one` from GitHub Pages settings.
 4. Change Porkbun DNS to Vercel:
    - `A lifepage.one 76.76.21.21`
