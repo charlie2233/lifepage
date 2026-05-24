@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
 export interface OpenAIClientConfig {
@@ -15,6 +16,7 @@ interface StructuredPromptOptions<Schema extends z.ZodType> {
   temperature: number;
   clientConfig?: OpenAIClientConfig;
   maxTokens?: number;
+  responseMode?: "json_object" | "json_schema";
 }
 
 function getOpenAI(clientConfig?: OpenAIClientConfig) {
@@ -89,6 +91,7 @@ export async function generateStructuredJsonFromPrompt<
   temperature,
   clientConfig,
   maxTokens,
+  responseMode = "json_object",
 }: StructuredPromptOptions<Schema>): Promise<z.infer<Schema>> {
   const client = getOpenAI(clientConfig);
 
@@ -96,6 +99,25 @@ export async function generateStructuredJsonFromPrompt<
     const responsesPrompt = /\bjson\b/i.test(prompt)
       ? prompt
       : `Return valid JSON only.\n\n${prompt}`;
+    if (responseMode === "json_schema") {
+      const parsedResponse = await client.responses.parse({
+        model,
+        input: responsesPrompt,
+        ...(instructions ? { instructions } : {}),
+        reasoning: { effort: "minimal" },
+        text: {
+          format: zodTextFormat(schema, schemaName),
+        },
+        ...getTemperatureOption(model, temperature),
+        ...getResponsesMaxTokenOption(maxTokens),
+      });
+
+      if (parsedResponse.output_parsed == null) {
+        throw new Error(`OpenAI returned no parsed ${schemaName} output.`);
+      }
+      return schema.parse(parsedResponse.output_parsed as unknown);
+    }
+
     const response = await client.responses.create({
       model,
       input: responsesPrompt,
