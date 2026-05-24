@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
 export interface OpenAIClientConfig {
@@ -94,22 +93,23 @@ export async function generateStructuredJsonFromPrompt<
   const client = getOpenAI(clientConfig);
 
   if (shouldUseResponsesApi(model, clientConfig)) {
-    const response = await client.responses.parse({
+    const response = await client.responses.create({
       model,
       input: prompt,
       ...(instructions ? { instructions } : {}),
       text: {
-        format: zodTextFormat(schema, schemaName),
+        format: { type: "json_object" },
       },
       ...getTemperatureOption(model, temperature),
       ...getResponsesMaxTokenOption(maxTokens),
     });
 
-    if (response.output_parsed === null) {
-      throw new Error(`OpenAI returned no parsed ${schemaName} output.`);
+    const raw = response.output_text?.trim();
+    if (!raw) {
+      throw new Error(`OpenAI returned an empty ${schemaName} payload.`);
     }
 
-    return schema.parse(response.output_parsed);
+    return schema.parse(JSON.parse(raw) as unknown);
   }
 
   const completion = await client.chat.completions.create({
