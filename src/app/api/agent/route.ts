@@ -25,6 +25,7 @@ import {
   applyAgentPortfolioPatch,
   buildArtifactMeta,
 } from "@/lib/agent-mutations";
+import { applyExplicitMutationOverrides } from "@/lib/agent-explicit-overrides";
 import {
   getDefaultPersonaSkillForContext,
   getPersonaSkill,
@@ -909,11 +910,16 @@ export async function POST(req: Request) {
         clientConfig: mutationReservation.clientConfig,
         maxTokens: mutationReservation.maxTokens,
       });
+      const mutationOverrides = applyExplicitMutationOverrides({
+        allowedTargets: resolvedWorkflowSkill.allowedMutationTargets,
+        message,
+        patch: mutationPlan.patch,
+      });
       const appliedMutation = await applyAgentPortfolioPatch({
         userId: session.user.id,
         currentProfile: profileData,
         currentSettings,
-        patch: mutationPlan.patch,
+        patch: mutationOverrides.patch,
         workflowSkillId: resolvedWorkflowSkill.id,
       });
       const mutationSummary = createMutationSummary({
@@ -953,7 +959,10 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         type: "mutation_result",
-        reply: mutationPlan.reply || strategy.reply,
+        reply:
+          mutationOverrides.exactHeadline
+            ? `I updated your headline to "${mutationOverrides.exactHeadline}".`
+            : mutationPlan.reply || strategy.reply,
         tool: "mutate_portfolio",
         output: mutationSummary,
         artifactId: artifact.id,
