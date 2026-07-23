@@ -6,7 +6,7 @@ Last updated: 2026-03-31
 
 - Real app host: Cloudflare Workers
 - Canonical production domain: `lifepage.one`
-- Optional fallback only: `https://charlie2233.github.io/My_portforlio/`
+- Optional fallback only: `https://charlie2233.github.io/lifepage/`
 - Non-canonical Worker preview host: `*.workers.dev`
 - GitHub Pages must not be treated as the real app runtime for auth, billing, database access, or API traffic
 
@@ -41,7 +41,7 @@ Last updated: 2026-03-31
 
 ### Fallback path
 
-- `https://charlie2233.github.io/My_portforlio/` may remain as a static fallback landing page
+- `https://charlie2233.github.io/lifepage/` may remain as a static fallback landing page
 - `lifepage.one` and `www.lifepage.one` must be detached from GitHub Pages before production cutover
 
 ## Required secrets
