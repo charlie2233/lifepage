@@ -29,8 +29,6 @@ jobs:
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/lifepage_test
       AUTH_SECRET: ci-auth-secret
       NEXTAUTH_SECRET: ci-nextauth-secret
-      AUTH_URL: http://127.0.0.1:3001
-      NEXTAUTH_URL: http://127.0.0.1:3001
       OPENAI_API_KEY: ci-openai-key
       CRON_SECRET: ci-cron-secret
       STRIPE_WEBHOOK_SECRET: whsec_ci_secret
@@ -40,7 +38,7 @@ jobs:
       STRIPE_PRO_YEARLY_PRICE_ID: price_ci_pro_yearly
       CLOUDFLARE_SAAS_CNAME_TARGET: customers.e2e.lifepage.test
       CLOUDFLARE_SAAS_FALLBACK_ORIGIN: origin.e2e.lifepage.test
-      E2E_BASE_URL: http://127.0.0.1:3001
+      E2E_BASE_URL: http://localhost:3001
       E2E_TEST_MODE: "1"
       E2E_FAKE_STRIPE: "1"
       E2E_FAKE_CLOUDFLARE: "1"
@@ -71,14 +69,14 @@ jobs:
       - name: Next build
         run: npm run build
 
-      - name: Cloudflare build
-        run: npm run cf:build
-
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E suite
         run: npm run test:e2e:ci
+
+      - name: Cloudflare build
+        run: npm run cf:build
 
       - name: Upload Playwright report
         if: failure()
