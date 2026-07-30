@@ -109,6 +109,7 @@ model PublicPageSettings {
   customDomain           String?
   customDomainNormalized String?  @unique
   customDomainStatus     String   @default("none")
+  customDomainDnsStatus  String   @default("not_started")
   customDomainVerificationName String?
   customDomainVerificationValue String?
   customDomainProviderId String?
@@ -117,6 +118,7 @@ model PublicPageSettings {
   customDomainProviderError String?
   customDomainLastCheckedAt DateTime?
   customDomainError      String?
+  customDomainDiagnostics Json?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 }

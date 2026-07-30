@@ -55,6 +55,7 @@ export async function verifyCustomDomainDns(hostname: string) {
       ok: false,
       error:
         "No Cloudflare SaaS CNAME target is configured. Set CLOUDFLARE_SAAS_CNAME_TARGET first.",
+      observedValues: [] as string[],
       verification,
     };
   }
@@ -65,12 +66,17 @@ export async function verifyCustomDomainDns(hostname: string) {
     () => [] as string[]
   );
   if (cnameValues.includes(normalizedTarget)) {
-    return { ok: true, verification };
+    return {
+      ok: true,
+      observedValues: cnameValues,
+      verification,
+    };
   }
 
   return {
     ok: false,
     error: `DNS is not pointing ${hostname} to the required CNAME target ${targetHost} yet.`,
+    observedValues: cnameValues,
     verification,
   };
 }

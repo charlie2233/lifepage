@@ -4,6 +4,12 @@ import {
 } from "@/lib/e2e-mode";
 
 const CLOUDFLARE_API_ROOT = "https://api.cloudflare.com/client/v4";
+export const CLOUDFLARE_SAAS_REQUIRED_ENV_NAMES = [
+  "CLOUDFLARE_API_TOKEN",
+  "CLOUDFLARE_SAAS_ZONE_ID",
+  "CLOUDFLARE_SAAS_CNAME_TARGET",
+  "CLOUDFLARE_SAAS_FALLBACK_ORIGIN",
+] as const;
 
 interface CloudflareApiError {
   code?: number;
@@ -120,33 +126,66 @@ export function getCloudflareSaasFallbackOrigin() {
   return normalizeHostname(process.env.CLOUDFLARE_SAAS_FALLBACK_ORIGIN);
 }
 
-export function isCloudflareSaasConfigured() {
-  if (isFakeCloudflareEnabled()) {
-    return Boolean(getCloudflareSaasCnameTarget() && getCloudflareSaasFallbackOrigin());
-  }
-
-  return Boolean(
-    process.env.CLOUDFLARE_API_TOKEN &&
-      process.env.CLOUDFLARE_SAAS_ZONE_ID &&
-      getCloudflareSaasCnameTarget() &&
-      getCloudflareSaasFallbackOrigin()
-  );
+export interface CloudflareSaasCapability {
+  configured: boolean;
+  cnameTarget: string | null;
+  fallbackOrigin: string | null;
+  missing: string[];
 }
 
-function getCloudflareSaasConfig() {
-  const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
-  const zoneId = process.env.CLOUDFLARE_SAAS_ZONE_ID?.trim();
+export function getCloudflareSaasCapability(args?: { forceMissing?: boolean }) {
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim() || null;
+  const zoneId = process.env.CLOUDFLARE_SAAS_ZONE_ID?.trim() || null;
   const cnameTarget = getCloudflareSaasCnameTarget();
   const fallbackOrigin = getCloudflareSaasFallbackOrigin();
 
-  if (!apiToken || !zoneId || !cnameTarget || !fallbackOrigin) {
+  const missing = [
+    ...(apiToken ? [] : ["CLOUDFLARE_API_TOKEN"]),
+    ...(zoneId ? [] : ["CLOUDFLARE_SAAS_ZONE_ID"]),
+    ...(cnameTarget ? [] : ["CLOUDFLARE_SAAS_CNAME_TARGET"]),
+    ...(fallbackOrigin ? [] : ["CLOUDFLARE_SAAS_FALLBACK_ORIGIN"]),
+  ];
+
+  if (isFakeCloudflareEnabled()) {
+    return {
+      configured:
+        !args?.forceMissing && Boolean(cnameTarget && fallbackOrigin),
+      cnameTarget,
+      fallbackOrigin,
+      missing: args?.forceMissing ? [...CLOUDFLARE_SAAS_REQUIRED_ENV_NAMES] : missing,
+    } satisfies CloudflareSaasCapability;
+  }
+
+  return {
+    configured: !args?.forceMissing && missing.length === 0,
+    cnameTarget,
+    fallbackOrigin,
+    missing: args?.forceMissing ? [...CLOUDFLARE_SAAS_REQUIRED_ENV_NAMES] : missing,
+  } satisfies CloudflareSaasCapability;
+}
+
+export function isCloudflareSaasConfigured(args?: { forceMissing?: boolean }) {
+  return getCloudflareSaasCapability(args).configured;
+}
+
+function getCloudflareSaasConfig() {
+  const capability = getCloudflareSaasCapability();
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  const zoneId = process.env.CLOUDFLARE_SAAS_ZONE_ID?.trim();
+
+  if (!capability.configured || !apiToken || !zoneId) {
     throw new CloudflareSaasError(
       "Cloudflare for SaaS is not configured. Set CLOUDFLARE_API_TOKEN, CLOUDFLARE_SAAS_ZONE_ID, CLOUDFLARE_SAAS_CNAME_TARGET, and CLOUDFLARE_SAAS_FALLBACK_ORIGIN.",
       { statusCode: 503 }
     );
   }
 
-  return { apiToken, zoneId, cnameTarget, fallbackOrigin };
+  return {
+    apiToken,
+    zoneId,
+    cnameTarget: capability.cnameTarget,
+    fallbackOrigin: capability.fallbackOrigin,
+  };
 }
 
 function buildCloudflareErrorMessage(
