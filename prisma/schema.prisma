@@ -39,6 +39,7 @@ model User {
   publicPageSettings PublicPageSettings?
   automations   Automation[]
   agentArtifacts AgentArtifact[]
+  productEvents ProductEvent[]
 }
 
 model UserProfile {
@@ -155,6 +156,20 @@ model AgentArtifact {
   output    Json
   meta      Json?
   createdAt DateTime @default(now())
+}
+
+model ProductEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  event     String
+  path      String?
+  referrer  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([event, createdAt])
+  @@index([userId, createdAt])
 }
 
 model StripeWebhookEvent {

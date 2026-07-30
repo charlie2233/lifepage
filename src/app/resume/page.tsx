@@ -5,6 +5,7 @@ import { PublicResumePage } from "@/components/public-resume-page";
 import { getRequestHostname, isInternalAppHostname } from "@/lib/custom-domain";
 import { getPublicPageUserByCustomDomain } from "@/lib/public-page";
 import type { ProfileJSON } from "@/lib/schema";
+import { SITE_DESCRIPTION } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const { hostname, isCustomHost, user } = await getCustomDomainResumeContext();
 
   if (!isCustomHost) {
-    return { title: "Resume — LifePage" };
+    return {
+      title: "Resume",
+      description: SITE_DESCRIPTION,
+    };
   }
 
   if (!user) {
@@ -39,7 +43,7 @@ export async function generateMetadata(): Promise<Metadata> {
     | undefined;
 
   return {
-    title: `${user.name ?? user.username ?? "Portfolio"} Resume — LifePage`,
+    title: `${user.name ?? user.username ?? "Portfolio"} Resume`,
     description:
       profile?.resume.summary ??
       profile?.headline ??

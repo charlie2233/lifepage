@@ -4,6 +4,9 @@ import type { ProfileJSON } from "@/lib/schema";
 import { PublicProfilePage } from "@/components/public-profile-page";
 import { getDemoPublicPageUser } from "@/lib/demo-public-pages";
 import { getPublicPageUserByUsername } from "@/lib/public-page";
+import { SITE_NAME, absoluteUrl } from "@/lib/site";
+
+export const revalidate = 300;
 
 interface Props {
   params: Promise<{ username: string }>;
@@ -25,8 +28,30 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     | undefined;
 
   return {
-    title: `${user.name ?? username} — LifePage`,
+    title: user.name ?? username,
     description: profile?.headline ?? `Portfolio of ${username}`,
+    alternates: {
+      canonical: absoluteUrl(`/u/${username}`),
+    },
+    openGraph: {
+      title: `${user.name ?? username} — ${SITE_NAME}`,
+      description: profile?.headline ?? `Portfolio of ${username}`,
+      url: absoluteUrl(`/u/${username}`),
+      images: [
+        {
+          url: absoluteUrl("/og-lifepage.svg"),
+          width: 1200,
+          height: 630,
+          alt: `${user.name ?? username} portfolio preview`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${user.name ?? username} — ${SITE_NAME}`,
+      description: profile?.headline ?? `Portfolio of ${username}`,
+      images: [absoluteUrl("/og-lifepage.svg")],
+    },
   };
 }
 
